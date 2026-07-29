@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Calendar as CalendarIcon, Clock, Plus, X, User, ShieldAlert, Trash2, CheckCheck } from 'lucide-react';
-import NotificationsDropdown from '../components/NotificationsDropdown';
+
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 
@@ -86,7 +86,6 @@ export default function GestorCitas() {
           <h1 className="text-2xl font-extrabold text-gray-900">Agenda</h1>
           <p className="text-xs text-gray-400 mt-0.5">{isAdmin ? 'Vista de toda la agencia' : `Mis citas · ${user?.nombre}`}</p>
         </div>
-        <NotificationsDropdown />
       </header>
 
       {/* TABS */}

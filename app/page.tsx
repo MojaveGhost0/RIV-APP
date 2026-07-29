@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Search, MapPin, CheckCircle, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import NotificationsDropdown from './components/NotificationsDropdown';
+
 import { useAuth } from './context/AuthContext';
 import { useData } from './context/DataContext';
 
@@ -14,7 +14,7 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Calcular KPIs dinámicamente
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD using local timezone
   const citasHoy = appointments.filter(c => c.fecha === today && c.estado === 'Pendiente').length;
   const totalPropiedades = properties.length;
   const proximaCita = appointments
@@ -39,7 +39,6 @@ export default function Dashboard() {
           </h1>
           <p className="text-sm text-gray-500">{isAdmin ? 'Administrador' : 'Asesor Inmobiliario'}</p>
         </div>
-        <NotificationsDropdown />
       </header>
 
       {/* SEARCH BAR */}

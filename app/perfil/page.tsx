@@ -3,7 +3,7 @@
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useRouter } from 'next/navigation';
-import { User, Shield, ChevronRight, LogOut, Home, Calendar, Bell } from 'lucide-react';
+import { User, Shield, ChevronRight, LogOut, Home, Calendar } from 'lucide-react';
 
 export default function Perfil() {
   const { user, isAdmin, logout } = useAuth();
@@ -12,7 +12,7 @@ export default function Perfil() {
 
   // Estadísticas reales del usuario
   const misCaptaciones = properties.filter(p => p.captador === user?.nombre);
-  const misCitas = appointments.filter(a => a.asesor === user?.nombre && a.estado === 'Pendiente');
+  const misCitas = appointments.filter(a => a.asesores.includes(user?.nombre ?? '') && a.estado === 'Pendiente');
 
   const menuItems = [
     {
@@ -27,12 +27,7 @@ export default function Perfil() {
       sub: `${misCitas.length} cita${misCitas.length !== 1 ? 's' : ''} pendiente${misCitas.length !== 1 ? 's' : ''}`,
       action: () => router.push('/citas'),
     },
-    {
-      icon: <Bell size={18} className="text-amber-500" />,
-      label: 'Notificaciones',
-      sub: 'Ver alertas del sistema',
-      action: () => router.push('/'),
-    },
+
   ];
 
   return (
