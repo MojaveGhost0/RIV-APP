@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   SISTEMA DE DISEÑO - RIV MARGARITA PREMIER
+   ============================================================ */
+
+:root {
+  --color-vinotinto: #800020;
+  --color-dorado: #D4AF37;
+  --color-texto: #1F2937;
+  --bottom-bar-height: 70px;
+  /* Safe area inset para dispositivos con notch (iPhone X y posteriores) */
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Fuente Global */
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--color-texto);
+  background: #F3F4F6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Previene el "rubber band" scroll en iOS */
+  overscroll-behavior: none;
+}
+
+/* ============================================================
+   PADDING INFERIOR GLOBAL
+   Garantiza que la BottomTabBar NUNCA tape contenido.
+   Usamos calc() para combinar la altura de la barra + safe-area del notch.
+   ============================================================ */
+.page-content {
+  padding-bottom: calc(var(--bottom-bar-height) + var(--safe-area-bottom) + 1.5rem);
+}
+
+/* ============================================================
+   BOTTOM TAB BAR - Soporte para iPhone con notch/Dynamic Island
+   ============================================================ */
+.bottom-tab-bar {
+  height: calc(var(--bottom-bar-height) + var(--safe-area-bottom));
+  padding-bottom: var(--safe-area-bottom);
+}
+
+/* ============================================================
+   SCROLLBAR OCULTO (para carruseles y listas horizontales)
+   ============================================================ */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
+   ANIMACIONES PERSONALIZADAS
+   ============================================================ */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.3s ease-out both;
+}
+
+/* Fix para que los inputs en iOS no hagan zoom al hacer focus */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="email"],
+select,
+textarea {
+  font-size: 16px !important;
+}
