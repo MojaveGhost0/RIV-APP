@@ -101,14 +101,62 @@ const DEFAULT_PROPERTIES: Property[] = [
     status: 'Activa',
     captador: 'Carlos Pérez',
     amenities: ['Amoblado', 'Vista al Mar', 'Ascensor', 'Piscina']
+  },
+  {
+    id: '4',
+    title: 'Townhouse en Conjunto Residencial',
+    price: 65000,
+    location: 'Playa El Ángel, Margarita',
+    beds: 3,
+    baths: 3,
+    sqm: 140,
+    description: 'Moderno townhouse de 2 niveles. Ideal para familias, excelente distribución y seguridad 24 horas.',
+    image: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=400&q=80",
+    images: ["https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=800&q=80"],
+    status: "Activa",
+    captador: "Amado Lovera",
+    amenities: ["Seguridad 24H", "Área de BBQ"]
+  },
+  {
+    id: '5',
+    title: 'Penthouse de Lujo',
+    price: 210000,
+    location: 'Av. Aldonza Manrique',
+    beds: 4,
+    baths: 5,
+    sqm: 320,
+    description: 'Impresionante penthouse con vista 360, terraza privada, jacuzzi y ascensor directo al apartamento.',
+    image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=400&q=80",
+    images: ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80"],
+    status: "Vendida",
+    captador: "Juan Garcia",
+    amenities: ["Jacuzzi", "Terraza Privada", "Vista 360", "Ascensor Privado"]
+  },
+  {
+    id: '6',
+    title: 'Local Comercial Céntrico',
+    price: 35000,
+    location: 'Av. Santiago Mariño, Porlamar',
+    beds: 0,
+    baths: 1,
+    sqm: 60,
+    description: 'Excelente local a pie de calle con alto tráfico peatonal, ideal para boutique o tienda de tecnología.',
+    image: "https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&w=400&q=80",
+    images: ["https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&w=800&q=80"],
+    status: "Activa",
+    captador: "Gerardo Garcia",
+    amenities: ["Aire Acondicionado", "Vitrinas", "A pie de calle"]
   }
 ];
 
+const today = new Date().toISOString().slice(0, 10);
 const DEFAULT_CITAS: Appointment[] = [
-  { id: 1, tipo: 'Mostrar Propiedad',  titulo: 'Villa Exclusiva Costa Azul', cliente: 'María López',        fecha: '2026-07-16', hora: '14:30', asesor: 'Carlos Pérez',  estado: 'Pendiente'   },
-  { id: 2, tipo: 'Captar Propiedad',   titulo: 'Apto Pampatar',              cliente: 'Juan Gómez',          fecha: '2026-07-17', hora: '10:00', asesor: 'Ana Silva',     estado: 'Pendiente'   },
-  { id: 3, tipo: 'Cita en Oficina',    titulo: 'Firma de Contrato',          cliente: 'Familia Rodríguez',   fecha: '2026-07-14', hora: '16:00', asesor: 'Carlos Pérez',  estado: 'Completada'  },
-  { id: 4, tipo: 'Mostrar Propiedad',  titulo: 'Penthouse Playa El Agua',    cliente: 'Luis Fernández',      fecha: '2026-07-13', hora: '09:00', asesor: 'Ana Silva',     estado: 'Completada'  },
+  { id: 1, tipo: 'Mostrar Propiedad',  titulo: 'Villa Exclusiva Costa Azul', cliente: 'María López',        fecha: '2026-07-16', hora: '14:30', asesor: 'Juan Garcia',  estado: 'Pendiente'   },
+  { id: 2, tipo: 'Captar Propiedad',   titulo: 'Apto Pampatar',              cliente: 'Juan Gómez',          fecha: '2026-07-17', hora: '10:00', asesor: 'Amado Lovera',     estado: 'Pendiente'   },
+  { id: 3, tipo: 'Cita en Oficina',    titulo: 'Firma de Contrato',          cliente: 'Familia Rodríguez',   fecha: '2026-07-14', hora: '16:00', asesor: 'Juan Garcia',  estado: 'Completada'  },
+  { id: 4, tipo: 'Mostrar Propiedad',  titulo: 'Penthouse Playa El Agua',    cliente: 'Luis Fernández',      fecha: '2026-07-13', hora: '09:00', asesor: 'Amado Lovera',     estado: 'Completada'  },
+  { id: 5, tipo: 'Mostrar Propiedad',  titulo: 'Visita Local Comercial',     cliente: 'Pedro Sánchez',       fecha: today,       hora: '15:00', asesor: 'Gerardo Garcia',estado: 'Pendiente'   },
+  { id: 6, tipo: 'Firma',              titulo: 'Firma Opción a Compra',      cliente: 'Carlos Roa',          fecha: today,       hora: '17:30', asesor: 'Juan Garcia',  estado: 'Pendiente'   },
 ];
 
 // =============================================================================
@@ -123,21 +171,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Load initial data
   useEffect(() => {
-    const storedProperties = localStorage.getItem('riv_properties');
-    const storedAppointments = localStorage.getItem('riv_appointments');
+    const storedProperties = localStorage.getItem('riv_properties_v2');
+    const storedAppointments = localStorage.getItem('riv_appointments_v2');
 
     if (storedProperties) {
       setProperties(JSON.parse(storedProperties));
     } else {
       setProperties(DEFAULT_PROPERTIES);
-      localStorage.setItem('riv_properties', JSON.stringify(DEFAULT_PROPERTIES));
+      localStorage.setItem('riv_properties_v2', JSON.stringify(DEFAULT_PROPERTIES));
     }
 
     if (storedAppointments) {
       setAppointments(JSON.parse(storedAppointments));
     } else {
       setAppointments(DEFAULT_CITAS);
-      localStorage.setItem('riv_appointments', JSON.stringify(DEFAULT_CITAS));
+      localStorage.setItem('riv_appointments_v2', JSON.stringify(DEFAULT_CITAS));
     }
 
     setIsLoaded(true);
@@ -146,14 +194,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Save properties when they change
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem('riv_properties', JSON.stringify(properties));
+      localStorage.setItem('riv_properties_v2', JSON.stringify(properties));
     }
   }, [properties, isLoaded]);
 
   // Save appointments when they change
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem('riv_appointments', JSON.stringify(appointments));
+      localStorage.setItem('riv_appointments_v2', JSON.stringify(appointments));
     }
   }, [appointments, isLoaded]);
 
