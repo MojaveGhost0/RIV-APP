@@ -62,7 +62,7 @@ const DEFAULT_PROPERTIES: Property[] = [
       "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80"
     ],
     status: "Activa",
-    captador: "Carlos Pérez",
+    captador: "Gerardo Garcia",
     amenities: ["Piscina", "Vigilancia 24/7", "Planta Eléctrica"]
   },
   {
@@ -80,7 +80,7 @@ const DEFAULT_PROPERTIES: Property[] = [
       "https://images.unsplash.com/photo-1600607687931-cebf10cb8cb0?auto=format&fit=crop&w=800&q=80"
     ],
     status: "Activa",
-    captador: "Carlos Pérez",
+    captador: "Juan Garcia",
     amenities: ["Planta Eléctrica", "Vigilancia 24/7", "Pozo de Agua", "Estacionamiento Techado"]
   },
   {
@@ -99,7 +99,7 @@ const DEFAULT_PROPERTIES: Property[] = [
       'https://images.unsplash.com/photo-1600607687931-cebf10cb8cb0?auto=format&fit=crop&w=800&q=80',
     ],
     status: 'Activa',
-    captador: 'Carlos Pérez',
+    captador: 'Amado Lovera',
     amenities: ['Amoblado', 'Vista al Mar', 'Ascensor', 'Piscina']
   },
   {
@@ -171,21 +171,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Load initial data
   useEffect(() => {
-    const storedProperties = localStorage.getItem('riv_properties_v2');
-    const storedAppointments = localStorage.getItem('riv_appointments_v2');
+    const storedProperties = localStorage.getItem('riv_properties_v3');
+    const storedAppointments = localStorage.getItem('riv_appointments_v3');
 
     if (storedProperties) {
       setProperties(JSON.parse(storedProperties));
     } else {
       setProperties(DEFAULT_PROPERTIES);
-      localStorage.setItem('riv_properties_v2', JSON.stringify(DEFAULT_PROPERTIES));
+      localStorage.setItem('riv_properties_v3', JSON.stringify(DEFAULT_PROPERTIES));
     }
 
     if (storedAppointments) {
       setAppointments(JSON.parse(storedAppointments));
     } else {
       setAppointments(DEFAULT_CITAS);
-      localStorage.setItem('riv_appointments_v2', JSON.stringify(DEFAULT_CITAS));
+      localStorage.setItem('riv_appointments_v3', JSON.stringify(DEFAULT_CITAS));
     }
 
     setIsLoaded(true);
@@ -194,14 +194,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Save properties when they change
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem('riv_properties_v2', JSON.stringify(properties));
+      localStorage.setItem('riv_properties_v3', JSON.stringify(properties));
     }
   }, [properties, isLoaded]);
 
   // Save appointments when they change
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem('riv_appointments_v2', JSON.stringify(appointments));
+      localStorage.setItem('riv_appointments_v3', JSON.stringify(appointments));
     }
   }, [appointments, isLoaded]);
 

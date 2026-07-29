@@ -10,28 +10,7 @@ import {
 import { TrendingUp, Home, CheckCircle, Users, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 
-// =============================================================================
-// DATOS MOCK (Reemplazar con fetch a Supabase)
-// TODO: SELECT status, count(*) as total FROM inmuebles GROUP BY status
-// =============================================================================
-const PROPERTY_STATUS_DATA = [
-  { name: 'Activos',    value: 34, color: '#800020' },
-  { name: 'Vendidos',  value: 18, color: '#D4AF37' },
-  { name: 'Suspendidos', value: 5, color: '#9CA3AF' },
-];
-
-// TODO: SELECT usuarios.nombre, count(*) as captaciones FROM inmuebles
-//       JOIN usuarios ON inmuebles.asesor_id = usuarios.id
-//       WHERE date_trunc('month', inmuebles.created_at) = date_trunc('month', now())
-//       GROUP BY usuarios.nombre
-const CAPTACIONES_MES = [
-  { asesor: 'Carlos P.', captaciones: 8 },
-  { asesor: 'Ana S.',    captaciones: 12 },
-  { asesor: 'Miguel R.', captaciones: 5 },
-  { asesor: 'Lucía M.',  captaciones: 9 },
-];
-
-const KPI_DATA = { citasConcretadas: 23, nuevasCaptaciones: 14, totalAsesores: 4 };
+import { useData } from '../context/DataContext';
 
 const DonutTooltip = ({ active, payload }: any) => {
   if (active && payload?.length) {
@@ -47,7 +26,8 @@ const DonutTooltip = ({ active, payload }: any) => {
 };
 
 export default function Estadisticas() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, getAllUsers } = useAuth();
+  const { properties, appointments } = useData();
   const router = useRouter();
   const [filtroAsesor, setFiltroAsesor] = useState('Todos');
 
@@ -68,9 +48,60 @@ export default function Estadisticas() {
     );
   }
 
-  const asesores = ['Todos', ...CAPTACIONES_MES.map(c => c.asesor)];
+  // --- CALCULAR DATOS DINÁMICOS ---
+  
+  // 1. Estado del Inventario
+  const activos = properties.filter(p => p.status === 'Activa').length;
+  const vendidos = properties.filter(p => p.status === 'Vendida').length;
+  const suspendidos = properties.filter(p => p.status === 'Suspendida').length;
+  
+  const PROPERTY_STATUS_DATA = [
+    { name: 'Activos',    value: activos,     color: '#800020' },
+    { name: 'Vendidos',   value: vendidos,    color: '#D4AF37' },
+    { name: 'Suspendidos',value: suspendidos, color: '#9CA3AF' },
+  ];
+
+  const totalInmuebles = properties.length;
+
+  // 2. Captaciones del Mes por Asesor
+  const allUsers = getAllUsers();
+  
+  const CAPTACIONES_MES = allUsers.map(user => {
+    const captaciones = properties.filter(p => p.captador === user.nombre).length;
+    // Solo usamos el primer nombre y la inicial del apellido para que quepa en el gráfico
+    const nombreCorto = user.nombre.split(' ')[0] + ' ' + (user.nombre.split(' ')[1]?.[0] + '.' || '');
+    return {
+      asesorFull: user.nombre,
+      asesor: nombreCorto,
+      captaciones: captaciones
+    };
+  });
+
+  // 3. KPIs
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  
+  // Asumimos que "Nuevas captaciones" son todas por ahora (ya que no hay fecha de creación en el mock).
+  // Si hubiera un createdAt en Property, filtraríamos por mes.
+  const nuevasCaptaciones = properties.length;
+
+  // Citas concretadas (Completadas en el mes actual)
+  const citasConcretadas = appointments.filter(a => {
+    if (a.estado !== 'Completada') return false;
+    const date = new Date(a.fecha);
+    return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+  }).length;
+
+  const totalAsesores = allUsers.length;
+
+  const KPI_DATA = { 
+    citasConcretadas, 
+    nuevasCaptaciones, 
+    totalAsesores 
+  };
+
+  const asesoresNombres = ['Todos', ...CAPTACIONES_MES.map(c => c.asesor)];
   const dataFiltrada = filtroAsesor === 'Todos' ? CAPTACIONES_MES : CAPTACIONES_MES.filter(c => c.asesor === filtroAsesor);
-  const totalInmuebles = PROPERTY_STATUS_DATA.reduce((s, d) => s + d.value, 0);
 
   return (
     <div className="bg-gray-50 min-h-[100dvh] page-content">
@@ -142,7 +173,7 @@ export default function Estadisticas() {
             </div>
             <select value={filtroAsesor} onChange={e => setFiltroAsesor(e.target.value)}
               className="text-xs font-bold bg-vinotinto/10 text-vinotinto border-none rounded-lg px-2 py-1.5 outline-none cursor-pointer">
-              {asesores.map(a => <option key={a} value={a}>{a}</option>)}
+              {asesoresNombres.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
           <ResponsiveContainer width="100%" height={175}>
