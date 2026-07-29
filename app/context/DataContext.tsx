@@ -28,7 +28,6 @@ export interface Appointment {
   cliente: string;
   fecha: string;
   hora: string;
-  hora: string;
   asesores: string[];
   estado: string;
 }
