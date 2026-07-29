@@ -18,7 +18,7 @@ export default function Dashboard() {
   const citasHoy = appointments.filter(c => c.fecha === today && c.estado === 'Pendiente').length;
   const totalPropiedades = properties.length;
   const proximaCita = appointments
-    .filter(c => c.estado === 'Pendiente' && (!isAdmin ? c.asesor === user?.nombre : true))
+    .filter(c => c.estado === 'Pendiente' && (!isAdmin ? c.asesores.includes(user?.nombre ?? '') : true))
     .sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
 
   const handleSearch = (e: React.FormEvent) => {

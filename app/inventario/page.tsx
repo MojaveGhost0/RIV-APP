@@ -37,16 +37,20 @@ export default function Inventario() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') ?? '');
   const [activeFilter, setActiveFilter] = useState('Todas');
 
-  // Motor de búsqueda: filtra por título, ubicación y captador
+  // Motor de búsqueda avanzado: permite buscar por varias zonas/términos separados por comas
   const filteredProperties = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
+    const rawQueries = searchQuery.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+    
     return properties.filter(prop => {
-      const matchesSearch = !q ||
+      // Si la barra está vacía, match automático
+      const matchesSearch = rawQueries.length === 0 || rawQueries.some(q => 
         prop.title.toLowerCase().includes(q) ||
         prop.location.toLowerCase().includes(q) ||
         prop.captador.toLowerCase().includes(q) ||
         String(prop.price).includes(q) ||
-        String(prop.beds).includes(q);
+        String(prop.beds).includes(q)
+      );
+
       const matchesFilter = activeFilter === 'Todas' || prop.status === activeFilter;
       return matchesSearch && matchesFilter;
     });

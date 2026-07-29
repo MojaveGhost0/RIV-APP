@@ -25,14 +25,14 @@ export default function GestorCitas() {
     cliente: '',
     fecha: '',
     hora: '',
-    asesorId: user?.id ?? '',
+    asesoresIds: user?.id ? [user.id] : [],
   });
 
   // REGLA DE NEGOCIO:
   // - Asesor solo ve sus propias citas.
   // - Admin ve todas las citas de la agencia.
   const citasVisibles = appointments.filter(cita => {
-    const esMia = cita.asesor === user?.nombre;
+    const esMia = cita.asesores.includes(user?.nombre ?? '');
     if (!isAdmin && !esMia) return false;
     if (activeTab === 'proximas')  return cita.estado === 'Pendiente';
     if (activeTab === 'historico') return cita.estado === 'Completada' || cita.estado === 'Cancelada';
@@ -45,10 +45,15 @@ export default function GestorCitas() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Si admin asignó un asesor específico, usarlo; si no, usar el usuario actual
-    const asesorAsignado = isAdmin
-      ? (allUsers.find(u => u.id === formData.asesorId)?.nombre ?? user?.nombre ?? 'Asesor')
-      : (user?.nombre ?? 'Asesor');
+    // Si admin asignó asesores específicos, usarlos; si no, usar el usuario actual
+    const asesoresAsignados = isAdmin
+      ? formData.asesoresIds.map(id => allUsers.find(u => u.id === id)?.nombre).filter(Boolean) as string[]
+      : [user?.nombre ?? 'Asesor'];
+
+    if (asesoresAsignados.length === 0) {
+      alert("Debes seleccionar al menos un asesor.");
+      return;
+    }
 
     addAppointment({
       tipo: formData.tipo,
@@ -56,10 +61,10 @@ export default function GestorCitas() {
       cliente: formData.cliente,
       fecha: formData.fecha,
       hora: formData.hora,
-      asesor: asesorAsignado,
+      asesores: asesoresAsignados,
     });
     setIsModalOpen(false);
-    setFormData({ tipo: 'Mostrar Propiedad', titulo: '', cliente: '', fecha: '', hora: '', asesorId: user?.id ?? '' });
+    setFormData({ tipo: 'Mostrar Propiedad', titulo: '', cliente: '', fecha: '', hora: '', asesoresIds: user?.id ? [user.id] : [] });
   };
 
   const handleComplete = (id: string | number) => {
@@ -158,7 +163,7 @@ export default function GestorCitas() {
                   </div>
                   <span className="text-xs text-gray-400 flex-1">
                     {isAdmin ? (
-                      <>Asesor: <span className="font-semibold text-gray-600">{cita.asesor}</span></>
+                      <>Asesores: <span className="font-semibold text-gray-600">{cita.asesores.join(', ')}</span></>
                     ) : (
                       <>Registrada por mí</>
                     )}
@@ -175,7 +180,7 @@ export default function GestorCitas() {
                         Completar
                       </button>
                     )}
-                    {(isAdmin || cita.asesor === user?.nombre) && (
+                    {(isAdmin || cita.asesores.includes(user?.nombre ?? '')) && (
                       <button
                         onClick={() => handleDelete(cita.id)}
                         className="flex items-center gap-1 text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded-lg hover:bg-red-100 transition"
@@ -202,8 +207,8 @@ export default function GestorCitas() {
       {/* MODAL */}
       {isModalOpen && (
         <>
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-md rounded-t-3xl p-6 shadow-2xl animate-fade-in-up">
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm p-4 sm:items-center">
+            <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-fade-in-up max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-800">Agendar Cita</h2>
                 <button onClick={() => setIsModalOpen(false)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition">
@@ -249,22 +254,31 @@ export default function GestorCitas() {
                   </div>
                 </div>
 
-                {/* Asesor: Dropdown si Admin, info fija si Asesor */}
+                {/* Asesores: Checkboxes si Admin, info fija si Asesor */}
                 {isAdmin ? (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Asignar Asesor</label>
-                    <select
-                      name="asesorId"
-                      value={formData.asesorId}
-                      onChange={handleInputChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none font-medium text-gray-800"
-                    >
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Asignar Asesores</label>
+                    <div className="space-y-2 border border-gray-200 p-3 rounded-xl max-h-40 overflow-y-auto bg-gray-50">
                       {allUsers.map(u => (
-                        <option key={u.id} value={u.id}>
-                          {u.nombre} ({u.rol})
-                        </option>
+                        <label key={u.id} className="flex items-center gap-2 cursor-pointer p-1">
+                          <input
+                            type="checkbox"
+                            checked={formData.asesoresIds.includes(u.id)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setFormData(prev => ({
+                                ...prev,
+                                asesoresIds: checked 
+                                  ? [...prev.asesoresIds, u.id]
+                                  : prev.asesoresIds.filter(id => id !== u.id)
+                              }));
+                            }}
+                            className="w-4 h-4 text-vinotinto rounded focus:ring-vinotinto"
+                          />
+                          <span className="text-sm text-gray-800">{u.nombre} <span className="text-xs text-gray-400">({u.rol})</span></span>
+                        </label>
                       ))}
-                    </select>
+                    </div>
                   </div>
                 ) : (
                   <div className="bg-vinotinto/5 border border-vinotinto/10 p-3 rounded-lg flex items-center gap-2">
