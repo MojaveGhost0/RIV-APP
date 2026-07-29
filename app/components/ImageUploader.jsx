@@ -11,8 +11,8 @@ import { UploadCloud, X, CheckCircle, AlertCircle, ImagePlus, Loader2 } from 'lu
 //   - Upload Preset (Unsigned): Settings → Upload → Upload presets → Add upload preset
 //     Pon el modo en "Unsigned".
 // =============================================================================
-const CLOUDINARY_CLOUD_NAME = 'fvrnswua';
-const CLOUDINARY_UPLOAD_PRESET = 'inmuebles_preset';
+const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'fvrnswua';
+const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'inmuebles_preset';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 /**
@@ -42,20 +42,39 @@ const CLOUDINARY_UPLOAD_PRESET = 'inmuebles_preset';
  * @returns {Promise<string>}     - Resuelve con la `secure_url` de Cloudinary
  */
 async function uploadToCloudinary(file, onProgress) {
-  return new Promise((resolve) => {
-    onProgress(30);
-    const reader = new FileReader();
-    reader.onload = () => {
-      onProgress(100);
-      // Guardamos como base64 para que persista entre recargas de página
-      resolve(reader.result);
+  const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        onProgress(percent);
+      }
     };
-    reader.onerror = () => {
-      // Fallback a blob URL si falla la lectura
-      onProgress(100);
-      resolve(URL.createObjectURL(file));
+    
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        const response = JSON.parse(xhr.responseText);
+        resolve(response.secure_url);
+      } else {
+        try {
+          const errResponse = JSON.parse(xhr.responseText);
+          reject(new Error(errResponse.error?.message || 'Error al subir a Cloudinary'));
+        } catch {
+          reject(new Error('Error al subir a Cloudinary'));
+        }
+      }
     };
-    reader.readAsDataURL(file);
+    
+    xhr.onerror = () => reject(new Error('Error de red al conectar con Cloudinary'));
+    
+    xhr.send(formData);
   });
 }
 
