@@ -9,9 +9,14 @@ export default function BottomTabBar() {
   const pathname = usePathname();
   const { isAdmin } = useAuth();
 
+  // FIX UI#1 — El tab debe resaltar también en sub-rutas (ej: /inventario/123, /inventario/registro).
+  // La ruta raíz '/' se compara exactamente para no activarse en todas las demás.
+  const isActive = (href: string) =>
+    href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/');
+
   const linkClass = (href: string) =>
     `flex flex-col items-center justify-center w-full h-full transition-colors ${
-      pathname === href ? 'text-vinotinto' : 'text-gray-400 hover:text-vinotinto'
+      isActive(href) ? 'text-vinotinto' : 'text-gray-400 hover:text-vinotinto'
     }`;
 
   return (

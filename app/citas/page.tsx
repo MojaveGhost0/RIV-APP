@@ -67,11 +67,11 @@ export default function GestorCitas() {
     setFormData({ tipo: 'Mostrar Propiedad', titulo: '', cliente: '', fecha: '', hora: '', asesoresIds: user?.id ? [user.id] : [] });
   };
 
-  const handleComplete = (id: string | number) => {
+  const handleComplete = (id: string) => {
     updateAppointmentStatus(id, 'Completada');
   };
 
-  const handleDelete = (id: string | number) => {
+  const handleDelete = (id: string) => {
     if (confirm('¿Eliminar esta cita?')) {
       deleteAppointment(id);
     }
@@ -164,7 +164,8 @@ export default function GestorCitas() {
                     {isAdmin ? (
                       <>Asesores: <span className="font-semibold text-gray-600">{cita.asesores.join(', ')}</span></>
                     ) : (
-                      <>Registrada por mí</>
+                      // FIX UI#2 — Muestra todos los asesores de la cita, no solo "Registrada por mí"
+                      <>Asesor(es): <span className="font-semibold text-gray-600">{cita.asesores.join(', ')}</span></>
                     )}
                   </span>
 

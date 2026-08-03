@@ -84,7 +84,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl animate-in fade-in zoom-in duration-200">
+        <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl animate-fade-in-up">
           <div className="flex justify-between items-center mb-5">
             <h3 className="text-lg font-bold text-gray-900">Exportar Inmueble</h3>
             <button onClick={onClose} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full transition">
@@ -138,8 +138,24 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
         </div>
       </div>
 
-      {/* RENDERIZADOS OCULTOS PARA EXPORTACIÓN */}
-      <div className="overflow-hidden h-0 w-0 absolute top-[-9999px] left-[-9999px]">
+      {/*
+        FIX #2 — Las plantillas de exportación deben estar en el DOM y tener
+        dimensiones reales para que html2canvas las renderice correctamente.
+        NUNCA usar h-0/w-0 o overflow:hidden porque el canvas resultante queda vacío.
+        Se usa position:fixed + visibility:hidden para que sean invisibles al usuario
+        pero accesibles para el motor de renderizado del browser.
+      */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          top: '-9999px',
+          left: '-9999px',
+          visibility: 'hidden',
+          pointerEvents: 'none',
+          zIndex: -1,
+        }}
+      >
         {/* Plantilla PDF */}
         <div ref={pdfRef} className="bg-white text-black p-10 w-[794px] min-h-[1123px] flex flex-col font-sans">
           <div className="border-b-4 border-vinotinto pb-4 mb-6 flex justify-between items-end">

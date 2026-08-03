@@ -19,10 +19,12 @@ export interface Property {
   status: string;
   captador: string;
   amenities?: string[];
+  /** ISO date string — se asigna automáticamente al registrar */
+  createdAt?: string;
 }
 
 export interface Appointment {
-  id: string | number;
+  id: string;          // FIX #3 — Unificado a string (antes string|number causaba fallos en delete/update)
   tipo: string;
   titulo: string;
   cliente: string;
@@ -35,13 +37,19 @@ export interface Appointment {
 interface DataContextType {
   properties: Property[];
   appointments: Appointment[];
-  addProperty: (property: Omit<Property, 'id'>) => string;
+  addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => string;
   deleteProperty: (id: string) => void;
   updatePropertyStatus: (id: string, status: string) => void;
   addAppointment: (appointment: Omit<Appointment, 'id' | 'estado'>) => void;
-  deleteAppointment: (id: string | number) => void;
-  updateAppointmentStatus: (id: string | number, status: string) => void;
+  deleteAppointment: (id: string) => void;
+  updateAppointmentStatus: (id: string, status: string) => void;
 }
+
+// =============================================================================
+// HELPER — Fecha local en formato YYYY-MM-DD (FIX #4 — Timezone correcta)
+// toISOString() devuelve UTC y en Venezuela (UTC-4) puede dar el día siguiente.
+// =============================================================================
+const localToday = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
 
 // =============================================================================
 // DEFAULT SEED DATA
@@ -63,7 +71,8 @@ const DEFAULT_PROPERTIES: Property[] = [
     ],
     status: "Activa",
     captador: "Gerardo Garcia",
-    amenities: ["Piscina", "Vigilancia 24/7", "Planta Eléctrica"]
+    amenities: ["Piscina", "Vigilancia 24/7", "Planta Eléctrica"],
+    createdAt: "2026-07-10T10:00:00.000Z",
   },
   {
     id: '2',
@@ -81,7 +90,8 @@ const DEFAULT_PROPERTIES: Property[] = [
     ],
     status: "Activa",
     captador: "Juan Garcia",
-    amenities: ["Planta Eléctrica", "Vigilancia 24/7", "Pozo de Agua", "Estacionamiento Techado"]
+    amenities: ["Planta Eléctrica", "Vigilancia 24/7", "Pozo de Agua", "Estacionamiento Techado"],
+    createdAt: "2026-07-12T09:00:00.000Z",
   },
   {
     id: '123',
@@ -100,7 +110,8 @@ const DEFAULT_PROPERTIES: Property[] = [
     ],
     status: 'Activa',
     captador: 'Amado Lovera',
-    amenities: ['Amoblado', 'Vista al Mar', 'Ascensor', 'Piscina']
+    amenities: ['Amoblado', 'Vista al Mar', 'Ascensor', 'Piscina'],
+    createdAt: "2026-07-15T14:00:00.000Z",
   },
   {
     id: '4',
@@ -115,7 +126,8 @@ const DEFAULT_PROPERTIES: Property[] = [
     images: ["https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=800&q=80"],
     status: "Activa",
     captador: "Amado Lovera",
-    amenities: ["Seguridad 24H", "Área de BBQ"]
+    amenities: ["Seguridad 24H", "Área de BBQ"],
+    createdAt: "2026-06-20T11:00:00.000Z",
   },
   {
     id: '5',
@@ -130,7 +142,8 @@ const DEFAULT_PROPERTIES: Property[] = [
     images: ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80"],
     status: "Vendida",
     captador: "Juan Garcia",
-    amenities: ["Jacuzzi", "Terraza Privada", "Vista 360", "Ascensor Privado"]
+    amenities: ["Jacuzzi", "Terraza Privada", "Vista 360", "Ascensor Privado"],
+    createdAt: "2026-05-10T08:00:00.000Z",
   },
   {
     id: '6',
@@ -145,18 +158,22 @@ const DEFAULT_PROPERTIES: Property[] = [
     images: ["https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&w=800&q=80"],
     status: "Activa",
     captador: "Gerardo Garcia",
-    amenities: ["Aire Acondicionado", "Vitrinas", "A pie de calle"]
+    amenities: ["Aire Acondicionado", "Vitrinas", "A pie de calle"],
+    createdAt: "2026-07-01T10:00:00.000Z",
   }
 ];
 
-const today = new Date().toISOString().slice(0, 10);
+// FIX #3 — IDs unificados a string (antes eran number 1,2,3... lo que causaba
+//           que delete/update fallaran al comparar tras JSON.parse)
+// FIX #4 — fecha usa localToday() en vez de toISOString() para timezone correcta
+const today = localToday();
 const DEFAULT_CITAS: Appointment[] = [
-  { id: 1, tipo: 'Mostrar Propiedad',  titulo: 'Villa Exclusiva Costa Azul', cliente: 'María López',        fecha: '2026-07-16', hora: '14:30', asesores: ['Juan Garcia'],  estado: 'Pendiente'   },
-  { id: 2, tipo: 'Captar Propiedad',   titulo: 'Apto Pampatar',              cliente: 'Juan Gómez',          fecha: '2026-07-17', hora: '10:00', asesores: ['Amado Lovera'],     estado: 'Pendiente'   },
-  { id: 3, tipo: 'Cita en Oficina',    titulo: 'Firma de Contrato',          cliente: 'Familia Rodríguez',   fecha: '2026-07-14', hora: '16:00', asesores: ['Juan Garcia'],  estado: 'Completada'  },
-  { id: 4, tipo: 'Mostrar Propiedad',  titulo: 'Penthouse Playa El Agua',    cliente: 'Luis Fernández',      fecha: '2026-07-13', hora: '09:00', asesores: ['Amado Lovera', 'Gerardo Garcia'], estado: 'Completada'  },
-  { id: 5, tipo: 'Mostrar Propiedad',  titulo: 'Visita Local Comercial',     cliente: 'Pedro Sánchez',       fecha: today,       hora: '15:00', asesores: ['Gerardo Garcia'],estado: 'Pendiente'   },
-  { id: 6, tipo: 'Firma',              titulo: 'Firma Opción a Compra',      cliente: 'Carlos Roa',          fecha: today,       hora: '17:30', asesores: ['Juan Garcia', 'Amado Lovera'],  estado: 'Pendiente'   },
+  { id: '1', tipo: 'Mostrar Propiedad',  titulo: 'Villa Exclusiva Costa Azul', cliente: 'María López',        fecha: '2026-07-16', hora: '14:30', asesores: ['Juan Garcia'],                        estado: 'Pendiente'  },
+  { id: '2', tipo: 'Captar Propiedad',   titulo: 'Apto Pampatar',              cliente: 'Juan Gómez',          fecha: '2026-07-17', hora: '10:00', asesores: ['Amado Lovera'],                      estado: 'Pendiente'  },
+  { id: '3', tipo: 'Cita en Oficina',    titulo: 'Firma de Contrato',          cliente: 'Familia Rodríguez',   fecha: '2026-07-14', hora: '16:00', asesores: ['Juan Garcia'],                        estado: 'Completada' },
+  { id: '4', tipo: 'Mostrar Propiedad',  titulo: 'Penthouse Playa El Agua',    cliente: 'Luis Fernández',      fecha: '2026-07-13', hora: '09:00', asesores: ['Amado Lovera', 'Gerardo Garcia'],    estado: 'Completada' },
+  { id: '5', tipo: 'Mostrar Propiedad',  titulo: 'Visita Local Comercial',     cliente: 'Pedro Sánchez',       fecha: today,        hora: '15:00', asesores: ['Gerardo Garcia'],                    estado: 'Pendiente'  },
+  { id: '6', tipo: 'Firma',              titulo: 'Firma Opción a Compra',      cliente: 'Carlos Roa',          fecha: today,        hora: '17:30', asesores: ['Juan Garcia', 'Amado Lovera'],       estado: 'Pendiente'  },
 ];
 
 // =============================================================================
@@ -165,24 +182,40 @@ const DEFAULT_CITAS: Appointment[] = [
 const DataContext = createContext<DataContextType | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  // FIX #5 — Estado inicializado con DEFAULT data para evitar flash de "0 inmuebles / 0 citas"
+  // en el primer render. El useEffect sobreescribirá con el localStorage si existe.
+  const [properties, setProperties] = useState<Property[]>(DEFAULT_PROPERTIES);
+  const [appointments, setAppointments] = useState<Appointment[]>(DEFAULT_CITAS);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load initial data
+  // Load initial data — solo sobreescribe si hay datos guardados en localStorage
   useEffect(() => {
     const storedProperties = localStorage.getItem('riv_properties_v4');
     const storedAppointments = localStorage.getItem('riv_appointments_v4');
 
     if (storedProperties) {
-      setProperties(JSON.parse(storedProperties));
+      try {
+        setProperties(JSON.parse(storedProperties));
+      } catch {
+        // Datos corruptos → usar defaults
+        setProperties(DEFAULT_PROPERTIES);
+        localStorage.setItem('riv_properties_v4', JSON.stringify(DEFAULT_PROPERTIES));
+      }
     } else {
       setProperties(DEFAULT_PROPERTIES);
       localStorage.setItem('riv_properties_v4', JSON.stringify(DEFAULT_PROPERTIES));
     }
 
     if (storedAppointments) {
-      setAppointments(JSON.parse(storedAppointments));
+      try {
+        // FIX #3 — Normalizar IDs a string por si vienen de localStorage anterior con números
+        const parsed: Appointment[] = JSON.parse(storedAppointments);
+        const normalized = parsed.map(a => ({ ...a, id: String(a.id) }));
+        setAppointments(normalized);
+      } catch {
+        setAppointments(DEFAULT_CITAS);
+        localStorage.setItem('riv_appointments_v4', JSON.stringify(DEFAULT_CITAS));
+      }
     } else {
       setAppointments(DEFAULT_CITAS);
       localStorage.setItem('riv_appointments_v4', JSON.stringify(DEFAULT_CITAS));
@@ -205,12 +238,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [appointments, isLoaded]);
 
-  // Add Property
-  const addProperty = (newProp: Omit<Property, 'id'>) => {
+  // Add Property — FIX #8: se asigna createdAt automáticamente para el KPI de captaciones del mes
+  const addProperty = (newProp: Omit<Property, 'id' | 'createdAt'>) => {
     const newId = Date.now().toString();
     const property: Property = {
       ...newProp,
-      id: newId
+      id: newId,
+      createdAt: new Date().toISOString(),
     };
     setProperties(prev => [property, ...prev]);
     return newId;
@@ -226,9 +260,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setProperties(prev => prev.map(p => p.id === id ? { ...p, status } : p));
   };
 
-  // Add Appointment
+  // Add Appointment — FIX #3: ID siempre string
   const addAppointment = (newApp: Omit<Appointment, 'id' | 'estado'>) => {
-    const newId = Date.now();
+    const newId = Date.now().toString();
     const appointment: Appointment = {
       ...newApp,
       id: newId,
@@ -237,13 +271,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setAppointments(prev => [appointment, ...prev]);
   };
 
-  // Delete Appointment
-  const deleteAppointment = (id: string | number) => {
+  // Delete Appointment — FIX #3: recibe y compara string
+  const deleteAppointment = (id: string) => {
     setAppointments(prev => prev.filter(app => app.id !== id));
   };
 
-  // Update Appointment Status
-  const updateAppointmentStatus = (id: string | number, status: string) => {
+  // Update Appointment Status — FIX #3: recibe y compara string
+  const updateAppointmentStatus = (id: string, status: string) => {
     setAppointments(prev => prev.map(app => app.id === id ? { ...app, estado: status } : app));
   };
 

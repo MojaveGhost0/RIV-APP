@@ -80,10 +80,14 @@ export default function Estadisticas() {
   // 3. KPIs
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
-  
-  // Asumimos que "Nuevas captaciones" son todas por ahora (ya que no hay fecha de creación en el mock).
-  // Si hubiera un createdAt en Property, filtraríamos por mes.
-  const nuevasCaptaciones = properties.length;
+
+  // FIX #8 — Captaciones del mes: filtra por createdAt del mes actual.
+  // Las propiedades del seed sin createdAt se ignoran (captaciones históricas anteriores).
+  const nuevasCaptaciones = properties.filter(p => {
+    if (!p.createdAt) return false;
+    const d = new Date(p.createdAt);
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  }).length;
 
   // Citas concretadas (Completadas en el mes actual)
   const citasConcretadas = appointments.filter(a => {
@@ -93,6 +97,10 @@ export default function Estadisticas() {
   }).length;
 
   const totalAsesores = allUsers.length;
+
+  // FIX #7 — Nombre del mes dinámico (antes era "Julio 2025" hardcodeado)
+  const mesActual = new Date().toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+  const mesCapitalizado = mesActual.charAt(0).toUpperCase() + mesActual.slice(1);
 
   const KPI_DATA = { 
     citasConcretadas, 
@@ -169,7 +177,7 @@ export default function Estadisticas() {
           <div className="flex justify-between items-center mb-4">
             <div>
               <h2 className="text-base font-bold text-gray-800">Captaciones del Mes</h2>
-              <p className="text-xs text-gray-400">Julio 2025</p>
+              <p className="text-xs text-gray-400">{mesCapitalizado}</p>
             </div>
             <select value={filtroAsesor} onChange={e => setFiltroAsesor(e.target.value)}
               className="text-xs font-bold bg-vinotinto/10 text-vinotinto border-none rounded-lg px-2 py-1.5 outline-none cursor-pointer">

@@ -65,11 +65,18 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
 
   const handleShare = async () => {
     const text = `🏠 ${property.title}\n📍 ${property.location}\n💰 $${property.price.toLocaleString()} USD\n🛏 ${property.beds} hab · 🚿 ${property.baths} baños · 📐 ${property.sqm}m²`;
-    if (navigator.share) {
-      await navigator.share({ title: property.title, text });
-    } else {
-      await navigator.clipboard.writeText(text);
-      alert('¡Información copiada al portapapeles!');
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: property.title, text });
+      } else {
+        // FIX handleShare — navigator.clipboard requiere HTTPS o localhost.
+        // Envuelto en try/catch para evitar excepción no capturada en HTTP/dev.
+        await navigator.clipboard.writeText(text);
+        alert('¡Información copiada al portapapeles!');
+      }
+    } catch {
+      // Fallback manual si la API de clipboard no está disponible
+      alert('No se pudo compartir. Copia manualmente:\n\n' + text);
     }
   };
 
