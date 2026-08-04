@@ -68,16 +68,14 @@ const USERS_DB: Array<AuthUser & { password: string }> = [
 
 const SESSION_KEY = 'riv_session_user_id';
 
-// =============================================================================
-// CONTEXT
-// =============================================================================
+
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Al iniciar, recuperar sesión guardada del localStorage
+
   useEffect(() => {
     try {
       const savedId = localStorage.getItem(SESSION_KEY);
