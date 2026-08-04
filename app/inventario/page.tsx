@@ -1,11 +1,16 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { MapPin, Bed, Bath, Maximize, Filter, Plus, Search, Download, X, ChevronRight } from 'lucide-react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import {
+  MapPin, Bed, Bath, Maximize,
+  Plus, Search, Download, X, ChevronRight,
+  Wand2, Loader2, AlertCircle
+} from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import type { Property } from '../context/DataContext';
+import { fuzzySearch, applyAIFilters, type AIFilters } from '../lib/searchEngine';
 
 // ─── Exportar a CSV ─────────────────────────────────────────────────────────
 function exportToCSV(properties: Property[]) {
@@ -16,7 +21,6 @@ function exportToCSV(properties: Property[]) {
   const csvContent = [headers, ...rows]
     .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
     .join('\n');
-  
   const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -26,7 +30,29 @@ function exportToCSV(properties: Property[]) {
   URL.revokeObjectURL(url);
 }
 
+// ─── Llamada a la API de búsqueda IA ───────────────────────────────────────
+async function fetchAIFilters(query: string): Promise<AIFilters | null> {
+  try {
+    const res = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    if (!res.ok) return null;
+    const data: AIFilters & { error?: string } = await res.json();
+    if (data.error) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 const STATUS_FILTERS = ['Todas', 'Activa', 'Vendida', 'Suspendida'];
+
+// Cuántas palabras mínimas para activar IA (consultas cortas usan solo fuzzy)
+const AI_MIN_WORDS = 3;
+// Tiempo de espera tras el último keystroke antes de llamar a Gemini
+const AI_DEBOUNCE_MS = 700;
 
 export default function Inventario() {
   const router = useRouter();
@@ -34,27 +60,89 @@ export default function Inventario() {
   const { properties } = useData();
   const { isAdmin } = useAuth();
 
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') ?? '');
-  const [activeFilter, setActiveFilter] = useState('Todas');
+  const [searchQuery, setSearchQuery]       = useState(searchParams.get('q') ?? '');
+  const [activeFilter, setActiveFilter]     = useState('Todas');
+  const [aiFilters, setAiFilters]           = useState<AIFilters | null>(null);
+  const [isAILoading, setIsAILoading]       = useState(false);
+  const [aiError, setAiError]               = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Motor de búsqueda avanzado: permite buscar por varias zonas/términos separados por comas
+  // Determina si la query tiene suficientes palabras para disparar IA
+  const shouldUseAI = (q: string) =>
+    q.trim().split(/\s+/).filter(Boolean).length >= AI_MIN_WORDS;
+
+  // ─── Handler del input de búsqueda ─────────────────────────────────────────
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    setAiError(false);
+
+    // Limpiar timer anterior
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (!value.trim()) {
+      setAiFilters(null);
+      setIsAILoading(false);
+      return;
+    }
+
+    if (!shouldUseAI(value)) {
+      // Query corta → solo fuzzy, no llamar a IA
+      setAiFilters(null);
+      setIsAILoading(false);
+      return;
+    }
+
+    // Mostrar spinner mientras esperamos el debounce
+    setIsAILoading(true);
+
+    debounceRef.current = setTimeout(async () => {
+      const result = await fetchAIFilters(value);
+      if (result) {
+        setAiFilters(result);
+      } else {
+        // La IA falló o no está configurada → fuzzy como fallback
+        setAiFilters(null);
+        setAiError(true);
+      }
+      setIsAILoading(false);
+    }, AI_DEBOUNCE_MS);
+  }, []);
+
+  // Limpiar timer al desmontar
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, []);
+
+  // Limpiar todo
+  const handleClear = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setSearchQuery('');
+    setAiFilters(null);
+    setIsAILoading(false);
+    setAiError(false);
+  }, []);
+
+  // ─── Motor de búsqueda combinado ──────────────────────────────────────────
   const filteredProperties = useMemo(() => {
-    const rawQueries = searchQuery.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
-    
-    return properties.filter(prop => {
-      // Si la barra está vacía, match automático
-      const matchesSearch = rawQueries.length === 0 || rawQueries.some(q => 
-        prop.title.toLowerCase().includes(q) ||
-        prop.location.toLowerCase().includes(q) ||
-        prop.captador.toLowerCase().includes(q) ||
-        String(prop.price).includes(q) ||
-        String(prop.beds).includes(q)
-      );
+    // Aplicar filtro de estado primero
+    const byStatus = activeFilter === 'Todas'
+      ? properties
+      : properties.filter(p => p.status === activeFilter);
 
-      const matchesFilter = activeFilter === 'Todas' || prop.status === activeFilter;
-      return matchesSearch && matchesFilter;
-    });
-  }, [properties, searchQuery, activeFilter]);
+    if (!searchQuery.trim()) return byStatus;
+
+    // Si la IA devolvió filtros → usarlos
+    if (aiFilters && !isAILoading) {
+      const aiResults = applyAIFilters(byStatus, aiFilters);
+      // Si la IA no encontró nada, caer a fuzzy como fallback
+      return aiResults.length > 0 ? aiResults : fuzzySearch(byStatus, searchQuery);
+    }
+
+    // Fuzzy local (instantáneo, mientras IA procesa o para queries cortas)
+    return fuzzySearch(byStatus, searchQuery);
+  }, [properties, searchQuery, activeFilter, aiFilters, isAILoading]);
+
+  const isAIActive = !!aiFilters && !isAILoading && !!searchQuery.trim();
 
   return (
     <div className="bg-gray-50 min-h-[100dvh] page-content">
@@ -75,28 +163,81 @@ export default function Inventario() {
           </button>
         </div>
 
-        {/* SEARCH BAR */}
+        {/* BARRA DE BÚSQUEDA */}
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Buscar por nombre, zona, precio..."
-            className="w-full pl-9 pr-9 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-vinotinto focus:bg-white transition"
+            onChange={e => handleSearchChange(e.target.value)}
+            placeholder="Busca: '3 hab cerca del mar con piscina menos de 80k'..."
+            className={`w-full pl-9 pr-10 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-1 transition bg-gray-100 ${
+              isAIActive
+                ? 'border-vinotinto/40 bg-white focus:ring-vinotinto ring-1 ring-vinotinto/20'
+                : 'border-gray-200 focus:ring-vinotinto focus:bg-white'
+            }`}
           />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X size={14} />
-            </button>
-          )}
+
+          {/* Icono derecho: spinner, X o Wand */}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            {isAILoading ? (
+              <Loader2 size={15} className="text-vinotinto animate-spin" />
+            ) : searchQuery ? (
+              <button onClick={handleClear} className="text-gray-400 hover:text-gray-600 transition">
+                <X size={15} />
+              </button>
+            ) : (
+              <Wand2 size={15} className="text-gray-300" />
+            )}
+          </div>
         </div>
+
+        {/* CHIP DE BÚSQUEDA IA */}
+        {isAIActive && aiFilters?.interpretacion && (
+          <div className="flex items-center gap-2 mt-2 px-1 animate-fade-in-up">
+            <div className="flex items-center gap-1.5 bg-vinotinto/5 border border-vinotinto/20 rounded-full px-3 py-1">
+              <Wand2 size={11} className="text-vinotinto shrink-0" />
+              <p className="text-xs text-vinotinto font-semibold leading-none">
+                {aiFilters.interpretacion}
+              </p>
+              <button
+                onClick={handleClear}
+                className="text-vinotinto/50 hover:text-vinotinto transition ml-1"
+                title="Limpiar búsqueda"
+              >
+                <X size={11} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* AVISO si IA no disponible y se usó fuzzy */}
+        {isAIActive && !aiFilters?.interpretacion && (
+          <div className="flex items-center gap-1.5 mt-2 px-1">
+            <Wand2 size={11} className="text-vinotinto" />
+            <p className="text-xs text-vinotinto font-semibold">Búsqueda inteligente activa</p>
+          </div>
+        )}
+
+        {/* HINT para el usuario: qué pasa si escriben poco */}
+        {!isAILoading && !isAIActive && searchQuery.trim() && !shouldUseAI(searchQuery) && (
+          <p className="text-[10px] text-gray-400 mt-1.5 px-1">
+            💡 Escribe 3 o más palabras para activar la búsqueda con IA
+          </p>
+        )}
+
+        {/* ERROR de IA (API no configurada o fallo) */}
+        {aiError && searchQuery && shouldUseAI(searchQuery) && (
+          <div className="flex items-center gap-1.5 mt-1.5 px-1">
+            <AlertCircle size={11} className="text-amber-500 shrink-0" />
+            <p className="text-[10px] text-amber-600 font-medium">
+              IA no disponible · Usando búsqueda local
+            </p>
+          </div>
+        )}
       </header>
 
-      {/* FILTROS RÁPIDOS */}
+      {/* FILTROS DE ESTADO */}
       <div className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-hide">
         {STATUS_FILTERS.map(f => (
           <button
@@ -119,7 +260,17 @@ export default function Inventario() {
           <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 mt-2">
             <Search className="mx-auto text-gray-300 mb-3" size={44} />
             <p className="text-gray-500 font-semibold">Sin resultados</p>
-            <p className="text-sm text-gray-400 mt-1">Intenta con otra búsqueda o filtro</p>
+            <p className="text-sm text-gray-400 mt-1">
+              {isAIActive ? 'La IA no encontró propiedades con esos criterios.' : 'Intenta con otra búsqueda o filtro'}
+            </p>
+            {isAIActive && (
+              <button
+                onClick={handleClear}
+                className="mt-3 text-xs text-vinotinto font-bold underline underline-offset-2"
+              >
+                Limpiar búsqueda
+              </button>
+            )}
           </div>
         ) : (
           filteredProperties.map((prop) => (
@@ -145,6 +296,13 @@ export default function Inventario() {
                 }`}>
                   {prop.status}
                 </span>
+
+                {/* BADGE IA — solo cuando la IA encontró esta propiedad */}
+                {isAIActive && (
+                  <span className="absolute top-3 left-3 flex items-center gap-1 px-2 py-0.5 bg-vinotinto/80 backdrop-blur-sm text-white rounded-full text-[9px] font-bold">
+                    <Wand2 size={9} /> IA
+                  </span>
+                )}
               </div>
 
               {/* INFO */}
