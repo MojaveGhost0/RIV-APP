@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Search, MapPin, CheckCircle, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 
 import { useAuth } from './context/AuthContext';
 import { useData } from './context/DataContext';
@@ -28,46 +29,66 @@ export default function Dashboard() {
     }
   };
 
+  const containerVariants: any = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.08, delayChildren: 0.1 }
+    }
+  };
+
+  const itemVariants: any = {
+    hidden: { opacity: 0, y: 15 },
+    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  };
+
   return (
-    <div className="page-content p-4 pb-28 bg-gray-50 min-h-[100dvh]">
+    <motion.div 
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+      className="page-content p-4 pb-28 bg-gray-50 min-h-[100dvh]"
+    >
       
       {/* HEADER */}
-      <header className="flex justify-between items-center mb-6 pt-2">
+      <motion.header variants={itemVariants} className="flex justify-between items-center mb-6 pt-2">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">
             Hola, {user?.nombre?.split(' ')[0] ?? 'Bienvenido'} 👋
           </h1>
           <p className="text-sm text-gray-500">{isAdmin ? 'Administrador' : 'Asesor Inmobiliario'}</p>
         </div>
-      </header>
+      </motion.header>
 
       {/* SEARCH BAR */}
-      <form onSubmit={handleSearch} className="relative mb-8">
-        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+      <motion.form variants={itemVariants} onSubmit={handleSearch} className="relative mb-8">
+        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
           <Search className="text-gray-400" size={18} />
         </div>
         <input
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          className="block w-full pl-10 pr-16 py-3.5 border border-gray-200 rounded-2xl bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-vinotinto focus:border-vinotinto transition-colors shadow-sm text-sm"
+          className="block w-full pl-10 pr-20 py-3.5 border border-transparent rounded-2xl bg-white shadow-[0_2px_15px_rgba(0,0,0,0.04)] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-vinotinto/30 focus:border-vinotinto transition-all text-sm relative z-0 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)]"
           placeholder="Buscar inmueble: zona, precio, tipo..."
         />
         <button
           type="submit"
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-vinotinto text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-vinotinto/90 transition"
+          className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-vinotinto to-[#a60029] text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1 hover:shadow-md hover:shadow-vinotinto/20 active:scale-95 transition-all z-10"
         >
           Buscar
         </button>
-      </form>
+      </motion.form>
 
       {/* QUICK SUMMARY CARDS */}
-      <h2 className="text-base font-bold text-gray-800 mb-3">Resumen</h2>
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      <motion.h2 variants={itemVariants} className="text-base font-bold text-gray-800 mb-3">Resumen</motion.h2>
+      <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4 mb-8">
         
-        <div
+        <motion.div
+          whileHover={{ y: -4, scale: 1.01 }}
+          whileTap={{ scale: 0.97 }}
           onClick={() => router.push('/citas')}
-          className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex flex-col justify-between cursor-pointer hover:shadow-md transition-shadow active:scale-[0.97]"
+          className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex flex-col justify-between cursor-pointer hover:shadow-[0_8px_25px_rgba(0,0,0,0.06)] transition-all"
         >
           <div className="flex items-center justify-between mb-2">
             <div className="bg-vinotinto/10 p-2 rounded-xl">
@@ -77,11 +98,13 @@ export default function Dashboard() {
           </div>
           <p className="text-sm font-semibold text-gray-600">Citas Hoy</p>
           <p className="text-xs text-vinotinto font-bold mt-1 flex items-center gap-0.5">Ver agenda <ArrowRight size={12} /></p>
-        </div>
+        </motion.div>
 
-        <div
+        <motion.div
+          whileHover={{ y: -4, scale: 1.01 }}
+          whileTap={{ scale: 0.97 }}
           onClick={() => router.push('/inventario')}
-          className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex flex-col justify-between cursor-pointer hover:shadow-md transition-shadow active:scale-[0.97]"
+          className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex flex-col justify-between cursor-pointer hover:shadow-[0_8px_25px_rgba(0,0,0,0.06)] transition-all"
         >
           <div className="flex items-center justify-between mb-2">
             <div className="bg-dorado/10 p-2 rounded-xl">
@@ -91,61 +114,74 @@ export default function Dashboard() {
           </div>
           <p className="text-sm font-semibold text-gray-600">Inmuebles</p>
           <p className="text-xs text-dorado-dark font-bold mt-1 flex items-center gap-0.5">Ver inventario <ArrowRight size={12} /></p>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       {/* PRÓXIMA CITA */}
-      <h2 className="text-base font-bold text-gray-800 mb-3">Próxima Cita</h2>
-      {proximaCita ? (
-        <div
-          onClick={() => router.push('/citas')}
-          className="bg-gradient-to-r from-vinotinto to-vinotinto-light p-5 rounded-2xl shadow-md text-white cursor-pointer active:scale-[0.98] transition-transform"
-        >
-          <div className="flex justify-between items-start mb-3">
-            <div>
-              <p className="text-xs text-white/60 font-medium uppercase tracking-wider mb-0.5">{proximaCita.tipo}</p>
-              <h3 className="font-bold text-lg leading-tight">{proximaCita.titulo}</h3>
-              <p className="text-white/70 text-sm mt-0.5">Cliente: {proximaCita.cliente}</p>
+      <motion.h2 variants={itemVariants} className="text-base font-bold text-gray-800 mb-3">Próxima Cita</motion.h2>
+      <motion.div variants={itemVariants}>
+        {proximaCita ? (
+          <motion.div
+            whileHover={{ y: -3, scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => router.push('/citas')}
+            className="bg-gradient-to-br from-[#800020] via-[#990026] to-[#4a0012] p-5 rounded-2xl shadow-lg shadow-vinotinto/20 text-white cursor-pointer transition-all relative overflow-hidden"
+          >
+            {/* Elemento de cristal de fondo */}
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+            
+            <div className="flex justify-between items-start mb-3 relative z-10">
+              <div>
+                <p className="text-xs text-white/70 font-bold uppercase tracking-widest mb-1">{proximaCita.tipo}</p>
+                <h3 className="font-extrabold text-lg leading-tight drop-shadow-sm">{proximaCita.titulo}</h3>
+                <p className="text-white/80 text-sm mt-1">Cliente: <span className="font-medium text-white">{proximaCita.cliente}</span></p>
+              </div>
+              <div className="bg-white/10 px-3 py-1.5 rounded-xl text-sm font-bold backdrop-blur-md shrink-0 border border-white/20 shadow-sm">
+                {proximaCita.hora}
+              </div>
             </div>
-            <div className="bg-white/20 px-3 py-1.5 rounded-xl text-sm font-bold backdrop-blur-sm shrink-0">
-              {proximaCita.hora}
+            <div className="flex items-center text-sm text-white/80 mt-3 relative z-10">
+              <MapPin size={15} className="mr-1.5" />
+              {proximaCita.fecha}
             </div>
-          </div>
-          <div className="flex items-center text-sm text-white/70 mt-3">
-            <MapPin size={14} className="mr-1.5" />
-            {proximaCita.fecha}
-          </div>
-        </div>
-      ) : (
-        <div
-          onClick={() => router.push('/citas')}
-          className="bg-white border border-dashed border-gray-200 p-5 rounded-2xl text-center cursor-pointer hover:border-vinotinto/40 transition-colors"
-        >
-          <p className="text-gray-400 font-medium text-sm">No hay citas pendientes</p>
-          <p className="text-xs text-vinotinto font-bold mt-1">+ Agendar nueva cita</p>
-        </div>
-      )}
+          </motion.div>
+        ) : (
+          <motion.div
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => router.push('/citas')}
+            className="bg-white border-2 border-dashed border-gray-200 p-5 rounded-2xl text-center cursor-pointer hover:border-vinotinto/40 hover:bg-vinotinto/5 transition-all"
+          >
+            <p className="text-gray-400 font-medium text-sm">No hay citas pendientes</p>
+            <p className="text-xs text-vinotinto font-bold mt-1">+ Agendar nueva cita</p>
+          </motion.div>
+        )}
+      </motion.div>
 
       {/* ACCESO RÁPIDO */}
-      <h2 className="text-base font-bold text-gray-800 mb-3 mt-8">Acciones Rápidas</h2>
-      <div className="grid grid-cols-2 gap-3">
-        <button
+      <motion.h2 variants={itemVariants} className="text-base font-bold text-gray-800 mb-3 mt-8">Acciones Rápidas</motion.h2>
+      <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3">
+        <motion.button
+          whileHover={{ y: -2, scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
           onClick={() => router.push('/inventario/registro')}
-          className="bg-white border border-gray-100 rounded-2xl p-4 text-left shadow-sm hover:shadow-md transition-shadow active:scale-[0.97]"
+          className="bg-white border border-gray-100 rounded-2xl p-4 text-left shadow-sm hover:shadow-md transition-shadow"
         >
           <p className="text-xl mb-1">🏠</p>
           <p className="text-sm font-bold text-gray-800">Registrar Inmueble</p>
           <p className="text-xs text-gray-400 mt-0.5">Captar propiedad nueva</p>
-        </button>
-        <button
+        </motion.button>
+        <motion.button
+          whileHover={{ y: -2, scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
           onClick={() => router.push('/citas')}
-          className="bg-white border border-gray-100 rounded-2xl p-4 text-left shadow-sm hover:shadow-md transition-shadow active:scale-[0.97]"
+          className="bg-white border border-gray-100 rounded-2xl p-4 text-left shadow-sm hover:shadow-md transition-shadow"
         >
           <p className="text-xl mb-1">📅</p>
           <p className="text-sm font-bold text-gray-800">Nueva Cita</p>
           <p className="text-xs text-gray-400 mt-0.5">Agendar visita o reunión</p>
-        </button>
-      </div>
-    </div>
+        </motion.button>
+      </motion.div>
+    </motion.div>
   );
 }

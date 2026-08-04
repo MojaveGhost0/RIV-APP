@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
 
 // =============================================================================
 // TIPOS
@@ -20,86 +21,65 @@ interface AuthContextType {
   isAdmin: boolean;
   isAsesor: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   getAllUsers: () => AuthUser[];
 }
 
-// =============================================================================
-// BASE DE DATOS DE USUARIOS
-// Para agregar un nuevo usuario, copia uno de los bloques de abajo,
-// cambia el id, username, password, nombre, email y rol.
-// =============================================================================
-const USERS_DB: Array<AuthUser & { password: string }> = [
-  {
-    id: 'usr-001',
-    username: 'gerardo garcia',
-    password: 'Juan1234',
-    nombre: 'Gerardo Garcia',
-    email: 'admin@rivmargarita.com',
-    rol: 'ADMIN',
-  },
-  {
-    id: 'usr-002',
-    username: 'Juan Garcia',
-    password: 'mumu1234',
-    nombre: 'Juan García',
-    email: 'juan.garcia@rivmargarita.com',
-    rol: 'ASESOR',
-  },
-  {
-    id: 'usr-003',
-    username: 'amado lovera',
-    password: '123456',
-    nombre: 'Amado Lovera',
-    email: 'amadolovera@rivmargarita.com',
-    rol: 'ASESOR',
-  },
-  // ── AÑADE MÁS USUARIOS AQUÍ ───────────────────────────────────────────────
-  // {
-  //   id: 'usr-003',
-  //   username: 'nuevo_usuario',
-  //   password: 'su_contraseña123',
-  //   nombre: 'Nombre Completo',
-  //   email: 'correo@rivmargarita.com',
-  //   rol: 'ASESOR', // o 'ADMIN'
-  // },
-];
-
 const SESSION_KEY = 'riv_session_user_id';
-
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [allUsers, setAllUsers] = useState<AuthUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-
   useEffect(() => {
-    try {
-      const savedId = localStorage.getItem(SESSION_KEY);
-      if (savedId) {
-        const found = USERS_DB.find(u => u.id === savedId);
-        if (found) {
-          const { password: _, ...safeUser } = found;
-          setUser(safeUser);
+    const initAuth = async () => {
+      try {
+        // Cargar todos los usuarios (útil para asignar citas)
+        const { data: usersData } = await supabase.from('users').select('*');
+        if (usersData) {
+          // Remover password de los datos públicos en memoria por seguridad
+          const safeUsers = usersData.map(({ password, ...u }) => u as AuthUser);
+          setAllUsers(safeUsers);
+          
+          // Restaurar sesión si existe
+          const savedId = localStorage.getItem(SESSION_KEY);
+          if (savedId) {
+            const found = safeUsers.find((u: AuthUser) => u.id === savedId);
+            if (found) setUser(found);
+          }
         }
+      } catch (error) {
+        console.error('Error inicializando auth con Supabase:', error);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (_) { }
-    setIsLoading(false);
+    };
+
+    initAuth();
   }, []);
 
-  const login = (username: string, password: string): boolean => {
-    // Búsqueda insensible a mayúsculas en username
-    const found = USERS_DB.find(
-      u => u.username.toLowerCase() === username.trim().toLowerCase() && u.password === password
-    );
-    if (found) {
-      const { password: _, ...safeUser } = found;
-      setUser(safeUser);
-      try { localStorage.setItem(SESSION_KEY, found.id); } catch (_) { }
-      return true;
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      // Usar ilike para búsqueda insensible a mayúsculas en el username
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .ilike('username', username.trim())
+        .eq('password', password)
+        .single();
+
+      if (data && !error) {
+        const { password: _, ...safeUser } = data;
+        setUser(safeUser as AuthUser);
+        localStorage.setItem(SESSION_KEY, data.id);
+        return true;
+      }
+    } catch (e) {
+      console.error('Error en login:', e);
     }
     return false;
   };
@@ -110,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const getAllUsers = (): AuthUser[] => {
-    return USERS_DB.map(({ password: _, ...u }) => u);
+    return allUsers;
   };
 
   return (

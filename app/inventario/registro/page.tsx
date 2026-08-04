@@ -6,6 +6,7 @@ import {
   Home, Building2, Store, Maximize2, TreePine, Briefcase, Layers,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import ImageUploader from '../../components/ImageUploader';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
@@ -256,7 +257,7 @@ export default function RegistroPropiedad() {
     setIsSubmitting(true);
     await new Promise(r => setTimeout(r, 800));
 
-    const newId = addProperty({
+    const newId = await addProperty({
       title: formData.titulo,
       price: Number(formData.precio.replace(/\D/g, '')),
       location: formData.ubicacion,
@@ -280,14 +281,23 @@ export default function RegistroPropiedad() {
   // ─── Pantalla de éxito ────────────────────────────────────────────────────
   if (submitted) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center p-8 text-center bg-gray-50">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="min-h-[100dvh] flex flex-col items-center justify-center p-8 text-center bg-gray-50"
+      >
+        <motion.div 
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", damping: 12, delay: 0.1 }}
+          className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4"
+        >
           <CheckCircle size={40} className="text-green-500" />
-        </div>
+        </motion.div>
         <h2 className="text-2xl font-extrabold text-gray-800 mb-2">¡Inmueble Publicado!</h2>
         <p className="text-sm text-gray-500">Ya está visible en el inventario de toda la agencia.</p>
         <p className="text-xs text-gray-400 mt-3">Redirigiendo al detalle...</p>
-      </div>
+      </motion.div>
     );
   }
 
@@ -381,7 +391,17 @@ export default function RegistroPropiedad() {
           </div>
         </div>
 
-        {/* ── PASO 1: DATOS BÁSICOS ──────────────────────────────────────── */}
+        {/* ── CONTENIDO DEL FORMULARIO ANIMADO ───────────────────────────── */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, x: 15 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -15 }}
+            transition={{ duration: 0.2 }}
+          >
+
+            {/* ── PASO 1: DATOS BÁSICOS ──────────────────────────────────────── */}
         {step === 1 && (
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-vinotinto mb-1">📋 Datos Básicos</h2>
@@ -652,6 +672,8 @@ export default function RegistroPropiedad() {
             )}
           </div>
         )}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* BOTONES */}
@@ -666,25 +688,29 @@ export default function RegistroPropiedad() {
         )}
 
         {step < totalSteps ? (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => setStep(step + 1)}
             disabled={!canProceed()}
             className={`flex-[2] py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all ${
               canProceed()
-                ? 'bg-vinotinto text-white active:scale-95'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                ? 'bg-gradient-to-r from-vinotinto to-[#a60029] text-white'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
             }`}
           >
             Siguiente <ArrowRight size={18} />
-          </button>
+          </motion.button>
         ) : (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleSubmit}
             disabled={isSubmitting || formData.imagenes.length === 0}
-            className="flex-[2] py-3.5 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all disabled:opacity-60"
+            className="flex-[2] py-3.5 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md disabled:opacity-60 disabled:shadow-none"
           >
             {isSubmitting ? 'Guardando...' : <>Publicar Inmueble <Check size={18} /></>}
-          </button>
+          </motion.button>
         )}
       </div>
       </div>{/* /px-4 wrapper */}

@@ -7,6 +7,7 @@ import {
   Wand2, Loader2, AlertCircle, Home, Building2, Store, Layers, Maximize2, TreePine, Briefcase,
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import type { Property, PropertyType } from '../context/DataContext';
@@ -155,6 +156,19 @@ export default function Inventario() {
 
   const isAIActive = !!aiFilters && !isAILoading && !!searchQuery.trim();
 
+  const containerVariants: any = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.08 }
+    }
+  };
+
+  const itemVariants: any = {
+    hidden: { opacity: 0, y: 15 },
+    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  };
+
   return (
     <div className="bg-gray-50 min-h-[100dvh] page-content">
 
@@ -251,22 +265,29 @@ export default function Inventario() {
       {/* FILTROS DE ESTADO */}
       <div className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-hide">
         {STATUS_FILTERS.map(f => (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             key={f}
             onClick={() => setActiveFilter(f)}
             className={`px-4 py-1.5 text-sm font-bold rounded-full whitespace-nowrap border transition-all ${
               activeFilter === f
-                ? 'bg-vinotinto text-white border-vinotinto shadow-sm'
+                ? 'bg-vinotinto text-white border-vinotinto shadow-sm shadow-vinotinto/20'
                 : 'bg-white border-gray-200 text-gray-600 hover:border-vinotinto/40'
             }`}
           >
             {f}
-          </button>
+          </motion.button>
         ))}
       </div>
 
       {/* LISTADO */}
-      <div className="px-4 pb-28 space-y-4">
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="px-4 pb-28 space-y-4"
+      >
         {filteredProperties.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 mt-2">
             <Search className="mx-auto text-gray-300 mb-3" size={44} />
@@ -284,11 +305,19 @@ export default function Inventario() {
             )}
           </div>
         ) : (
-          filteredProperties.map((prop) => (
-            <div
+          <AnimatePresence>
+          {filteredProperties.map((prop) => (
+            <motion.div
+              layout
+              variants={itemVariants}
+              initial="hidden"
+              animate="visible"
+              exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+              whileHover={{ y: -4 }}
+              whileTap={{ scale: 0.98 }}
               key={prop.id}
               onClick={() => router.push(`/inventario/${prop.id}`)}
-              className="bg-white rounded-2xl overflow-hidden shadow-[0_4px_15px_rgba(0,0,0,0.04)] border border-gray-100 cursor-pointer active:scale-[0.98] transition-all hover:shadow-md"
+              className="bg-white rounded-2xl overflow-hidden shadow-[0_4px_15px_rgba(0,0,0,0.04)] border border-gray-100 cursor-pointer hover:shadow-[0_8px_25px_rgba(0,0,0,0.08)] transition-shadow"
             >
               {/* IMAGEN */}
               <div className="relative w-full h-48 bg-gray-200">
@@ -356,10 +385,11 @@ export default function Inventario() {
                   <ChevronRight size={16} className="text-gray-300" />
                 </div>
               </div>
-            </div>
-          ))
+            </motion.div>
+          ))}
+          </AnimatePresence>
         )}
-      </div>
+      </motion.div>
 
       <button
         onClick={() => router.push('/inventario/registro')}

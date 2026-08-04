@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Calendar as CalendarIcon, Clock, Plus, X, User, ShieldAlert, Trash2, CheckCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -83,6 +84,19 @@ export default function GestorCitas() {
     }
   };
 
+  const containerVariants: any = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.08 }
+    }
+  };
+
+  const itemVariants: any = {
+    hidden: { opacity: 0, y: 15 },
+    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  };
+
   return (
     <div className="bg-gray-50 min-h-[100dvh] page-content">
 
@@ -122,16 +136,30 @@ export default function GestorCitas() {
       </div>
 
       {/* LISTA DE CITAS */}
-      <div className="px-4 pb-28 space-y-4">
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="px-4 pb-28 space-y-4"
+      >
         {citasVisibles.length === 0 ? (
-          <div className="text-center py-14 bg-white rounded-2xl border border-gray-100">
+          <div className="text-center py-14 bg-white rounded-2xl border border-gray-100 mt-4">
             <CalendarIcon className="mx-auto text-gray-300 mb-3" size={44} />
             <p className="text-gray-500 font-semibold">No hay citas en esta vista.</p>
             <p className="text-sm text-gray-400 mt-1">Toca el botón + para agendar una.</p>
           </div>
         ) : (
-          citasVisibles.map((cita) => (
-            <div key={cita.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden animate-fade-in-up">
+          <AnimatePresence>
+          {citasVisibles.map((cita) => (
+            <motion.div 
+              layout
+              variants={itemVariants}
+              initial="hidden"
+              animate="visible"
+              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+              key={cita.id} 
+              className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] relative overflow-hidden transition-all hover:shadow-[0_8px_25px_rgba(0,0,0,0.06)]"
+            >
               <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl ${TIPO_COLOR[cita.tipo] ?? 'bg-gray-400'}`}></div>
 
               <div className="pl-3">
@@ -197,10 +225,11 @@ export default function GestorCitas() {
                   </div>
                 </div>
               </div>
-            </div>
-          ))
+            </motion.div>
+          ))}
+          </AnimatePresence>
         )}
-      </div>
+      </motion.div>
 
       {/* FAB */}
       <button
@@ -211,10 +240,22 @@ export default function GestorCitas() {
       </button>
 
       {/* MODAL */}
+      <AnimatePresence>
       {isModalOpen && (
         <>
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm p-4 sm:items-center">
-            <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-fade-in-up max-h-[90vh] overflow-y-auto">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm p-4 sm:items-center"
+          >
+            <motion.div 
+              initial={{ opacity: 0, y: 50, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+            >
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-800">Agendar Cita</h2>
                 <button onClick={() => setIsModalOpen(false)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition">
@@ -295,15 +336,20 @@ export default function GestorCitas() {
                   </div>
                 )}
 
-                <button type="submit"
-                  className="w-full py-4 bg-vinotinto text-white rounded-xl font-bold shadow-lg active:scale-95 transition-transform">
+                <motion.button 
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="submit"
+                  className="w-full py-4 bg-gradient-to-r from-vinotinto to-[#a60029] text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all"
+                >
                   Guardar Cita
-                </button>
+                </motion.button>
               </form>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </>
       )}
+      </AnimatePresence>
     </div>
   );
 }

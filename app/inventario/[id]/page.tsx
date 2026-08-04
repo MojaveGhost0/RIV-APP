@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, MapPin, Bed, Bath, Maximize, User, ChevronLeft, ChevronRight, Share2, Trash2, ShieldAlert, Download, CheckCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useData } from '../../context/DataContext';
 import ExportModal from '../../components/ExportModal';
 import { useAuth } from '../../context/AuthContext';
@@ -82,11 +83,29 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
 
   const PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\' viewBox=\'0 0 400 300\'%3E%3Crect width=\'400\' height=\'300\' fill=\'%23f3f4f6\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%239ca3af\' font-size=\'48\'%3E🏠%3C/text%3E%3C/svg%3E';
 
+  const containerVariants: any = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.08, delayChildren: 0.2 }
+    }
+  };
+
+  const itemVariants: any = {
+    hidden: { opacity: 0, y: 15 },
+    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  };
+
   return (
     <div className="bg-white min-h-[100dvh]">
 
       {/* GALERÍA DE FOTOS */}
-      <div className="relative w-full h-72 bg-gray-200">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="relative w-full h-72 bg-gray-200"
+      >
         <img
           src={imgError[activeImageIndex] ? PLACEHOLDER : allImages[activeImageIndex]}
           alt={`Foto ${activeImageIndex + 1} de ${property.title}`}
@@ -150,7 +169,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
         <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-sm text-white text-xs font-bold px-2.5 py-1 rounded-full">
           {activeImageIndex + 1}/{allImages.length}
         </div>
-      </div>
+      </motion.div>
 
       {/* THUMBNAILS */}
       {allImages.length > 1 && (
@@ -175,10 +194,15 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
       )}
 
       {/* CONTENIDO */}
-      <div className="px-5 pt-5 pb-28 space-y-5">
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="px-5 pt-5 pb-28 space-y-5"
+      >
 
         {/* Título y precio */}
-        <div>
+        <motion.div variants={itemVariants}>
           <div className="flex justify-between items-start gap-2 mb-2">
             <h1 className="text-2xl font-extrabold text-gray-900 leading-tight flex-1">{property.title}</h1>
             <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 mt-1 border ${STATUS_STYLE[property.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
@@ -186,16 +210,16 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
             </span>
           </div>
           <p className="text-3xl font-black text-vinotinto">${property.price.toLocaleString()} <span className="text-base font-semibold text-gray-400">USD</span></p>
-        </div>
+        </motion.div>
 
         {/* Ubicación */}
-        <div className="flex items-center gap-2 text-gray-500">
+        <motion.div variants={itemVariants} className="flex items-center gap-2 text-gray-500">
           <MapPin size={16} className="text-vinotinto shrink-0" />
           <p className="text-sm">{property.location}</p>
-        </div>
+        </motion.div>
 
         {/* Características */}
-        <div className="grid grid-cols-3 gap-3">
+        <motion.div variants={itemVariants} className="grid grid-cols-3 gap-3">
           {[
             { icon: <Bed size={20} className="text-vinotinto" />, value: property.beds, label: 'Habitaciones' },
             { icon: <Bath size={20} className="text-vinotinto" />, value: property.baths, label: 'Baños' },
@@ -207,17 +231,17 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
               <p className="text-xs text-gray-500 mt-0.5">{f.label}</p>
             </div>
           ))}
-        </div>
+        </motion.div>
 
         {/* Descripción */}
-        <div>
+        <motion.div variants={itemVariants}>
           <h2 className="text-base font-bold text-gray-800 mb-2">Descripción</h2>
           <p className="text-sm text-gray-600 leading-relaxed">{property.description}</p>
-        </div>
+        </motion.div>
 
         {/* Comodidades */}
         {property.amenities && property.amenities.length > 0 && (
-          <div>
+          <motion.div variants={itemVariants}>
             <h2 className="text-base font-bold text-gray-800 mb-3">Comodidades</h2>
             <div className="flex flex-wrap gap-2">
               {property.amenities.map(amenity => (
@@ -226,11 +250,11 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                 </span>
               ))}
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Captador */}
-        <div className="bg-vinotinto/5 border border-vinotinto/10 rounded-2xl p-4 flex items-center gap-3">
+        <motion.div variants={itemVariants} className="bg-vinotinto/5 border border-vinotinto/10 rounded-2xl p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-vinotinto flex items-center justify-center shrink-0">
             <User size={20} className="text-white" />
           </div>
@@ -238,11 +262,11 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
             <p className="text-xs text-gray-500 font-medium">Asesor Captador</p>
             <p className="font-bold text-gray-800">{property.captador}</p>
           </div>
-        </div>
+        </motion.div>
 
         {/* Acciones Admin */}
         {isAdmin && (
-          <div className="border-t border-gray-100 pt-4 space-y-3">
+          <motion.div variants={itemVariants} className="border-t border-gray-100 pt-4 space-y-3">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
               <ShieldAlert size={12} /> Panel Admin
             </p>
@@ -280,9 +304,9 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
               <Trash2 size={16} />
               Eliminar Inmueble
             </button>
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
 
       <ExportModal
         property={property}

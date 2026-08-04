@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
 
 // =============================================================================
 // UBICACIONES DE MARGARITA
@@ -157,12 +158,12 @@ export interface Appointment {
 interface DataContextType {
   properties: Property[];
   appointments: Appointment[];
-  addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => string;
-  deleteProperty: (id: string) => void;
-  updatePropertyStatus: (id: string, status: string) => void;
-  addAppointment: (appointment: Omit<Appointment, 'id' | 'estado'>) => void;
-  deleteAppointment: (id: string) => void;
-  updateAppointmentStatus: (id: string, status: string) => void;
+  addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => Promise<string>;
+  deleteProperty: (id: string) => Promise<void>;
+  updatePropertyStatus: (id: string, status: string) => Promise<void>;
+  addAppointment: (appointment: Omit<Appointment, 'id' | 'estado'>) => Promise<void>;
+  deleteAppointment: (id: string) => Promise<void>;
+  updateAppointmentStatus: (id: string, status: string) => Promise<void>;
 }
 
 // =============================================================================
@@ -302,101 +303,101 @@ const DEFAULT_CITAS: Appointment[] = [
 const DataContext = createContext<DataContextType | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  // FIX #5 — Estado inicializado con DEFAULT data para evitar flash de "0 inmuebles / 0 citas"
-  // en el primer render. El useEffect sobreescribirá con el localStorage si existe.
-  const [properties, setProperties] = useState<Property[]>(DEFAULT_PROPERTIES);
-  const [appointments, setAppointments] = useState<Appointment[]>(DEFAULT_CITAS);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load initial data — solo sobreescribe si hay datos guardados en localStorage
+  // Cargar datos de Supabase al montar
   useEffect(() => {
-    const storedProperties  = localStorage.getItem('riv_properties_v5');
-    const storedAppointments = localStorage.getItem('riv_appointments_v5');
-
-    if (storedProperties) {
+    const fetchData = async () => {
       try {
-        setProperties(JSON.parse(storedProperties));
-      } catch {
-        setProperties(DEFAULT_PROPERTIES);
-        localStorage.setItem('riv_properties_v5', JSON.stringify(DEFAULT_PROPERTIES));
-      }
-    } else {
-      setProperties(DEFAULT_PROPERTIES);
-      localStorage.setItem('riv_properties_v5', JSON.stringify(DEFAULT_PROPERTIES));
-    }
+        const [propsRes, appsRes] = await Promise.all([
+          supabase.from('properties').select('*').order('created_at', { ascending: false }),
+          supabase.from('appointments').select('*').order('fecha', { ascending: true })
+        ]);
 
-    if (storedAppointments) {
-      try {
-        const parsed: Appointment[] = JSON.parse(storedAppointments);
-        const normalized = parsed.map(a => ({ ...a, id: String(a.id) }));
-        setAppointments(normalized);
-      } catch {
-        setAppointments(DEFAULT_CITAS);
-        localStorage.setItem('riv_appointments_v5', JSON.stringify(DEFAULT_CITAS));
+        if (propsRes.data) {
+          // Supabase devuelve el nombre exacto de la tabla, normalizamos
+          setProperties(propsRes.data as Property[]);
+        }
+        if (appsRes.data) {
+          setAppointments(appsRes.data as Appointment[]);
+        }
+      } catch (error) {
+        console.error('Error fetching data from Supabase:', error);
+      } finally {
+        setIsLoaded(true);
       }
-    } else {
-      setAppointments(DEFAULT_CITAS);
-      localStorage.setItem('riv_appointments_v5', JSON.stringify(DEFAULT_CITAS));
-    }
-
-    setIsLoaded(true);
+    };
+    
+    fetchData();
   }, []);
 
-  // Save properties when they change
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem('riv_properties_v5', JSON.stringify(properties));
-    }
-  }, [properties, isLoaded]);
+  // Add Property
+  const addProperty = async (newProp: Omit<Property, 'id' | 'createdAt'>): Promise<string> => {
+    const { data, error } = await supabase
+      .from('properties')
+      .insert([newProp])
+      .select('id')
+      .single();
 
-  // Save appointments when they change
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem('riv_appointments_v5', JSON.stringify(appointments));
+    if (error) {
+      console.error('Error adding property:', error);
+      throw error;
     }
-  }, [appointments, isLoaded]);
 
-  // Add Property — FIX #8: se asigna createdAt automáticamente para el KPI de captaciones del mes
-  const addProperty = (newProp: Omit<Property, 'id' | 'createdAt'>) => {
-    const newId = Date.now().toString();
     const property: Property = {
       ...newProp,
-      id: newId,
+      id: data.id,
       createdAt: new Date().toISOString(),
     };
     setProperties(prev => [property, ...prev]);
-    return newId;
+    return data.id;
   };
 
   // Delete Property
-  const deleteProperty = (id: string) => {
+  const deleteProperty = async (id: string) => {
     setProperties(prev => prev.filter(prop => prop.id !== id));
+    await supabase.from('properties').delete().eq('id', id);
   };
 
   // Update Property Status
-  const updatePropertyStatus = (id: string, status: string) => {
+  const updatePropertyStatus = async (id: string, status: string) => {
     setProperties(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+    await supabase.from('properties').update({ status }).eq('id', id);
   };
 
-  // Add Appointment — FIX #3: ID siempre string
-  const addAppointment = (newApp: Omit<Appointment, 'id' | 'estado'>) => {
-    const newId = Date.now().toString();
+  // Add Appointment
+  const addAppointment = async (newApp: Omit<Appointment, 'id' | 'estado'>) => {
+    const { data, error } = await supabase
+      .from('appointments')
+      .insert([{ ...newApp, estado: 'Pendiente' }])
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('Error adding appointment:', error);
+      throw error;
+    }
+
     const appointment: Appointment = {
       ...newApp,
-      id: newId,
+      id: data.id,
       estado: 'Pendiente'
     };
     setAppointments(prev => [appointment, ...prev]);
   };
 
-  // Delete Appointment — FIX #3: recibe y compara string
-  const deleteAppointment = (id: string) => {
+  // Delete Appointment
+  const deleteAppointment = async (id: string) => {
     setAppointments(prev => prev.filter(app => app.id !== id));
+    await supabase.from('appointments').delete().eq('id', id);
   };
 
-  // Update Appointment Status — FIX #3: recibe y compara string
-  const updateAppointmentStatus = (id: string, status: string) => {
+  // Update Appointment Status
+  const updateAppointmentStatus = async (id: string, status: string) => {
     setAppointments(prev => prev.map(app => app.id === id ? { ...app, estado: status } : app));
+    await supabase.from('appointments').update({ estado: status }).eq('id', id);
   };
 
   return (
