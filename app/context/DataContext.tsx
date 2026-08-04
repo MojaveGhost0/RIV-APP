@@ -288,12 +288,12 @@ const DEFAULT_PROPERTIES: Property[] = [
 // FIX #4 — fecha usa localToday() en vez de toISOString() para timezone correcta
 const today = localToday();
 const DEFAULT_CITAS: Appointment[] = [
-  { id: '1', tipo: 'Mostrar Propiedad',  titulo: 'Villa Exclusiva Costa Azul', cliente: 'María López',        fecha: '2026-07-16', hora: '14:30', asesores: ['Juan Garcia'],                        estado: 'Pendiente'  },
-  { id: '2', tipo: 'Captar Propiedad',   titulo: 'Apto Pampatar',              cliente: 'Juan Gómez',          fecha: '2026-07-17', hora: '10:00', asesores: ['Amado Lovera'],                      estado: 'Pendiente'  },
-  { id: '3', tipo: 'Cita en Oficina',    titulo: 'Firma de Contrato',          cliente: 'Familia Rodríguez',   fecha: '2026-07-14', hora: '16:00', asesores: ['Juan Garcia'],                        estado: 'Completada' },
-  { id: '4', tipo: 'Mostrar Propiedad',  titulo: 'Penthouse Playa El Agua',    cliente: 'Luis Fernández',      fecha: '2026-07-13', hora: '09:00', asesores: ['Amado Lovera', 'Gerardo Garcia'],    estado: 'Completada' },
-  { id: '5', tipo: 'Mostrar Propiedad',  titulo: 'Visita Local Comercial',     cliente: 'Pedro Sánchez',       fecha: today,        hora: '15:00', asesores: ['Gerardo Garcia'],                    estado: 'Pendiente'  },
-  { id: '6', tipo: 'Firma',              titulo: 'Firma Opción a Compra',      cliente: 'Carlos Roa',          fecha: today,        hora: '17:30', asesores: ['Juan Garcia', 'Amado Lovera'],       estado: 'Pendiente'  },
+  { id: '1', tipo: 'Mostrar Propiedad',  titulo: 'Villa Exclusiva Costa Azul', cliente: 'María López',        fecha: '2026-07-16', hora: '14:30', asesores: ['Juan García'],                         estado: 'Pendiente'  },
+  { id: '2', tipo: 'Captar Propiedad',   titulo: 'Apto Pampatar',              cliente: 'Juan Gómez',          fecha: '2026-07-17', hora: '10:00', asesores: ['Amado Lovera'],                       estado: 'Pendiente'  },
+  { id: '3', tipo: 'Cita en Oficina',    titulo: 'Firma de Contrato',          cliente: 'Familia Rodríguez',   fecha: '2026-07-14', hora: '16:00', asesores: ['Juan García'],                         estado: 'Completada' },
+  { id: '4', tipo: 'Mostrar Propiedad',  titulo: 'Penthouse Playa El Agua',    cliente: 'Luis Fernández',      fecha: '2026-07-13', hora: '09:00', asesores: ['Amado Lovera', 'Gerardo Garcia'],     estado: 'Completada' },
+  { id: '5', tipo: 'Mostrar Propiedad',  titulo: 'Visita Local Comercial',     cliente: 'Pedro Sánchez',       fecha: today,        hora: '15:00', asesores: ['Gerardo Garcia'],                     estado: 'Pendiente'  },
+  { id: '6', tipo: 'Firma',              titulo: 'Firma Opción a Compra',      cliente: 'Carlos Roa',          fecha: today,        hora: '17:30', asesores: ['Juan García', 'Amado Lovera'],        estado: 'Pendiente'  },
 ];
 
 // =============================================================================
@@ -310,35 +310,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Load initial data — solo sobreescribe si hay datos guardados en localStorage
   useEffect(() => {
-    const storedProperties = localStorage.getItem('riv_properties_v4');
-    const storedAppointments = localStorage.getItem('riv_appointments_v4');
+    const storedProperties  = localStorage.getItem('riv_properties_v5');
+    const storedAppointments = localStorage.getItem('riv_appointments_v5');
 
     if (storedProperties) {
       try {
         setProperties(JSON.parse(storedProperties));
       } catch {
-        // Datos corruptos → usar defaults
         setProperties(DEFAULT_PROPERTIES);
-        localStorage.setItem('riv_properties_v4', JSON.stringify(DEFAULT_PROPERTIES));
+        localStorage.setItem('riv_properties_v5', JSON.stringify(DEFAULT_PROPERTIES));
       }
     } else {
       setProperties(DEFAULT_PROPERTIES);
-      localStorage.setItem('riv_properties_v4', JSON.stringify(DEFAULT_PROPERTIES));
+      localStorage.setItem('riv_properties_v5', JSON.stringify(DEFAULT_PROPERTIES));
     }
 
     if (storedAppointments) {
       try {
-        // FIX #3 — Normalizar IDs a string por si vienen de localStorage anterior con números
         const parsed: Appointment[] = JSON.parse(storedAppointments);
         const normalized = parsed.map(a => ({ ...a, id: String(a.id) }));
         setAppointments(normalized);
       } catch {
         setAppointments(DEFAULT_CITAS);
-        localStorage.setItem('riv_appointments_v4', JSON.stringify(DEFAULT_CITAS));
+        localStorage.setItem('riv_appointments_v5', JSON.stringify(DEFAULT_CITAS));
       }
     } else {
       setAppointments(DEFAULT_CITAS);
-      localStorage.setItem('riv_appointments_v4', JSON.stringify(DEFAULT_CITAS));
+      localStorage.setItem('riv_appointments_v5', JSON.stringify(DEFAULT_CITAS));
     }
 
     setIsLoaded(true);
@@ -347,14 +345,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Save properties when they change
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem('riv_properties_v4', JSON.stringify(properties));
+      localStorage.setItem('riv_properties_v5', JSON.stringify(properties));
     }
   }, [properties, isLoaded]);
 
   // Save appointments when they change
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem('riv_appointments_v4', JSON.stringify(appointments));
+      localStorage.setItem('riv_appointments_v5', JSON.stringify(appointments));
     }
   }, [appointments, isLoaded]);
 

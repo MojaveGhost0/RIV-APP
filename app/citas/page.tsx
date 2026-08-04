@@ -28,11 +28,17 @@ export default function GestorCitas() {
     asesoresIds: user?.id ? [user.id] : [],
   });
 
+  // Normaliza un nombre: quita tildes, pasa a minúsculas y recorta espacios
+  // Así 'Juan Garcia' y 'Juan García' se comparan igual
+  const normalize = (s: string) =>
+    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
   // REGLA DE NEGOCIO:
   // - Asesor solo ve sus propias citas.
   // - Admin ve todas las citas de la agencia.
+  const myNombre = normalize(user?.nombre ?? '');
   const citasVisibles = appointments.filter(cita => {
-    const esMia = cita.asesores.includes(user?.nombre ?? '');
+    const esMia = cita.asesores.some(a => normalize(a) === myNombre);
     if (!isAdmin && !esMia) return false;
     if (activeTab === 'proximas')  return cita.estado === 'Pendiente';
     if (activeTab === 'historico') return cita.estado === 'Completada' || cita.estado === 'Cancelada';
