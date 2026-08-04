@@ -4,13 +4,24 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   MapPin, Bed, Bath, Maximize,
   Plus, Search, Download, X, ChevronRight,
-  Wand2, Loader2, AlertCircle
+  Wand2, Loader2, AlertCircle, Home, Building2, Store, Layers, Maximize2, TreePine, Briefcase,
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import type { Property } from '../context/DataContext';
+import type { Property, PropertyType } from '../context/DataContext';
 import { fuzzySearch, applyAIFilters, type AIFilters } from '../lib/searchEngine';
+
+// Icono pequeño por tipo (para el badge de las tarjetas)
+const TYPE_BADGE: Partial<Record<PropertyType, { icon: React.ReactNode; label: string }>> = {
+  'Apartamento':     { icon: <Building2 size={10} />,  label: 'Apto' },
+  'Casa / Quinta':   { icon: <Home size={10} />,        label: 'Casa' },
+  'Townhouse':       { icon: <Layers size={10} />,      label: 'Townhouse' },
+  'Penthouse':       { icon: <Maximize2 size={10} />,   label: 'PH' },
+  'Local Comercial': { icon: <Store size={10} />,       label: 'Local' },
+  'Oficina':         { icon: <Briefcase size={10} />,   label: 'Oficina' },
+  'Terreno':         { icon: <TreePine size={10} />,    label: 'Terreno' },
+};
 
 // ─── Exportar a CSV ─────────────────────────────────────────────────────────
 function exportToCSV(properties: Property[]) {
@@ -52,7 +63,7 @@ const STATUS_FILTERS = ['Todas', 'Activa', 'Vendida', 'Suspendida'];
 // Cuántas palabras mínimas para activar IA (consultas cortas usan solo fuzzy)
 const AI_MIN_WORDS = 3;
 // Tiempo de espera tras el último keystroke antes de llamar a Gemini
-const AI_DEBOUNCE_MS = 700;
+const AI_DEBOUNCE_MS = 1500;
 
 export default function Inventario() {
   const router = useRouter();
@@ -296,6 +307,14 @@ export default function Inventario() {
                 }`}>
                   {prop.status}
                 </span>
+
+                {/* BADGE TIPO DE PROPIEDAD */}
+                {prop.propertyType && TYPE_BADGE[prop.propertyType] && (
+                  <span className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-0.5 bg-black/50 backdrop-blur-sm text-white rounded-full text-[9px] font-bold">
+                    {TYPE_BADGE[prop.propertyType]!.icon}
+                    {TYPE_BADGE[prop.propertyType]!.label}
+                  </span>
+                )}
 
                 {/* BADGE IA — solo cuando la IA encontró esta propiedad */}
                 {isAIActive && (

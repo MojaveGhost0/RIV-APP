@@ -3,6 +3,125 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 // =============================================================================
+// UBICACIONES DE MARGARITA
+// =============================================================================
+export const MARGARITA_LOCATIONS: string[] = [
+  // Municipio Maneiro
+  'Pampatar, Maneiro, Isla de Margarita',
+  'El Cardón, Maneiro, Isla de Margarita',
+  'Guarame, Maneiro, Isla de Margarita',
+  'Los Millanes, Maneiro, Isla de Margarita',
+  'Av. Aldonza Manrique, Maneiro, Isla de Margarita',
+  'Urb. El Morro, Maneiro, Isla de Margarita',
+  'Urb. Jorge Coll, Maneiro, Isla de Margarita',
+  'Urb. Maneiro, Maneiro, Isla de Margarita',
+  'Urb. Paraíso 1, Maneiro, Isla de Margarita',
+  'Urb. Paraíso 2, Maneiro, Isla de Margarita',
+  'Playa Pampatar, Maneiro, Isla de Margarita',
+  'Los Uveros, Maneiro, Isla de Margarita',
+
+  // Municipio Mariño
+  'Porlamar, Mariño, Isla de Margarita',
+  'Los Robles, Mariño, Isla de Margarita',
+  'Costa Azul, Mariño, Isla de Margarita',
+  'Urb. Ferrol, Mariño, Isla de Margarita',
+  'Urb. San Marino, Mariño, Isla de Margarita',
+  'Urb. Bella Vista, Mariño, Isla de Margarita',
+  'Urb. Las Margaritas, Mariño, Isla de Margarita',
+  'La Granja, Mariño, Isla de Margarita',
+  'La Costera, Mariño, Isla de Margarita',
+  'Av. Santiago Mariño, Mariño, Isla de Margarita',
+  'Av. 4 de Mayo, Mariño, Isla de Margarita',
+  'Sector Los Cocos, Mariño, Isla de Margarita',
+  'Urb. El Pilar, Mariño, Isla de Margarita',
+  'Centro de Porlamar, Mariño, Isla de Margarita',
+
+  // Municipio Arismendi
+  'La Asunción, Arismendi, Isla de Margarita',
+  'Santa Ana, Arismendi, Isla de Margarita',
+  'El Cercado, Arismendi, Isla de Margarita',
+  'Los Bagres, Arismendi, Isla de Margarita',
+  'Urb. El Peñón, Arismendi, Isla de Margarita',
+  'Sector La Fuente, Arismendi, Isla de Margarita',
+  'Juan Griego, Arismendi, Isla de Margarita',
+  'El Maco, Arismendi, Isla de Margarita',
+  'Urb. El Caney, Arismendi, Isla de Margarita',
+
+  // Municipio Díaz
+  'San Juan Bautista, Díaz, Isla de Margarita',
+  'Tacuantar, Díaz, Isla de Margarita',
+  'El Espinal, Díaz, Isla de Margarita',
+  'Urb. Las Delicias, Díaz, Isla de Margarita',
+  'Sector La Sabana, Díaz, Isla de Margarita',
+
+  // Municipio García
+  'Santa Ana del Norte, García, Isla de Margarita',
+  'El Salado, García, Isla de Margarita',
+  'La Sierra, García, Isla de Margarita',
+  'Urb. El Bosque, García, Isla de Margarita',
+
+  // Municipio Gómez
+  'Santa Ana del Norte, Gómez, Isla de Margarita',
+  'La Vecindad, Gómez, Isla de Margarita',
+  'Boca Río, Gómez, Isla de Margarita',
+  'Los Barales, Gómez, Isla de Margarita',
+
+  // Municipio Marcano
+  'El Agua, Marcano, Isla de Margarita',
+  'Playa El Agua, Marcano, Isla de Margarita',
+  'Pedro González, Marcano, Isla de Margarita',
+  'Manzanillo, Marcano, Isla de Margarita',
+  'Playa Parguito, Marcano, Isla de Margarita',
+  'Playa Guacuco, Marcano, Isla de Margarita',
+  'Los Manantiales, Marcano, Isla de Margarita',
+  'El Tirano, Marcano, Isla de Margarita',
+
+  // Municipio Tubores
+  'Villa Rosa, Tubores, Isla de Margarita',
+  'Los Barales, Tubores, Isla de Margarita',
+  'Urb. Los Samanes, Tubores, Isla de Margarita',
+
+  // Municipio Villalba
+  'Punta de Piedras, Villalba, Isla de Margarita',
+  'La Guardia, Villalba, Isla de Margarita',
+  'Urb. Los Mangos, Villalba, Isla de Margarita',
+
+  // Municipio Antolín del Campo
+  'El Espinal, Antolín del Campo, Isla de Margarita',
+  'Playa El Ángel, Antolín del Campo, Isla de Margarita',
+  'Playa Caribe, Antolín del Campo, Isla de Margarita',
+  'Playa Guacuco, Antolín del Campo, Isla de Margarita',
+  'Playa La Mula, Antolín del Campo, Isla de Margarita',
+
+  // Municipio Macanao (Península)
+  'Boca del Río, Macanao, Isla de Margarita',
+  'La Restinga, Macanao, Isla de Margarita',
+  'Laguna de La Restinga, Macanao, Isla de Margarita',
+  'Playa La Guardia, Macanao, Isla de Margarita',
+  'El Manglillo, Macanao, Isla de Margarita',
+  'Urb. Los Roques, Macanao, Isla de Margarita',
+
+  // Isla de Coche
+  'San Pedro de Coche, Isla de Coche',
+  'La Uva, Isla de Coche',
+  'El Bichar, Isla de Coche',
+];
+
+// =============================================================================
+// TIPOS DE PROPIEDAD
+// =============================================================================
+export const PROPERTY_TYPES = [
+  'Apartamento',
+  'Casa / Quinta',
+  'Townhouse',
+  'Penthouse',
+  'Local Comercial',
+  'Oficina',
+  'Terreno',
+] as const;
+export type PropertyType = typeof PROPERTY_TYPES[number];
+
+// =============================================================================
 // INTERFACES
 // =============================================================================
 export interface Property {
@@ -19,6 +138,7 @@ export interface Property {
   status: string;
   captador: string;
   amenities?: string[];
+  propertyType?: PropertyType;
   /** ISO date string — se asigna automáticamente al registrar */
   createdAt?: string;
 }
