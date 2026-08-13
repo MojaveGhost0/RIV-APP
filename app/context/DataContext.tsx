@@ -155,15 +155,26 @@ export interface Appointment {
   estado: string;
 }
 
+export interface CrmLog {
+  id: string;
+  cliente: string;
+  asesor: string;
+  tipo_interaccion: string;
+  notas: string;
+  created_at?: string;
+}
+
 interface DataContextType {
   properties: Property[];
   appointments: Appointment[];
+  crmLogs: CrmLog[];
   addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => Promise<string>;
   deleteProperty: (id: string) => Promise<void>;
   updatePropertyStatus: (id: string, status: string) => Promise<void>;
   addAppointment: (appointment: Omit<Appointment, 'id' | 'estado'>) => Promise<void>;
   deleteAppointment: (id: string) => Promise<void>;
   updateAppointmentStatus: (id: string, status: string) => Promise<void>;
+  addCrmLog: (log: Omit<CrmLog, 'id' | 'created_at'>) => Promise<void>;
 }
 
 // =============================================================================
@@ -305,15 +316,17 @@ const DataContext = createContext<DataContextType | null>(null);
 export function DataProvider({ children }: { children: ReactNode }) {
   const [properties, setProperties] = useState<Property[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [crmLogs, setCrmLogs] = useState<CrmLog[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Cargar datos de Supabase al montar
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [propsRes, appsRes] = await Promise.all([
+        const [propsRes, appsRes, crmRes] = await Promise.all([
           supabase.from('properties').select('*').order('created_at', { ascending: false }),
-          supabase.from('appointments').select('*').order('fecha', { ascending: true })
+          supabase.from('appointments').select('*').order('fecha', { ascending: true }),
+          supabase.from('crm_logs').select('*').order('created_at', { ascending: false })
         ]);
 
         if (propsRes.data) {
@@ -322,6 +335,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
         if (appsRes.data) {
           setAppointments(appsRes.data as Appointment[]);
+        }
+        if (crmRes.data) {
+          setCrmLogs(crmRes.data as CrmLog[]);
         }
       } catch (error) {
         console.error('Error fetching data from Supabase:', error);
@@ -400,16 +416,39 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await supabase.from('appointments').update({ estado: status }).eq('id', id);
   };
 
+  // Add CRM Log
+  const addCrmLog = async (newLog: Omit<CrmLog, 'id' | 'created_at'>) => {
+    const { data, error } = await supabase
+      .from('crm_logs')
+      .insert([newLog])
+      .select('id, created_at')
+      .single();
+
+    if (error) {
+      console.error('Error adding CRM log:', error);
+      throw error;
+    }
+
+    const log: CrmLog = {
+      ...newLog,
+      id: data.id,
+      created_at: data.created_at
+    };
+    setCrmLogs(prev => [log, ...prev]);
+  };
+
   return (
     <DataContext.Provider value={{
       properties,
       appointments,
+      crmLogs,
       addProperty,
       deleteProperty,
       updatePropertyStatus,
       addAppointment,
       deleteAppointment,
-      updateAppointmentStatus
+      updateAppointmentStatus,
+      addCrmLog
     }}>
       {children}
     </DataContext.Provider>

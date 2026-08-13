@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, List, Calendar, User, BarChart2 } from 'lucide-react';
+import { Home, List, Calendar, User, BarChart2, Briefcase } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
@@ -36,6 +36,11 @@ export default function BottomTabBar() {
       <Link href="/citas" className={linkClass('/citas')}>
         <Calendar size={22} />
         <span className="text-[10px] mt-0.5 font-semibold">Citas</span>
+      </Link>
+
+      <Link href="/crm" className={linkClass('/crm')}>
+        <Briefcase size={22} />
+        <span className="text-[10px] mt-0.5 font-semibold">CRM</span>
       </Link>
 
       {/* KPIs: SOLO visible para ADMINISTRADOR */}

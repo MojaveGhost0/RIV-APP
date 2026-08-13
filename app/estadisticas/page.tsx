@@ -11,10 +11,13 @@ import {
 import {
   TrendingUp, Home, CheckCircle, Users, ShieldAlert,
   MapPin, DollarSign, AlertTriangle, TrendingDown, Lightbulb,
-  BarChart2, Megaphone, Target, Star,
+  BarChart2, Megaphone, Target, Star, Download,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { Property } from '../context/DataContext';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { useRef } from 'react';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
@@ -74,6 +77,27 @@ export default function Estadisticas() {
   const { properties, appointments } = useData();
   const router = useRouter();
   const [filtroAsesor, setFiltroAsesor] = useState('Todos');
+  const [isExporting, setIsExporting] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const exportPDF = async () => {
+    if (!printRef.current) return;
+    setIsExporting(true);
+    try {
+      const canvas = await html2canvas(printRef.current, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`KPIs_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error('Error al exportar PDF:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   useEffect(() => {
     if (!isAdmin) router.replace('/');
@@ -137,6 +161,24 @@ export default function Estadisticas() {
   const dataFiltrada = filtroAsesor === 'Todos'
     ? CAPTACIONES_MES
     : CAPTACIONES_MES.filter(c => c.asesor === filtroAsesor);
+
+  // Cálculos Rendimiento Individual (Solo si filtroAsesor != 'Todos')
+  const asesorSeleccionado = allUsers.find(u => {
+    const alias = u.nombre.split(' ')[0] + ' ' + (u.nombre.split(' ')[1]?.[0] + '.' || '');
+    return alias === filtroAsesor;
+  });
+  
+  const citasAsesor = asesorSeleccionado 
+    ? appointments.filter(a => a.asesores.some(ase => ase === asesorSeleccionado.nombre)).length 
+    : 0;
+  
+  const ventasAsesor = asesorSeleccionado
+    ? properties.filter(p => p.status === 'Vendida' && p.captador === asesorSeleccionado.nombre).length
+    : 0;
+
+  const captacionesAsesor = asesorSeleccionado
+    ? properties.filter(p => p.captador === asesorSeleccionado.nombre).length
+    : 0;
 
   // 3. Inmuebles por municipio / zona
   const zonaCount: Record<string, number> = {};
@@ -269,18 +311,28 @@ export default function Estadisticas() {
     <div className="bg-gray-50 min-h-[100dvh] page-content">
 
       {/* HEADER */}
-      <header className="bg-white px-5 pt-8 pb-5 sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="bg-vinotinto/10 p-1.5 rounded-lg">
-            <TrendingUp size={16} className="text-vinotinto" />
+      <header className="bg-white px-5 pt-8 pb-5 sticky top-0 z-10 shadow-sm flex justify-between items-end">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="bg-vinotinto/10 p-1.5 rounded-lg">
+              <TrendingUp size={16} className="text-vinotinto" />
+            </div>
+            <p className="text-[10px] font-bold text-vinotinto uppercase tracking-widest">Solo Admin</p>
           </div>
-          <p className="text-[10px] font-bold text-vinotinto uppercase tracking-widest">Solo Admin</p>
+          <h1 className="text-2xl font-extrabold text-gray-900">Estadísticas</h1>
+          <p className="text-xs text-gray-400 mt-0.5">{mesCapitalizado}</p>
         </div>
-        <h1 className="text-2xl font-extrabold text-gray-900">Estadísticas</h1>
-        <p className="text-xs text-gray-400 mt-0.5">{mesCapitalizado}</p>
+        <button
+          onClick={exportPDF}
+          disabled={isExporting}
+          className="flex items-center gap-1 text-xs font-bold bg-vinotinto/10 text-vinotinto px-3 py-2 rounded-xl transition-all hover:bg-vinotinto/20 active:scale-95 disabled:opacity-50"
+        >
+          <Download size={14} />
+          {isExporting ? 'Exportando...' : 'PDF'}
+        </button>
       </header>
 
-      <div className="p-4 space-y-5 pb-28">
+      <div className="p-4 space-y-5 pb-28" ref={printRef}>
 
         {/* ── KPI MINI CARDS ──────────────────────────────────────────────── */}
         <div className="grid grid-cols-3 gap-3">
@@ -499,6 +551,26 @@ export default function Estadisticas() {
               <Bar dataKey="captaciones" name="Captaciones" fill="#800020" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+
+          {filtroAsesor !== 'Todos' && asesorSeleccionado && (
+            <div className="mt-5 border-t border-gray-100 pt-5">
+              <h3 className="text-sm font-bold text-gray-800 mb-3">Rendimiento Individual: {asesorSeleccionado.nombre}</h3>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-vinotinto/5 rounded-xl p-3 text-center border border-vinotinto/10">
+                  <p className="text-2xl font-extrabold text-vinotinto">{captacionesAsesor}</p>
+                  <p className="text-[10px] font-bold text-vinotinto mt-1">Captaciones</p>
+                </div>
+                <div className="bg-green-50 rounded-xl p-3 text-center border border-green-100">
+                  <p className="text-2xl font-extrabold text-green-600">{ventasAsesor}</p>
+                  <p className="text-[10px] font-bold text-green-700 mt-1">Ventas</p>
+                </div>
+                <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100">
+                  <p className="text-2xl font-extrabold text-blue-600">{citasAsesor}</p>
+                  <p className="text-[10px] font-bold text-blue-700 mt-1">Total Citas</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── RECOMENDACIONES DE MARKETING ─────────────────────────────────── */}

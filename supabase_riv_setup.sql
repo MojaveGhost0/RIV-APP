@@ -62,6 +62,18 @@ CREATE TABLE IF NOT EXISTS appointments (
 );
 
 -- =============================================================================
+-- TABLA: crm_logs (Registro de CRM)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS crm_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  cliente TEXT NOT NULL,
+  asesor TEXT NOT NULL,
+  tipo_interaccion TEXT NOT NULL,
+  notas TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- =============================================================================
 -- SEGURIDAD (Row Level Security - RLS)
 -- =============================================================================
 -- Por ahora (fase 1) permitimos lectura/escritura pública anónima (usando la anon key)
@@ -69,6 +81,7 @@ CREATE TABLE IF NOT EXISTS appointments (
 ALTER TABLE properties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE crm_logs ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Permitir lectura y escritura publica en properties" ON properties;
 CREATE POLICY "Permitir lectura y escritura publica en properties" ON properties
@@ -80,6 +93,10 @@ CREATE POLICY "Permitir lectura y escritura publica en appointments" ON appointm
 
 DROP POLICY IF EXISTS "Permitir lectura y escritura publica en users" ON users;
 CREATE POLICY "Permitir lectura y escritura publica en users" ON users
+  FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir lectura y escritura publica en crm_logs" ON crm_logs;
+CREATE POLICY "Permitir lectura y escritura publica en crm_logs" ON crm_logs
   FOR ALL USING (true) WITH CHECK (true);
 
 -- =============================================================================
