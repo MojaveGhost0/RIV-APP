@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { useData } from '../../context/DataContext';
 import ExportModal from '../../components/ExportModal';
 import { useAuth } from '../../context/AuthContext';
+import { containerVariants, itemVariants } from '../../lib/motion';
 
 const STATUS_OPTIONS = ['Activa', 'Suspendida', 'Vendida'];
 
@@ -82,19 +83,6 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
   };
 
   const PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\' viewBox=\'0 0 400 300\'%3E%3Crect width=\'400\' height=\'300\' fill=\'%23f3f4f6\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%239ca3af\' font-size=\'48\'%3E🏠%3C/text%3E%3C/svg%3E';
-
-  const containerVariants: any = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.08, delayChildren: 0.2 }
-    }
-  };
-
-  const itemVariants: any = {
-    hidden: { opacity: 0, y: 15 },
-    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-  };
 
   return (
     <div className="bg-white min-h-[100dvh]">

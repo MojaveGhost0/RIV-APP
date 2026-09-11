@@ -19,8 +19,8 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-        {/* Escala correcta en móviles: no zoom automático en inputs de iOS */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+        {/* Escala accesible en móviles respetando WCAG 1.4.4 (DT-02) */}
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#800020" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

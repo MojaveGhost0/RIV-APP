@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar as CalendarIcon, Clock, Plus, X, User, ShieldAlert, Trash2, CheckCheck } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Plus, X, User, ShieldAlert, Trash2, CheckCheck, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { containerVariants, itemVariants } from '../lib/motion';
+import { normalize } from '../lib/searchEngine';
 
 const TIPO_COLOR: Record<string, string> = {
   'Cita en Oficina':   'bg-blue-500',
@@ -20,6 +22,8 @@ export default function GestorCitas() {
 
   const [activeTab, setActiveTab] = useState<'proximas' | 'historico'>('proximas');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     tipo: 'Mostrar Propiedad',
     titulo: '',
@@ -29,12 +33,7 @@ export default function GestorCitas() {
     asesoresIds: user?.id ? [user.id] : [],
   });
 
-  // Normaliza un nombre: quita tildes, pasa a minúsculas y recorta espacios
-  // Así 'Juan Garcia' y 'Juan García' se comparan igual
-  const normalize = (s: string) =>
-    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-
-  // REGLA DE NEGOCIO:
+  // REGLA DE NEGOCIO (DT-04: normalize compartido desde searchEngine.ts):
   // - Asesor solo ve sus propias citas.
   // - Admin ve todas las citas de la agencia.
   const myNombre = normalize(user?.nombre ?? '');
@@ -50,28 +49,39 @@ export default function GestorCitas() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // LOG-04: handleSubmit async con try/catch; no cierra el modal si falla
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
+
     // Si admin asignó asesores específicos, usarlos; si no, usar el usuario actual
     const asesoresAsignados = isAdmin
       ? formData.asesoresIds.map(id => allUsers.find(u => u.id === id)?.nombre).filter(Boolean) as string[]
       : [user?.nombre ?? 'Asesor'];
 
     if (asesoresAsignados.length === 0) {
-      alert("Debes seleccionar al menos un asesor.");
+      setSubmitError("Debes seleccionar al menos un asesor.");
       return;
     }
 
-    addAppointment({
-      tipo: formData.tipo,
-      titulo: formData.titulo,
-      cliente: formData.cliente,
-      fecha: formData.fecha,
-      hora: formData.hora,
-      asesores: asesoresAsignados,
-    });
-    setIsModalOpen(false);
-    setFormData({ tipo: 'Mostrar Propiedad', titulo: '', cliente: '', fecha: '', hora: '', asesoresIds: user?.id ? [user.id] : [] });
+    setIsSubmitting(true);
+    try {
+      await addAppointment({
+        tipo: formData.tipo,
+        titulo: formData.titulo,
+        cliente: formData.cliente,
+        fecha: formData.fecha,
+        hora: formData.hora,
+        asesores: asesoresAsignados,
+      });
+      setIsModalOpen(false);
+      setFormData({ tipo: 'Mostrar Propiedad', titulo: '', cliente: '', fecha: '', hora: '', asesoresIds: user?.id ? [user.id] : [] });
+    } catch (err: any) {
+      console.error('Error al guardar cita (LOG-04):', err);
+      setSubmitError(err?.message || 'Error al guardar la cita en el servidor. Revisa tu conexión.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleComplete = (id: string) => {
@@ -82,19 +92,6 @@ export default function GestorCitas() {
     if (confirm('¿Eliminar esta cita?')) {
       deleteAppointment(id);
     }
-  };
-
-  const containerVariants: any = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.08 }
-    }
-  };
-
-  const itemVariants: any = {
-    hidden: { opacity: 0, y: 15 },
-    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
 
   return (
@@ -258,12 +255,18 @@ export default function GestorCitas() {
             >
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-800">Agendar Cita</h2>
-                <button onClick={() => setIsModalOpen(false)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition">
+                <button onClick={() => { setIsModalOpen(false); setSubmitError(null); }} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition">
                   <X size={20} />
                 </button>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                {submitError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+                    <AlertCircle size={16} className="shrink-0 text-red-500" />
+                    <span>{submitError}</span>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Cita</label>
                   <select name="tipo" value={formData.tipo} onChange={handleInputChange}
@@ -340,9 +343,10 @@ export default function GestorCitas() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   type="submit"
-                  className="w-full py-4 bg-gradient-to-r from-vinotinto to-[#a60029] text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all"
+                  disabled={isSubmitting}
+                  className="w-full py-4 bg-gradient-to-r from-vinotinto to-[#a60029] text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all disabled:opacity-50"
                 >
-                  Guardar Cita
+                  {isSubmitting ? 'Guardando...' : 'Guardar Cita'}
                 </motion.button>
               </form>
             </motion.div>

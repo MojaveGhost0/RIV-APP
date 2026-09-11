@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 
 // =============================================================================
@@ -168,6 +168,7 @@ interface DataContextType {
   properties: Property[];
   appointments: Appointment[];
   crmLogs: CrmLog[];
+  dataError: string | null;
   addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => Promise<string>;
   deleteProperty: (id: string) => Promise<void>;
   updatePropertyStatus: (id: string, status: string) => Promise<void>;
@@ -184,11 +185,11 @@ interface DataContextType {
 const localToday = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
 
 // =============================================================================
-// DEFAULT SEED DATA
+// DEFAULT SEED DATA (DT-03: IDs con formato UUID estándar)
 // =============================================================================
 const DEFAULT_PROPERTIES: Property[] = [
   {
-    id: '1',
+    id: '00000000-0000-0000-0000-000000000001',
     title: "Apartamento Vista al Mar",
     price: 45000,
     location: "Pampatar, Margarita",
@@ -207,7 +208,7 @@ const DEFAULT_PROPERTIES: Property[] = [
     createdAt: "2026-07-10T10:00:00.000Z",
   },
   {
-    id: '2',
+    id: '00000000-0000-0000-0000-000000000002',
     title: "Villa Exclusiva Costa Azul",
     price: 120000,
     location: "Costa Azul, Porlamar",
@@ -226,7 +227,7 @@ const DEFAULT_PROPERTIES: Property[] = [
     createdAt: "2026-07-12T09:00:00.000Z",
   },
   {
-    id: '123',
+    id: '00000000-0000-0000-0000-000000000003',
     title: 'Exclusivo Apartamento Vista al Mar',
     price: 85000,
     location: 'Pampatar, Isla de Margarita',
@@ -246,7 +247,7 @@ const DEFAULT_PROPERTIES: Property[] = [
     createdAt: "2026-07-15T14:00:00.000Z",
   },
   {
-    id: '4',
+    id: '00000000-0000-0000-0000-000000000004',
     title: 'Townhouse en Conjunto Residencial',
     price: 65000,
     location: 'Playa El Ángel, Margarita',
@@ -262,7 +263,7 @@ const DEFAULT_PROPERTIES: Property[] = [
     createdAt: "2026-06-20T11:00:00.000Z",
   },
   {
-    id: '5',
+    id: '00000000-0000-0000-0000-000000000005',
     title: 'Penthouse de Lujo',
     price: 210000,
     location: 'Av. Aldonza Manrique',
@@ -278,7 +279,7 @@ const DEFAULT_PROPERTIES: Property[] = [
     createdAt: "2026-05-10T08:00:00.000Z",
   },
   {
-    id: '6',
+    id: '00000000-0000-0000-0000-000000000006',
     title: 'Local Comercial Céntrico',
     price: 35000,
     location: 'Av. Santiago Mariño, Porlamar',
@@ -295,17 +296,14 @@ const DEFAULT_PROPERTIES: Property[] = [
   }
 ];
 
-// FIX #3 — IDs unificados a string (antes eran number 1,2,3... lo que causaba
-//           que delete/update fallaran al comparar tras JSON.parse)
-// FIX #4 — fecha usa localToday() en vez de toISOString() para timezone correcta
 const today = localToday();
 const DEFAULT_CITAS: Appointment[] = [
-  { id: '1', tipo: 'Mostrar Propiedad',  titulo: 'Villa Exclusiva Costa Azul', cliente: 'María López',        fecha: '2026-07-16', hora: '14:30', asesores: ['Juan García'],                         estado: 'Pendiente'  },
-  { id: '2', tipo: 'Captar Propiedad',   titulo: 'Apto Pampatar',              cliente: 'Juan Gómez',          fecha: '2026-07-17', hora: '10:00', asesores: ['Amado Lovera'],                       estado: 'Pendiente'  },
-  { id: '3', tipo: 'Cita en Oficina',    titulo: 'Firma de Contrato',          cliente: 'Familia Rodríguez',   fecha: '2026-07-14', hora: '16:00', asesores: ['Juan García'],                         estado: 'Completada' },
-  { id: '4', tipo: 'Mostrar Propiedad',  titulo: 'Penthouse Playa El Agua',    cliente: 'Luis Fernández',      fecha: '2026-07-13', hora: '09:00', asesores: ['Amado Lovera', 'Gerardo Garcia'],     estado: 'Completada' },
-  { id: '5', tipo: 'Mostrar Propiedad',  titulo: 'Visita Local Comercial',     cliente: 'Pedro Sánchez',       fecha: today,        hora: '15:00', asesores: ['Gerardo Garcia'],                     estado: 'Pendiente'  },
-  { id: '6', tipo: 'Firma',              titulo: 'Firma Opción a Compra',      cliente: 'Carlos Roa',          fecha: today,        hora: '17:30', asesores: ['Juan García', 'Amado Lovera'],        estado: 'Pendiente'  },
+  { id: '10000000-0000-0000-0000-000000000001', tipo: 'Mostrar Propiedad',  titulo: 'Villa Exclusiva Costa Azul', cliente: 'María López',        fecha: '2026-07-16', hora: '14:30', asesores: ['Juan García'],                         estado: 'Pendiente'  },
+  { id: '10000000-0000-0000-0000-000000000002', tipo: 'Captar Propiedad',   titulo: 'Apto Pampatar',              cliente: 'Juan Gómez',          fecha: '2026-07-17', hora: '10:00', asesores: ['Amado Lovera'],                       estado: 'Pendiente'  },
+  { id: '10000000-0000-0000-0000-000000000003', tipo: 'Cita en Oficina',    titulo: 'Firma de Contrato',          cliente: 'Familia Rodríguez',   fecha: '2026-07-14', hora: '16:00', asesores: ['Juan García'],                         estado: 'Completada' },
+  { id: '10000000-0000-0000-0000-000000000004', tipo: 'Mostrar Propiedad',  titulo: 'Penthouse Playa El Agua',    cliente: 'Luis Fernández',      fecha: '2026-07-13', hora: '09:00', asesores: ['Amado Lovera', 'Gerardo Garcia'],     estado: 'Completada' },
+  { id: '10000000-0000-0000-0000-000000000005', tipo: 'Mostrar Propiedad',  titulo: 'Visita Local Comercial',     cliente: 'Pedro Sánchez',       fecha: today,        hora: '15:00', asesores: ['Gerardo Garcia'],                     estado: 'Pendiente'  },
+  { id: '10000000-0000-0000-0000-000000000006', tipo: 'Firma',              titulo: 'Firma Opción a Compra',      cliente: 'Carlos Roa',          fecha: today,        hora: '17:30', asesores: ['Juan García', 'Amado Lovera'],        estado: 'Pendiente'  },
 ];
 
 // =============================================================================
@@ -317,40 +315,49 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [properties, setProperties] = useState<Property[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [crmLogs, setCrmLogs] = useState<CrmLog[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
 
-  // Cargar datos de Supabase al montar
+  // Cargar datos de Supabase al montar — con distinción de error real vs lista vacía (LOG-05)
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [propsRes, appsRes, crmRes] = await Promise.all([
           supabase.from('properties').select('*').order('created_at', { ascending: false }),
           supabase.from('appointments').select('*').order('fecha', { ascending: true }),
-          supabase.from('crm_logs').select('*').order('created_at', { ascending: false })
+          supabase.from('crm_logs').select('*').order('created_at', { ascending: false }),
         ]);
 
-        if (propsRes.data) {
-          // Supabase devuelve el nombre exacto de la tabla, normalizamos
-          setProperties(propsRes.data as Property[]);
+        const anyError = propsRes.error || appsRes.error || crmRes.error;
+        if (anyError) {
+          const errMsg = propsRes.error?.message || appsRes.error?.message || crmRes.error?.message || 'Error de conexión o permisos';
+          console.warn('Error al cargar datos desde Supabase (LOG-05):', errMsg);
+          setDataError(errMsg);
+          // Modo fallback de demostración si hubo error
+          setProperties(DEFAULT_PROPERTIES);
+          setAppointments(DEFAULT_CITAS);
+          return;
         }
-        if (appsRes.data) {
-          setAppointments(appsRes.data as Appointment[]);
-        }
-        if (crmRes.data) {
-          setCrmLogs(crmRes.data as CrmLog[]);
-        }
-      } catch (error) {
-        console.error('Error fetching data from Supabase:', error);
-      } finally {
-        setIsLoaded(true);
+
+        setDataError(null);
+        const propsData = propsRes.data as Property[] | null;
+        setProperties(propsData ?? []);
+
+        if (appsRes.data) setAppointments(appsRes.data as Appointment[]);
+        if (crmRes.data) setCrmLogs(crmRes.data as CrmLog[]);
+      } catch (err: any) {
+        const errMsg = err?.message || 'Error de red o conexión a Supabase';
+        console.error('Excepción al conectar con Supabase:', err);
+        setDataError(errMsg);
+        setProperties(DEFAULT_PROPERTIES);
+        setAppointments(DEFAULT_CITAS);
       }
     };
-    
+
     fetchData();
   }, []);
 
   // Add Property
-  const addProperty = async (newProp: Omit<Property, 'id' | 'createdAt'>): Promise<string> => {
+  const addProperty = useCallback(async (newProp: Omit<Property, 'id' | 'createdAt'>): Promise<string> => {
     const { data, error } = await supabase
       .from('properties')
       .insert([newProp])
@@ -369,22 +376,46 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
     setProperties(prev => [property, ...prev]);
     return data.id;
-  };
+  }, []);
 
-  // Delete Property
-  const deleteProperty = async (id: string) => {
-    setProperties(prev => prev.filter(prop => prop.id !== id));
-    await supabase.from('properties').delete().eq('id', id);
-  };
+  // Delete Property con Rollback (LOG-01)
+  const deleteProperty = useCallback(async (id: string) => {
+    let previousState: Property[] = [];
+    setProperties(prev => {
+      previousState = prev;
+      return prev.filter(prop => prop.id !== id);
+    });
 
-  // Update Property Status
-  const updatePropertyStatus = async (id: string, status: string) => {
-    setProperties(prev => prev.map(p => p.id === id ? { ...p, status } : p));
-    await supabase.from('properties').update({ status }).eq('id', id);
-  };
+    try {
+      const { error } = await supabase.from('properties').delete().eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error al eliminar propiedad en Supabase. Revirtiendo estado local (LOG-01):', err);
+      setProperties(previousState);
+      throw err;
+    }
+  }, []);
+
+  // Update Property Status con Rollback (LOG-02)
+  const updatePropertyStatus = useCallback(async (id: string, status: string) => {
+    let previousState: Property[] = [];
+    setProperties(prev => {
+      previousState = prev;
+      return prev.map(p => p.id === id ? { ...p, status } : p);
+    });
+
+    try {
+      const { error } = await supabase.from('properties').update({ status }).eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error al actualizar status de propiedad. Revirtiendo estado local (LOG-02):', err);
+      setProperties(previousState);
+      throw err;
+    }
+  }, []);
 
   // Add Appointment
-  const addAppointment = async (newApp: Omit<Appointment, 'id' | 'estado'>) => {
+  const addAppointment = useCallback(async (newApp: Omit<Appointment, 'id' | 'estado'>) => {
     const { data, error } = await supabase
       .from('appointments')
       .insert([{ ...newApp, estado: 'Pendiente' }])
@@ -399,25 +430,49 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const appointment: Appointment = {
       ...newApp,
       id: data.id,
-      estado: 'Pendiente'
+      estado: 'Pendiente',
     };
-    setAppointments(prev => [appointment, ...prev]);
-  };
+    setAppointments(prev => [...prev, appointment].sort((a, b) => a.fecha.localeCompare(b.fecha)));
+  }, []);
 
-  // Delete Appointment
-  const deleteAppointment = async (id: string) => {
-    setAppointments(prev => prev.filter(app => app.id !== id));
-    await supabase.from('appointments').delete().eq('id', id);
-  };
+  // Delete Appointment con Rollback (ROB-04)
+  const deleteAppointment = useCallback(async (id: string) => {
+    let previousState: Appointment[] = [];
+    setAppointments(prev => {
+      previousState = prev;
+      return prev.filter(app => app.id !== id);
+    });
 
-  // Update Appointment Status
-  const updateAppointmentStatus = async (id: string, status: string) => {
-    setAppointments(prev => prev.map(app => app.id === id ? { ...app, estado: status } : app));
-    await supabase.from('appointments').update({ estado: status }).eq('id', id);
-  };
+    try {
+      const { error } = await supabase.from('appointments').delete().eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error al eliminar cita en Supabase. Revirtiendo estado local (ROB-04):', err);
+      setAppointments(previousState);
+      throw err;
+    }
+  }, []);
+
+  // Update Appointment Status con Rollback (LOG-02)
+  const updateAppointmentStatus = useCallback(async (id: string, status: string) => {
+    let previousState: Appointment[] = [];
+    setAppointments(prev => {
+      previousState = prev;
+      return prev.map(app => app.id === id ? { ...app, estado: status } : app);
+    });
+
+    try {
+      const { error } = await supabase.from('appointments').update({ estado: status }).eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error al actualizar status de cita. Revirtiendo estado local (LOG-02):', err);
+      setAppointments(previousState);
+      throw err;
+    }
+  }, []);
 
   // Add CRM Log
-  const addCrmLog = async (newLog: Omit<CrmLog, 'id' | 'created_at'>) => {
+  const addCrmLog = useCallback(async (newLog: Omit<CrmLog, 'id' | 'created_at'>) => {
     const { data, error } = await supabase
       .from('crm_logs')
       .insert([newLog])
@@ -432,16 +487,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const log: CrmLog = {
       ...newLog,
       id: data.id,
-      created_at: data.created_at
+      created_at: data.created_at,
     };
     setCrmLogs(prev => [log, ...prev]);
-  };
+  }, []);
 
   return (
     <DataContext.Provider value={{
       properties,
       appointments,
       crmLogs,
+      dataError,
       addProperty,
       deleteProperty,
       updatePropertyStatus,

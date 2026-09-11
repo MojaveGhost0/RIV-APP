@@ -12,6 +12,7 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import type { Property, PropertyType } from '../context/DataContext';
 import { fuzzySearch, applyAIFilters, type AIFilters } from '../lib/searchEngine';
+import { containerVariants, itemVariants } from '../lib/motion';
 
 // Icono pequeño por tipo (para el badge de las tarjetas)
 const TYPE_BADGE: Partial<Record<PropertyType, { icon: React.ReactNode; label: string }>> = {
@@ -155,19 +156,6 @@ export default function Inventario() {
   }, [properties, searchQuery, activeFilter, aiFilters, isAILoading]);
 
   const isAIActive = !!aiFilters && !isAILoading && !!searchQuery.trim();
-
-  const containerVariants: any = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.08 }
-    }
-  };
-
-  const itemVariants: any = {
-    hidden: { opacity: 0, y: 15 },
-    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-  };
 
   return (
     <div className="bg-gray-50 min-h-[100dvh] page-content">

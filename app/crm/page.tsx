@@ -7,6 +7,15 @@ import { ShieldAlert, Plus, User, Calendar, FileText, Download, X, Search, Chevr
 import { motion, AnimatePresence } from 'framer-motion';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { normalize } from '../lib/searchEngine';
+
+// SEC-05: Sanitización preventiva de texto contra scripts o tags HTML maliciosos
+function sanitizeText(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<[^>]+>/g, '');
+}
 
 export default function CRMPage() {
   const { user, isAdmin } = useAuth();
@@ -24,8 +33,7 @@ export default function CRMPage() {
   
   const printRef = useRef<HTMLDivElement>(null);
 
-  // Normalización para búsquedas
-  const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  // DT-04: Usa normalize compartido desde searchEngine.ts
   const myNombre = normalize(user?.nombre ?? '');
 
   // Derivar la lista de clientes (ya sea de citas o del crmLogs)
@@ -38,11 +46,16 @@ export default function CRMPage() {
       if (isAdmin || isMyAppointment) {
         const clientName = app.cliente.trim();
         if (!clientsMap.has(clientName)) clientsMap.set(clientName, []);
+        
+        // LOG-07: Asegurar timezone explícita (-04:00 Margarita / Venezuela) para consistencia entre navegadores
+        const horaIso = app.hora.length === 5 ? `${app.hora}:00` : app.hora;
+        const fechaIso = new Date(`${app.fecha}T${horaIso}-04:00`).toISOString();
+
         clientsMap.get(clientName)?.push({
           id: `app-${app.id}`,
           tipo: 'Cita: ' + app.tipo,
           notas: `${app.titulo} - Estado: ${app.estado}`,
-          fecha: new Date(`${app.fecha}T${app.hora}`).toISOString(),
+          fecha: fechaIso,
           asesor: app.asesores.join(', ')
         });
       }
@@ -89,13 +102,14 @@ export default function CRMPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.cliente.trim()) return;
+    // ROB-01: Validar tanto cliente como notas en la lógica JS antes de enviar
+    if (!formData.cliente.trim() || !formData.notas.trim()) return;
     
     await addCrmLog({
       cliente: formData.cliente.trim(),
       asesor: user?.nombre ?? 'Desconocido',
       tipo_interaccion: formData.tipo_interaccion,
-      notas: formData.notas
+      notas: formData.notas.trim()
     });
     
     setIsModalOpen(false);
@@ -138,7 +152,7 @@ export default function CRMPage() {
         </button>
       </header>
 
-      <div className="px-4 py-4 space-y-4" ref={printRef}>
+      <div className="px-4 py-4 space-y-4">
         {/* Search */}
         <div className="relative">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -151,14 +165,16 @@ export default function CRMPage() {
           />
         </div>
 
-        {clientData.length === 0 ? (
-          <div className="text-center py-14 bg-white rounded-2xl border border-gray-100 mt-4">
-            <Briefcase className="mx-auto text-gray-300 mb-3" size={44} />
-            <p className="text-gray-500 font-semibold">No hay clientes registrados.</p>
-            <p className="text-sm text-gray-400 mt-1">Registra una interacción para empezar.</p>
-          </div>
-        ) : (
-          <div className="space-y-3 pb-28">
+        {/* ROB-06: printRef envuelve únicamente el reporte de clientes y no la barra de búsqueda */}
+        <div ref={printRef} className="space-y-4">
+          {clientData.length === 0 ? (
+            <div className="text-center py-14 bg-white rounded-2xl border border-gray-100 mt-4">
+              <Briefcase className="mx-auto text-gray-300 mb-3" size={44} />
+              <p className="text-gray-500 font-semibold">No hay clientes registrados.</p>
+              <p className="text-sm text-gray-400 mt-1">Registra una interacción para empezar.</p>
+            </div>
+          ) : (
+            <div className="space-y-3 pb-28">
             {clientData.map((client) => (
               <div key={client.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <button
@@ -202,8 +218,8 @@ export default function CRMPage() {
                               </span>
                             </div>
                             {hist.notas && (
-                              <p className="text-sm text-gray-600 mt-2 bg-white p-2 rounded-lg border border-gray-100 leading-relaxed">
-                                {hist.notas}
+                              <p className="text-sm text-gray-600 mt-2 bg-white p-2 rounded-lg border border-gray-100 leading-relaxed break-words">
+                                {sanitizeText(hist.notas)}
                               </p>
                             )}
                             {isAdmin && (
@@ -230,6 +246,7 @@ export default function CRMPage() {
             ))}
           </div>
         )}
+        </div>
       </div>
 
       {/* FAB para nuevo cliente/registro global */}

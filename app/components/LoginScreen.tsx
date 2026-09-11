@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, Lock, User, AlertCircle, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { containerVariants, itemVariants } from '../lib/motion';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -32,22 +33,6 @@ export default function LoginScreen() {
     setIsLoading(false);
   };
 
-  const containerVariants: any = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1, delayChildren: 0.2 }
-    }
-  };
-
-  const itemVariants: any = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: { type: "spring", stiffness: 300, damping: 24 }
-    }
-  };
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-gray-50 relative overflow-hidden">

@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ImageUploader from '../../components/ImageUploader';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
+import { itemVariants } from '../../lib/motion';
 import {
   MARGARITA_LOCATIONS,
   PROPERTY_TYPES,
@@ -164,6 +165,7 @@ export default function RegistroPropiedad() {
   const totalSteps = 4;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   // Tipo seleccionado
   const [selectedType, setSelectedType] = useState<PropertyType>('Apartamento');
@@ -240,7 +242,8 @@ export default function RegistroPropiedad() {
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const canProceed = () => {
@@ -251,11 +254,12 @@ export default function RegistroPropiedad() {
 
   const handleSubmit = async () => {
     if (formData.imagenes.length === 0) {
-      alert('Por favor sube al menos una foto de la propiedad.');
+      setSubmitError('Debes subir al menos una foto antes de publicar.');
       return;
     }
+    setSubmitError('');
     setIsSubmitting(true);
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 600));
 
     const newId = await addProperty({
       title: formData.titulo,
@@ -665,9 +669,9 @@ export default function RegistroPropiedad() {
               </div>
             </div>
 
-            {formData.imagenes.length === 0 && (
+            {(formData.imagenes.length === 0 || submitError) && (
               <div className="bg-red-50 border border-red-200 p-3 rounded-xl text-red-700 text-sm">
-                ⚠️ Debes subir al menos una foto en el paso 3.
+                {submitError || '⚠️ Debes subir al menos una foto en el paso 3.'}
               </div>
             )}
           </div>

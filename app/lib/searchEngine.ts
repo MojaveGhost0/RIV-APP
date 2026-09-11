@@ -116,6 +116,12 @@ export function parsePriceRange(query: string): PriceRange {
     result.max = result.max ?? 120000;
   }
 
+  // ROB-03: Validar que min <= max; si min > max es un rango contradictorio, retornar {} y advertir
+  if (result.min !== undefined && result.max !== undefined && result.min > result.max) {
+    console.warn(`[searchEngine] Rango de precio inconsistente: min (${result.min}) > max (${result.max}). Descartando rango inválido.`);
+    return {};
+  }
+
   return result;
 }
 
@@ -232,7 +238,9 @@ export function fuzzySearch(properties: Property[], query: string): Property[] {
   const normalized = normalize(trimmed);
   const rawTokens = normalized.split(/[\s,]+/).filter(t => t.length > 1);
 
-  if (!rawTokens.length) return properties;
+  // ROB-02: Si se ingresó una búsqueda pero ningún token tiene longitud > 1 (e.g. 'a', 'b '),
+  // no se debe devolver todo el inventario, sino un array vacío.
+  if (!rawTokens.length) return [];
 
   const tokenArray = Array.from(expandTokens(rawTokens));
   const priceRange = parsePriceRange(normalized);
