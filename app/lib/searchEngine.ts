@@ -132,6 +132,13 @@ export function parseBeds(query: string): number | null {
   return m ? parseInt(m[1]) : null;
 }
 
+// ─── Parser de baños ────────────────────────────────────────────────────────
+export function parseBaths(query: string): number | null {
+  const q = normalize(query);
+  const m = q.match(/(\d+)\s*(?:ba[nñ]o(?:s)?|aseo(?:s)?|lavabo(?:s)?)/);
+  return m ? parseInt(m[1]) : null;
+}
+
 // ─── Parser de metraje ────────────────────────────────────────────────────────
 interface SqmRange { min?: number; max?: number; }
 
@@ -181,12 +188,14 @@ function scoreProperty(
   priceRange: PriceRange,
   sqmRange: SqmRange,
   bedsMin: number | null,
+  bathsMin: number | null,   // Paso 7 — nuevo filtro duro por baños
   propertyType: string | null,
 ): ScoredProperty {
   // Filtros duros (exclusión total)
   if (priceRange.min != null && property.price < priceRange.min) return { property, score: -1 };
   if (priceRange.max != null && property.price > priceRange.max) return { property, score: -1 };
-  if (bedsMin != null && property.beds < bedsMin)                return { property, score: -1 };
+  if (bedsMin  != null && property.beds  < bedsMin)              return { property, score: -1 };
+  if (bathsMin != null && property.baths < bathsMin)             return { property, score: -1 };
   if (sqmRange.min != null && property.sqm < sqmRange.min)       return { property, score: -1 };
   if (sqmRange.max != null && property.sqm > sqmRange.max)       return { property, score: -1 };
 
@@ -212,7 +221,9 @@ function scoreProperty(
     if (token.length < 2) continue;
     for (const field of fields) {
       if (field.text.includes(token)) {
-        score += field.weight;
+        // Paso 8 — Bonus x1.5 si el token coincide como palabra completa (no solo subcadena)
+        const isWholeWord = new RegExp(`\\b${token}\\b`).test(field.text);
+        score += field.weight * (isWholeWord ? 1.5 : 1);
       }
     }
   }
@@ -227,8 +238,9 @@ function scoreProperty(
  * - Parser de rangos de precio ("menos de 80k", "entre 50 y 100")
  * - Parser de metraje ("más de 100m²", "menos de 80 metros")
  * - Parser de habitaciones ("3 habs", "4 cuartos")
+ * - Parser de baños ("2 baños", "3 aseos")
  * - Parser de tipo de propiedad ("penthouse", "local comercial")
- * - Scoring de relevancia (los más relevantes primero)
+ * - Scoring de relevancia con bonus por palabra completa
  * - Insensible a tildes y mayúsculas
  */
 export function fuzzySearch(properties: Property[], query: string): Property[] {
@@ -245,11 +257,12 @@ export function fuzzySearch(properties: Property[], query: string): Property[] {
   const tokenArray = Array.from(expandTokens(rawTokens));
   const priceRange = parsePriceRange(normalized);
   const sqmRange = parseSqmRange(normalized);
-  const bedsMin = parseBeds(normalized);
+  const bedsMin  = parseBeds(normalized);
+  const bathsMin = parseBaths(normalized);  // Paso 7 — nuevo
   const propertyType = parsePropertyType(normalized);
 
   const scored = properties
-    .map(p => scoreProperty(p, tokenArray, priceRange, sqmRange, bedsMin, propertyType))
+    .map(p => scoreProperty(p, tokenArray, priceRange, sqmRange, bedsMin, bathsMin, propertyType))
     .filter(r => r.score > 0);
 
   scored.sort((a, b) => b.score - a.score);

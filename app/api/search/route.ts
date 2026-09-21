@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { GoogleAuth } from 'google-auth-library';
+import path from 'path';
 
 // =============================================================================
 // API ROUTE — /api/search
@@ -14,17 +16,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Query demasiado corta' }, { status: 400 });
     }
 
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-    if (!GEMINI_API_KEY) {
+    if (!GROQ_API_KEY) {
       // No hay API key configurada → el cliente debe hacer fallback a fuzzy
       return NextResponse.json({ error: 'AI_NOT_CONFIGURED' }, { status: 503 });
     }
 
+    // Paso 3 — Sanitizar query: limitar longitud y eliminar comillas que podrían romper el prompt
+    const safeQuery = query.trim().slice(0, 200).replace(/["“”‘’`]/g, "'");
+
     const prompt = `Eres un asistente de búsqueda para "RIV Margarita Premier", una agencia inmobiliaria en la Isla de Margarita, Venezuela.
 Tu tarea es analizar la consulta del usuario y extraer filtros estructurados para buscar propiedades. Los precios son en USD.
 
-Consulta del usuario: "${query.trim()}"
+Consulta del usuario: "${safeQuery}"
 
 Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin markdown, sin texto extra):
 {
@@ -90,36 +95,69 @@ Ubicación:
 Si no puedes extraer un filtro, déjalo null o array vacío [].
 Responde SOLO el JSON sin explicación adicional.`;
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.05,    // Muy baja temperatura → respuestas deterministas
-            maxOutputTokens: 512,
-            responseMimeType: "application/json",
-          },
-        }),
-      }
-    );
+    // Paso 2 — Timeout de 8 segundos con AbortController para evitar esperas indefinidas
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    if (!geminiRes.ok) {
-      console.error(`Gemini API error: ${geminiRes.status}`);
+    let groqRes: Response;
+    try {
+      groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: 'qwen/qwen3.8-27b', // Modelo disponible dinámicamente en tu API Key
+          messages: [
+            {
+              role: 'user',
+              content: prompt,
+            }
+          ],
+          temperature: 0.05,
+        }),
+      });
+    } catch (fetchErr) {
+      clearTimeout(timeoutId);
+      if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
+        console.warn('[search] Groq timeout después de 8s');
+        return NextResponse.json({ error: 'TIMEOUT' }, { status: 504 });
+      }
+      throw fetchErr;
+    }
+    clearTimeout(timeoutId);
+
+    if (!groqRes.ok) {
+      const errBody = await groqRes.text();
+      console.error(`[search] Groq API error: ${groqRes.status}`);
+      console.error(`[search] Groq error body:`, errBody);
       return NextResponse.json({ error: 'API_ERROR' }, { status: 502 });
     }
 
-    const data = await geminiRes.json();
-    const rawText: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+    const data = await groqRes.json();
+    const rawText: string = data.choices?.[0]?.message?.content ?? '';
 
-    // Como usamos responseMimeType: "application/json", Gemini devuelve el JSON directo
-    const filters = JSON.parse(rawText);
+    if (!rawText) {
+      console.error('[search] Groq devolvió respuesta vacía');
+      return NextResponse.json({ error: 'EMPTY_RESPONSE' }, { status: 502 });
+    }
+
+    // Paso 1 — Proteger JSON.parse: limpiar posible markdown envolvente y capturar errores
+    let filters: Record<string, unknown>;
+    try {
+      const cleaned = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+      filters = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error('[search] Gemini no devolvió JSON válido:', rawText, parseErr);
+      return NextResponse.json({ error: 'PARSE_ERROR' }, { status: 502 });
+    }
+
     return NextResponse.json(filters);
 
   } catch (err) {
-    console.error('Search route error:', err);
+    console.error('[search] Error interno:', err);
     return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
   }
 }

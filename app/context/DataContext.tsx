@@ -140,19 +140,26 @@ export interface Property {
   captador: string;
   amenities?: string[];
   propertyType?: PropertyType;
+  propietarioNombre?: string;
+  propietarioTelefono?: string;
+  formasNegociacion?: string;
+  metodosPago?: string;
   /** ISO date string — se asigna automáticamente al registrar */
   createdAt?: string;
+  created_at?: string;
 }
 
 export interface Appointment {
   id: string;          // FIX #3 — Unificado a string (antes string|number causaba fallos en delete/update)
   tipo: string;
   titulo: string;
-  cliente: string;
+  cliente?: string;
   fecha: string;
   hora: string;
   asesores: string[];
   estado: string;
+  reminder_sent?: boolean;
+  created_at?: string;
 }
 
 export interface CrmLog {
@@ -169,13 +176,17 @@ interface DataContextType {
   appointments: Appointment[];
   crmLogs: CrmLog[];
   dataError: string | null;
-  addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => Promise<string>;
+  addProperty: (property: Omit<Property, 'id' | 'createdAt' | 'created_at'>) => Promise<string>;
+  updateProperty: (id: string, updates: Partial<Omit<Property, 'id' | 'createdAt' | 'created_at'>>) => Promise<void>;
   deleteProperty: (id: string) => Promise<void>;
   updatePropertyStatus: (id: string, status: string) => Promise<void>;
   addAppointment: (appointment: Omit<Appointment, 'id' | 'estado'>) => Promise<void>;
+  updateAppointment: (id: string, updates: Partial<Omit<Appointment, 'id'>>) => Promise<void>;
   deleteAppointment: (id: string) => Promise<void>;
   updateAppointmentStatus: (id: string, status: string) => Promise<void>;
   addCrmLog: (log: Omit<CrmLog, 'id' | 'created_at'>) => Promise<void>;
+  updateCrmLog: (id: string, updates: Partial<Omit<CrmLog, 'id' | 'created_at'>>) => Promise<void>;
+  deleteCrmLog: (id: string) => Promise<void>;
 }
 
 // =============================================================================
@@ -339,7 +350,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
 
         setDataError(null);
-        const propsData = propsRes.data as Property[] | null;
+        const propsData = (propsRes.data as any[] | null)?.map(p => ({
+          ...p,
+          createdAt: p.createdAt || p.created_at,
+          created_at: p.created_at || p.createdAt,
+        })) as Property[] | null;
         setProperties(propsData ?? []);
 
         if (appsRes.data) setAppointments(appsRes.data as Appointment[]);
@@ -356,26 +371,50 @@ export function DataProvider({ children }: { children: ReactNode }) {
     fetchData();
   }, []);
 
-  // Add Property
-  const addProperty = useCallback(async (newProp: Omit<Property, 'id' | 'createdAt'>): Promise<string> => {
-    const { data, error } = await supabase
-      .from('properties')
-      .insert([newProp])
-      .select('id')
-      .single();
+  // Add Property con soporte para campos de propietario y fallback preventivo
+  const addProperty = useCallback(async (newProp: Omit<Property, 'id' | 'createdAt' | 'created_at'>): Promise<string> => {
+    let dataId: string;
+    let dataCreatedAt: string | undefined;
+    try {
+      const { data, error } = await supabase
+        .from('properties')
+        .insert([newProp])
+        .select('id, created_at')
+        .single();
 
-    if (error) {
-      console.error('Error adding property:', error);
-      throw error;
+      if (error) throw error;
+      dataId = data.id;
+      dataCreatedAt = data.created_at;
+    } catch (err: any) {
+      // Si las columnas de propietario aún no han sido migradas en la BD de Supabase, reintentar sin ellas
+      const isColError = err?.message?.includes('does not exist') || err?.code === '42703';
+      if (isColError) {
+        console.warn('Supabase: Columnas de propietario aún no creadas en BD. Guardando campos base...', err);
+        const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, ...baseProp } = newProp;
+        const { data: retryData, error: retryError } = await supabase
+          .from('properties')
+          .insert([baseProp])
+          .select('id, created_at')
+          .single();
+
+        if (retryError) throw retryError;
+        dataId = retryData.id;
+        dataCreatedAt = retryData.created_at;
+      } else {
+        console.error('Error adding property:', err);
+        throw err;
+      }
     }
 
+    const timestamp = dataCreatedAt || new Date().toISOString();
     const property: Property = {
       ...newProp,
-      id: data.id,
-      createdAt: new Date().toISOString(),
+      id: dataId,
+      createdAt: timestamp,
+      created_at: timestamp,
     };
     setProperties(prev => [property, ...prev]);
-    return data.id;
+    return dataId;
   }, []);
 
   // Delete Property con Rollback (LOG-01)
@@ -414,6 +453,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Update Property completo con Rollback
+  const updateProperty = useCallback(async (id: string, updates: Partial<Omit<Property, 'id' | 'createdAt' | 'created_at'>>) => {
+    let previousState: Property[] = [];
+    setProperties(prev => {
+      previousState = prev;
+      return prev.map(p => p.id === id ? { ...p, ...updates } : p);
+    });
+
+    try {
+      const { error } = await supabase.from('properties').update(updates).eq('id', id);
+      if (error) {
+        // Fallback defensivo si alguna columna aún no existe en Supabase
+        const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, ...coreUpdates } = updates as any;
+        const { error: coreError } = await supabase.from('properties').update(coreUpdates).eq('id', id);
+        if (coreError) throw coreError;
+      }
+    } catch (err) {
+      console.error('Error al actualizar propiedad en Supabase. Revirtiendo estado local:', err);
+      setProperties(previousState);
+      throw err;
+    }
+  }, []);
+
   // Add Appointment
   const addAppointment = useCallback(async (newApp: Omit<Appointment, 'id' | 'estado'>) => {
     const { data, error } = await supabase
@@ -431,8 +493,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ...newApp,
       id: data.id,
       estado: 'Pendiente',
+      reminder_sent: false,
     };
     setAppointments(prev => [...prev, appointment].sort((a, b) => a.fecha.localeCompare(b.fecha)));
+
+    // Fire and forget notification
+    fetch('/api/notifications/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(appointment),
+    }).catch(err => console.error('Error al enviar notificacion de cita:', err));
+  }, []);
+
+  // Update Appointment completo con Rollback
+  const updateAppointment = useCallback(async (id: string, updates: Partial<Omit<Appointment, 'id'>>) => {
+    let previousState: Appointment[] = [];
+    setAppointments(prev => {
+      previousState = prev;
+      return prev.map(app => app.id === id ? { ...app, ...updates } : app);
+    });
+
+    try {
+      const { error } = await supabase.from('appointments').update(updates).eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error al actualizar cita en Supabase. Revirtiendo estado local:', err);
+      setAppointments(previousState);
+      throw err;
+    }
   }, []);
 
   // Delete Appointment con Rollback (ROB-04)
@@ -492,6 +580,42 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setCrmLogs(prev => [log, ...prev]);
   }, []);
 
+  // Update CRM Log con Rollback
+  const updateCrmLog = useCallback(async (id: string, updates: Partial<Omit<CrmLog, 'id' | 'created_at'>>) => {
+    let previousState: CrmLog[] = [];
+    setCrmLogs(prev => {
+      previousState = prev;
+      return prev.map(log => log.id === id ? { ...log, ...updates } : log);
+    });
+
+    try {
+      const { error } = await supabase.from('crm_logs').update(updates).eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error al actualizar registro CRM en Supabase. Revirtiendo estado local:', err);
+      setCrmLogs(previousState);
+      throw err;
+    }
+  }, []);
+
+  // Delete CRM Log con Rollback
+  const deleteCrmLog = useCallback(async (id: string) => {
+    let previousState: CrmLog[] = [];
+    setCrmLogs(prev => {
+      previousState = prev;
+      return prev.filter(log => log.id !== id);
+    });
+
+    try {
+      const { error } = await supabase.from('crm_logs').delete().eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error al eliminar registro CRM en Supabase. Revirtiendo estado local:', err);
+      setCrmLogs(previousState);
+      throw err;
+    }
+  }, []);
+
   return (
     <DataContext.Provider value={{
       properties,
@@ -499,12 +623,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
       crmLogs,
       dataError,
       addProperty,
+      updateProperty,
       deleteProperty,
       updatePropertyStatus,
       addAppointment,
+      updateAppointment,
       deleteAppointment,
       updateAppointmentStatus,
-      addCrmLog
+      addCrmLog,
+      updateCrmLog,
+      deleteCrmLog,
     }}>
       {children}
     </DataContext.Provider>

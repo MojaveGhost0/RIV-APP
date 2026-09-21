@@ -15,16 +15,22 @@ CREATE TABLE IF NOT EXISTS users (
   nombre TEXT NOT NULL,
   email TEXT NOT NULL,
   rol TEXT NOT NULL CHECK (rol IN ('ADMIN', 'ASESOR')),
+  telefono TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Migración segura si la tabla ya existía previamente
+ALTER TABLE users ADD COLUMN IF NOT EXISTS telefono TEXT;
+
 -- Datos iniciales de usuarios con contraseñas hasheadas con bcrypt (pgcrypto)
--- Se utiliza crypt('contraseña', gen_salt('bf')) para nunca almacenar texto plano.
-INSERT INTO users (id, username, password, nombre, email, rol) VALUES
-('usr-001', 'gerardo garcia', crypt('Juan1234', gen_salt('bf')), 'Gerardo Garcia', 'admin@rivmargarita.com', 'ADMIN'),
-('usr-002', 'Juan Garcia', crypt('mumu1234', gen_salt('bf')), 'Juan García', 'juan.garcia@rivmargarita.com', 'ASESOR'),
-('usr-003', 'amado lovera', crypt('123456', gen_salt('bf')), 'Amado Lovera', 'amadolovera@rivmargarita.com', 'ASESOR')
-ON CONFLICT (id) DO UPDATE SET password = EXCLUDED.password;
+-- Se incluye el teléfono de contacto oficial de cada asesor
+INSERT INTO users (id, username, password, nombre, email, rol, telefono) VALUES
+('usr-001', 'gerardo garcia', crypt('Juan1234', gen_salt('bf')), 'Gerardo Garcia', 'admin@rivmargarita.com', 'ADMIN', '0414-7901111'),
+('usr-002', 'Juan Garcia', crypt('mumu1234', gen_salt('bf')), 'Juan García', 'juan.garcia@rivmargarita.com', 'ASESOR', '0414-7902222'),
+('usr-003', 'amado lovera', crypt('123456', gen_salt('bf')), 'Amado Lovera', 'amadolovera@rivmargarita.com', 'ASESOR', '0414-7903333')
+ON CONFLICT (id) DO UPDATE SET 
+  password = EXCLUDED.password,
+  telefono = COALESCE(EXCLUDED.telefono, users.telefono);
 
 -- =============================================================================
 -- FUNCION RPC: authenticate_user (SEC-01)
@@ -32,10 +38,10 @@ ON CONFLICT (id) DO UPDATE SET password = EXCLUDED.password;
 -- password al cliente ni permitir queries con contraseñas en parámetros URL.
 -- =============================================================================
 CREATE OR REPLACE FUNCTION authenticate_user(p_username TEXT, p_password TEXT)
-RETURNS TABLE (id TEXT, username TEXT, nombre TEXT, email TEXT, rol TEXT) AS $$
+RETURNS TABLE (id TEXT, username TEXT, nombre TEXT, email TEXT, rol TEXT, telefono TEXT) AS $$
 BEGIN
   RETURN QUERY
-  SELECT u.id, u.username, u.nombre, u.email, u.rol
+  SELECT u.id, u.username, u.nombre, u.email, u.rol, u.telefono
   FROM users u
   WHERE lower(trim(u.username)) = lower(trim(p_username))
     AND (u.password = crypt(p_password, u.password) OR u.password = p_password);
@@ -60,8 +66,18 @@ CREATE TABLE IF NOT EXISTS properties (
   captador TEXT NOT NULL,
   amenities TEXT[] DEFAULT '{}',
   "propertyType" TEXT,
+  "propietarioNombre" TEXT,
+  "propietarioTelefono" TEXT,
+  "formasNegociacion" TEXT,
+  "metodosPago" TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migraciones automáticas si la tabla ya existía previamente:
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS "propietarioNombre" TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS "propietarioTelefono" TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS "formasNegociacion" TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS "metodosPago" TEXT;
 
 -- =============================================================================
 -- TABLA: appointments (Citas y Agenda)

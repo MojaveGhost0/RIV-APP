@@ -9,6 +9,7 @@ import { useAuth } from './context/AuthContext';
 import { useData } from './context/DataContext';
 import { containerVariants, itemVariants } from './lib/motion';
 import { normalize } from './lib/searchEngine';
+import BrandLogo from './components/BrandLogo';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -58,23 +59,24 @@ export default function Dashboard() {
           </h1>
           <p className="text-sm text-gray-500">{isAdmin ? 'Administrador' : 'Asesor Inmobiliario'}</p>
         </div>
+        <BrandLogo size="sm" className="shrink-0" />
       </motion.header>
 
       {/* BÚSQUEDA */}
       <motion.form variants={itemVariants} onSubmit={handleSearch} className="relative mb-8">
-        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
-          <Search className="text-gray-400" size={18} />
+        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none z-10">
+          <Search className="text-gray-400" size={22} />
         </div>
         <input
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          className="block w-full pl-10 pr-20 py-3.5 border border-transparent rounded-2xl bg-white shadow-[0_2px_15px_rgba(0,0,0,0.04)] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-vinotinto/30 focus:border-vinotinto transition-all text-sm hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)]"
+          className="block w-full pl-14 pr-24 py-5 border border-transparent rounded-2xl bg-white shadow-[0_2px_15px_rgba(0,0,0,0.04)] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-vinotinto/30 focus:border-vinotinto transition-all text-base hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)]"
           placeholder="Buscar por zona, precio, tipo..."
         />
         <button
           type="submit"
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-vinotinto to-[#a60029] text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1 hover:shadow-md hover:shadow-vinotinto/20 active:scale-95 transition-all z-10"
+          className="absolute right-3 top-1/2 -translate-y-1/2 bg-gradient-to-r from-vinotinto to-[#a60029] text-white px-5 py-3 rounded-xl text-sm font-bold flex items-center gap-1 hover:shadow-md hover:shadow-vinotinto/20 active:scale-95 transition-all z-10"
         >
           Buscar
         </button>
@@ -145,9 +147,15 @@ export default function Dashboard() {
                 <h3 className="font-extrabold text-lg leading-tight drop-shadow-sm">
                   {proximaCita.titulo}
                 </h3>
-                <p className="text-white/80 text-sm mt-1">
-                  Cliente: <span className="font-semibold text-white">{proximaCita.cliente}</span>
-                </p>
+                {proximaCita.cliente?.trim() ? (
+                  <p className="text-white/80 text-sm mt-1">
+                    Cliente: <span className="font-semibold text-white">{proximaCita.cliente}</span>
+                  </p>
+                ) : (
+                  <p className="text-white/60 text-xs mt-1 italic">
+                    Sin cliente asignado
+                  </p>
+                )}
               </div>
               <div className="bg-white/10 px-3 py-1.5 rounded-xl text-sm font-bold backdrop-blur-md shrink-0 border border-white/20">
                 {proximaCita.hora}
@@ -196,6 +204,27 @@ export default function Dashboard() {
           <p className="text-xl mb-1">📅</p>
           <p className="text-sm font-bold text-gray-800">Nueva Cita</p>
           <p className="text-xs text-gray-400 mt-0.5">Agendar visita o reunión</p>
+        </motion.button>
+        <motion.button
+          whileHover={{ y: -2, scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => router.push('/crm')}
+          className="bg-white border border-gray-100 rounded-2xl p-4 text-left shadow-sm hover:shadow-md transition-shadow"
+        >
+          <p className="text-xl mb-1">👥</p>
+          <p className="text-sm font-bold text-gray-800">CRM</p>
+          <p className="text-xs text-gray-400 mt-0.5">Gestión de clientes</p>
+        </motion.button>
+
+        <motion.button
+          whileHover={{ y: -2, scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => router.push('/perfil')}
+          className="bg-white border border-gray-100 rounded-2xl p-4 text-left shadow-sm hover:shadow-md transition-shadow"
+        >
+          <p className="text-xl mb-1">⚙️</p>
+          <p className="text-sm font-bold text-gray-800">Mi Perfil</p>
+          <p className="text-xs text-gray-400 mt-0.5">Ajustes y equipo</p>
         </motion.button>
       </motion.div>
     </motion.div>

@@ -39,6 +39,10 @@ body {
   padding-bottom: var(--safe-area-bottom);
 }
 
+.pb-safe {
+  padding-bottom: max(1rem, var(--safe-area-bottom));
+}
+
 /* ============================================================
    SCROLLBAR OCULTO — carruseles y listas horizontales
    ============================================================ */

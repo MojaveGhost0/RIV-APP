@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, Lock, User, AlertCircle, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { containerVariants, itemVariants } from '../lib/motion';
+import BrandLogo from './BrandLogo';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -57,9 +58,9 @@ export default function LoginScreen() {
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", stiffness: 200, damping: 20 }}
-          className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center mb-5 border border-white/20 shadow-xl"
+          className="w-24 h-24 bg-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center p-3 mb-5 border border-white/20 shadow-xl"
         >
-          <span className="text-4xl font-black text-white tracking-tight leading-none">RIV</span>
+          <BrandLogo size="lg" variant="light" className="w-full h-full" />
         </motion.div>
         
         <motion.h1 

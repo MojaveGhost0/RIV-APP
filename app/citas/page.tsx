@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar as CalendarIcon, Clock, Plus, X, User, ShieldAlert, Trash2, CheckCheck, AlertCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Plus, X, User, ShieldAlert, Trash2, CheckCheck, AlertCircle, Edit2, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useAuth } from '../context/AuthContext';
@@ -17,7 +17,7 @@ const TIPO_COLOR: Record<string, string> = {
 
 export default function GestorCitas() {
   const { user, isAdmin, getAllUsers } = useAuth();
-  const { appointments, addAppointment, deleteAppointment, updateAppointmentStatus } = useData();
+  const { appointments, addAppointment, deleteAppointment, updateAppointmentStatus, updateAppointment } = useData();
   const allUsers = getAllUsers();
 
   const [activeTab, setActiveTab] = useState<'proximas' | 'historico'>('proximas');
@@ -68,8 +68,8 @@ export default function GestorCitas() {
     try {
       await addAppointment({
         tipo: formData.tipo,
-        titulo: formData.titulo,
-        cliente: formData.cliente,
+        titulo: formData.titulo.trim(),
+        cliente: formData.cliente.trim(),
         fecha: formData.fecha,
         hora: formData.hora,
         asesores: asesoresAsignados,
@@ -91,6 +91,72 @@ export default function GestorCitas() {
   const handleDelete = (id: string) => {
     if (confirm('¿Eliminar esta cita?')) {
       deleteAppointment(id);
+    }
+  };
+
+  // Estado para editar cita
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingCitaId, setEditingCitaId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    tipo: 'Mostrar Propiedad',
+    titulo: '',
+    cliente: '',
+    fecha: '',
+    hora: '',
+    asesoresIds: [] as string[],
+  });
+  const [editSubmitError, setEditSubmitError] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const handleOpenEditModal = (cita: any) => {
+    setEditingCitaId(cita.id);
+    const matchedIds = allUsers
+      .filter(u => cita.asesores.some((a: string) => normalize(a) === normalize(u.nombre)))
+      .map(u => u.id);
+
+    setEditFormData({
+      tipo: cita.tipo,
+      titulo: cita.titulo,
+      cliente: cita.cliente,
+      fecha: cita.fecha,
+      hora: cita.hora,
+      asesoresIds: matchedIds.length > 0 ? matchedIds : (user?.id ? [user.id] : []),
+    });
+    setEditSubmitError(null);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCitaId) return;
+    setEditSubmitError(null);
+
+    const asesoresAsignados = isAdmin
+      ? editFormData.asesoresIds.map(id => allUsers.find(u => u.id === id)?.nombre).filter(Boolean) as string[]
+      : [user?.nombre ?? 'Asesor'];
+
+    if (asesoresAsignados.length === 0) {
+      setEditSubmitError("Debes seleccionar al menos un asesor.");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      await updateAppointment(editingCitaId, {
+        tipo: editFormData.tipo,
+        titulo: editFormData.titulo.trim(),
+        cliente: editFormData.cliente.trim(),
+        fecha: editFormData.fecha,
+        hora: editFormData.hora,
+        asesores: asesoresAsignados,
+      });
+      setIsEditModalOpen(false);
+      setEditingCitaId(null);
+    } catch (err: any) {
+      console.error('Error al editar cita:', err);
+      setEditSubmitError(err?.message || 'Error al guardar los cambios.');
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -172,10 +238,17 @@ export default function GestorCitas() {
                 <h3 className="font-bold text-gray-800 text-base mb-3 leading-snug">{cita.titulo}</h3>
 
                 <div className="space-y-1.5 text-sm text-gray-500">
-                  <div className="flex items-center gap-2">
-                    <User size={14} className="text-vinotinto/60 shrink-0" />
-                    <span>Cliente: <span className="font-medium text-gray-700">{cita.cliente}</span></span>
-                  </div>
+                  {cita.cliente?.trim() ? (
+                    <div className="flex items-center gap-2">
+                      <User size={14} className="text-vinotinto/60 shrink-0" />
+                      <span>Cliente: <span className="font-medium text-gray-700">{cita.cliente}</span></span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <User size={14} className="text-gray-300 shrink-0" />
+                      <span className="text-xs italic">Sin cliente asignado</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <CalendarIcon size={14} className="text-vinotinto/60 shrink-0" />
                     <span>{cita.fecha}</span>
@@ -211,13 +284,23 @@ export default function GestorCitas() {
                         Completar
                       </button>
                     )}
-                    {(isAdmin || cita.asesores.includes(user?.nombre ?? '')) && (
-                      <button
-                        onClick={() => handleDelete(cita.id)}
-                        className="flex items-center gap-1 text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded-lg hover:bg-red-100 transition"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                    {(isAdmin || cita.asesores.some(a => normalize(a) === myNombre)) && (
+                      <>
+                        <button
+                          onClick={() => handleOpenEditModal(cita)}
+                          className="flex items-center gap-1 text-xs text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100 transition"
+                          title="Editar cita"
+                        >
+                          <Edit2 size={12} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(cita.id)}
+                          className="flex items-center gap-1 text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded-lg hover:bg-red-100 transition"
+                          title="Eliminar cita"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -244,14 +327,14 @@ export default function GestorCitas() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm p-4 sm:items-center"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
           >
             <motion.div 
               initial={{ opacity: 0, y: 50, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+              className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto pb-safe"
             >
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-800">Agendar Cita</h2>
@@ -285,10 +368,17 @@ export default function GestorCitas() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Cliente</label>
-                  <input type="text" name="cliente" value={formData.cliente} onChange={handleInputChange} required
-                    placeholder="Ej: María López"
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nombre del Cliente <span className="text-gray-400 font-normal text-xs">(Opcional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="cliente"
+                    value={formData.cliente}
+                    onChange={handleInputChange}
+                    placeholder="Ej: María López (dejar vacío si no aplica)"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -352,6 +442,158 @@ export default function GestorCitas() {
             </motion.div>
           </motion.div>
         </>
+      )}
+      </AnimatePresence>
+
+      {/* MODAL DE EDICIÓN DE CITA */}
+      <AnimatePresence>
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
+          <motion.div 
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto pb-safe"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-2">
+                <Edit2 size={20} className="text-vinotinto" />
+                <h2 className="text-xl font-bold text-gray-800">Editar Cita</h2>
+              </div>
+              <button onClick={() => { setIsEditModalOpen(false); setEditSubmitError(null); }} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              {editSubmitError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+                  <AlertCircle size={16} className="shrink-0 text-red-500" />
+                  <span>{editSubmitError}</span>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Cita</label>
+                <select
+                  name="tipo"
+                  value={editFormData.tipo}
+                  onChange={e => setEditFormData({ ...editFormData, tipo: e.target.value })}
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none font-medium text-gray-800"
+                >
+                  <option value="Cita en Oficina">🏢 Cita en Oficina</option>
+                  <option value="Mostrar Propiedad">🏡 Mostrar Propiedad</option>
+                  <option value="Captar Propiedad">📝 Captar Propiedad</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Propiedad o Asunto</label>
+                <input
+                  type="text"
+                  name="titulo"
+                  value={editFormData.titulo}
+                  onChange={e => setEditFormData({ ...editFormData, titulo: e.target.value })}
+                  required
+                  placeholder="Ej: Visita Villa Costa Azul"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre del Cliente <span className="text-gray-400 font-normal text-xs">(Opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  name="cliente"
+                  value={editFormData.cliente}
+                  onChange={e => setEditFormData({ ...editFormData, cliente: e.target.value })}
+                  placeholder="Ej: María López (dejar vacío si no aplica)"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                  <input
+                    type="date"
+                    name="fecha"
+                    value={editFormData.fecha}
+                    onChange={e => setEditFormData({ ...editFormData, fecha: e.target.value })}
+                    required
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                  <input
+                    type="time"
+                    name="hora"
+                    value={editFormData.hora}
+                    onChange={e => setEditFormData({ ...editFormData, hora: e.target.value })}
+                    required
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Asesores */}
+              {isAdmin ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Asignar Asesores</label>
+                  <div className="space-y-2 border border-gray-200 p-3 rounded-xl max-h-40 overflow-y-auto bg-gray-50">
+                    {allUsers.map(u => (
+                      <label key={u.id} className="flex items-center gap-2 cursor-pointer p-1">
+                        <input
+                          type="checkbox"
+                          checked={editFormData.asesoresIds.includes(u.id)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setEditFormData(prev => ({
+                              ...prev,
+                              asesoresIds: checked 
+                                ? [...prev.asesoresIds, u.id]
+                                : prev.asesoresIds.filter(id => id !== u.id)
+                            }));
+                          }}
+                          className="w-4 h-4 text-vinotinto rounded focus:ring-vinotinto"
+                        />
+                        <span className="text-sm text-gray-800">{u.nombre} <span className="text-xs text-gray-400">({u.rol})</span></span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-vinotinto/5 border border-vinotinto/10 p-3 rounded-lg flex items-center gap-2">
+                  <User size={16} className="text-vinotinto shrink-0" />
+                  <p className="text-xs text-vinotinto/80 leading-tight">
+                    Asignado a: <span className="font-bold">{user?.nombre}</span>
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="flex-1 py-3.5 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="flex-[2] py-3.5 bg-gradient-to-r from-vinotinto to-[#a60029] text-white rounded-xl font-bold shadow-md hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <Save size={16} />
+                  {isSavingEdit ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
       )}
       </AnimatePresence>
     </div>
