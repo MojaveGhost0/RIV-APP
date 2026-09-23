@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleAuth } from 'google-auth-library';
-import path from 'path';
 
 // =============================================================================
 // API ROUTE — /api/search
@@ -95,39 +93,63 @@ Ubicación:
 Si no puedes extraer un filtro, déjalo null o array vacío [].
 Responde SOLO el JSON sin explicación adicional.`;
 
-    // Paso 2 — Timeout de 8 segundos con AbortController para evitar esperas indefinidas
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    // Modelos ordenados por preferencia — el primero disponible en el plan gratuito de Groq
+    const GROQ_MODELS = [
+      'llama-3.3-70b-versatile',   // Recomendado: disponible en todos los planes
+      'llama3-8b-8192',            // Fallback ligero
+      'mixtral-8x7b-32768',        // Fallback alternativo
+    ];
 
-    let groqRes: Response;
-    try {
-      groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: 'qwen/qwen3.8-27b', // Modelo disponible dinámicamente en tu API Key
-          messages: [
-            {
-              role: 'user',
-              content: prompt,
-            }
-          ],
-          temperature: 0.05,
-        }),
-      });
-    } catch (fetchErr) {
-      clearTimeout(timeoutId);
-      if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
-        console.warn('[search] Groq timeout después de 8s');
+    let groqRes: Response | null = null;
+    let lastError = '';
+
+    for (const model of GROQ_MODELS) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      try {
+        groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.05,
+          }),
+        });
+        clearTimeout(timeoutId);
+
+        // Si el modelo no existe o no está permitido, probar el siguiente
+        if (groqRes.status === 404 || groqRes.status === 400) {
+          const errBody = await groqRes.text();
+          console.warn(`[search] Modelo ${model} no disponible:`, errBody);
+          lastError = errBody;
+          groqRes = null;
+          continue;
+        }
+
+        break; // Modelo válido — salir del loop
+      } catch (fetchErr) {
+        clearTimeout(timeoutId);
+        if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
+          console.warn(`[search] Timeout con modelo ${model}`);
+          lastError = 'TIMEOUT';
+          continue;
+        }
+        throw fetchErr;
+      }
+    }
+
+    if (!groqRes) {
+      if (lastError === 'TIMEOUT') {
         return NextResponse.json({ error: 'TIMEOUT' }, { status: 504 });
       }
-      throw fetchErr;
+      return NextResponse.json({ error: 'NO_MODEL_AVAILABLE' }, { status: 502 });
     }
-    clearTimeout(timeoutId);
 
     if (!groqRes.ok) {
       const errBody = await groqRes.text();
