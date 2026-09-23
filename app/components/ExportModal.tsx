@@ -107,25 +107,25 @@ const FORMAT_CONFIG = {
   },
   instagram: {
     label: 'Historia Instagram (9:16)',
-    description: 'Formato vertical Reels/Stories con Glassmorphism',
+    description: 'Minimalista · Foto full-bleed · Badge precio · Sin tarjetas',
     icon: Instagram,
     color: 'from-pink-500 via-purple-500 to-yellow-400',
     bg: 'bg-pink-50',
     border: 'border-pink-200',
     text: 'text-pink-600',
-    templateA: { name: 'Oscura Glass', desc: 'Full bleed 9:16 · Card flotante · CTA' },
-    templateB: { name: 'Gold Premier', desc: 'Full bleed 9:16 · Luxury Frosted · CTA' },
+    templateA: { name: 'Clean Dark', desc: 'Full bleed 9:16 · Badge vinotinto · Overlay minimalista' },
+    templateB: { name: 'Clean Gold', desc: 'Full bleed 9:16 · Badge dorado · Overlay minimalista' },
   },
   whatsapp: {
     label: 'WhatsApp Marketing',
-    description: 'Copy enriquecido + Imagen 1:1 y envío directo',
+    description: 'Copy enriquecido + Imagen 1:1 minimalista y envío directo',
     icon: MessageCircle,
     color: 'from-green-500 to-emerald-600',
     bg: 'bg-green-50',
     border: 'border-green-200',
     text: 'text-green-600',
-    templateA: { name: 'Full Foto', desc: 'Foto fondo · Overlay vinotinto' },
-    templateB: { name: 'Panel Premium', desc: 'Foto + Tarjetas de datos' },
+    templateA: { name: 'Clean Full Foto', desc: '1:1 · Badge precio · Texto directo sobre foto' },
+    templateB: { name: 'Clean Split', desc: '1:1 · Foto + Panel blanco · Info limpia' },
   },
   video: {
     label: 'Video Slideshow (9:16)',
@@ -1024,625 +1024,554 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
           </div>
         </div>
 
-        {/* ── Instagram – Plantilla A: Oscura Glass 9:16 (Full Bleed) ─────── */}
-        <div 
-          ref={igARef} 
-          style={{ 
-            position: 'relative', 
-            width: '1080px', 
-            height: '1920px', 
-            background: '#0a0a0c', 
-            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', 
+        {/* ── Instagram – Plantilla A: Clean Dark 9:16 (Ultra-Minimalista) ──── */}
+        <div
+          ref={igARef}
+          style={{
+            position: 'relative',
+            width: '1080px',
+            height: '1920px',
+            background: '#0a0a0a',
+            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             overflow: 'hidden',
             boxSizing: 'border-box'
           }}
         >
-          {/* FOTO DE FONDO FULL BLEED (9:16) */}
-          <img 
-            src={base64Img || property.image} 
-            crossOrigin="anonymous" 
-            style={{ 
-              position: 'absolute', 
-              inset: 0, 
-              width: '100%', 
-              height: '100%', 
-              objectFit: 'cover' 
-            }} 
-            alt="" 
+          {/* FOTO FULL BLEED — sin distorsión */}
+          <img
+            src={base64Img || property.image}
+            crossOrigin="anonymous"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center'
+            }}
+            alt=""
           />
 
-          {/* OVERLAY DE DEGRADADO NEGRO SUTIL DESDE LA BASE (rgba(0,0,0,0.8)) */}
-          <div 
-            style={{ 
-              position: 'absolute', 
-              inset: 0, 
-              background: 'linear-gradient(to top, rgba(0,0,0,0.94) 0%, rgba(0,0,0,0.80) 36%, rgba(0,0,0,0.28) 65%, rgba(0,0,0,0.60) 100%)',
-              pointerEvents: 'none'
-            }} 
-          />
-          
-          {/* HEADER TRANSPARENTE: [ RIV MARGARITA PREMIER ]   [ EN VENTA ] */}
-          <div style={{ position: 'absolute', top: 70, left: 60, right: 60, display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
-            <div style={{ 
-              background: 'rgba(12, 12, 16, 0.68)', 
-              backdropFilter: 'blur(20px)', 
-              WebkitBackdropFilter: 'blur(20px)',
-              border: '1.5px solid rgba(212, 175, 55, 0.45)', 
-              padding: '12px 28px', 
-              borderRadius: '24px', 
-              display: 'flex', 
-              alignItems: 'center',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.45)'
+          {/* DEGRADADO SUTIL SOLO EN LA BASE para contraste del texto */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.35) 35%, transparent 60%)',
+            pointerEvents: 'none'
+          }} />
+
+          {/* BADGE SUPERIOR DERECHO — Precio o Estatus */}
+          <div style={{
+            position: 'absolute',
+            top: 56,
+            right: 56,
+            zIndex: 20,
+            background: '#8B0000',
+            padding: '18px 36px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0'
+          }}>
+            <span style={{
+              color: '#FFFFFF',
+              fontWeight: 900,
+              fontSize: '36px',
+              letterSpacing: '1px',
+              textTransform: 'uppercase',
+              lineHeight: 1
             }}>
-              <img src="/logo-riv.svg" style={{ minWidth: '120px', height: 'auto', maxHeight: '36px', objectFit: 'contain' }} alt="RIV Margarita Premier" crossOrigin="anonymous" />
+              {property.status === 'Vendida'
+                ? 'VENDIDO'
+                : `$${fmt(property.price)} USD`}
+            </span>
+          </div>
+
+          {/* BLOQUE INFERIOR MINIMALISTA — directo sobre la foto */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: '60px 60px 72px',
+            zIndex: 10,
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            gap: '28px'
+          }}>
+            {/* Ícono izquierdo — Casa vectorial */}
+            <div style={{ flexShrink: 0, paddingBottom: '8px' }}>
+              <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
+                <path d="M9 21V12h6v9" />
+              </svg>
             </div>
-            <div style={{ 
-              background: 'linear-gradient(135deg, rgba(128,0,32,0.95) 0%, rgba(85,0,21,0.95) 100%)', 
-              border: '1.5px solid rgba(255,255,255,0.25)', 
-              padding: '14px 30px', 
-              borderRadius: '999px',
-              boxShadow: '0 8px 24px rgba(128,0,32,0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
+
+            {/* Textos centrales */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {/* Línea 1 — Título / Ubicación */}
+              <p style={{
+                color: '#FFFFFF',
+                fontSize: '32px',
+                fontWeight: 500,
+                letterSpacing: '2px',
+                textTransform: 'uppercase',
+                margin: '0 0 10px 0',
+                lineHeight: 1.2,
+                opacity: 0.9
+              }}>
+                {property.location.toUpperCase()}
+              </p>
+
+              {/* Línea 2 — Tipo de inmueble + Atributos */}
+              <p style={{
+                color: '#FFFFFF',
+                fontSize: '46px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                margin: '0 0 16px 0',
+                lineHeight: 1.1,
+                letterSpacing: '-0.5px'
+              }}>
+                {property.propertyType
+                  ? `${property.propertyType.toUpperCase()} ${property.status === 'Vendida' ? 'VENDIDA' : 'EN VENTA'}`
+                  : 'EN VENTA'}
+                {validSpecs.length > 0 && (
+                  <span style={{ fontSize: '34px', fontWeight: 700, opacity: 0.85 }}>
+                    {' · '}{validSpecs.map(s => s.v).join(' | ')}
+                  </span>
+                )}
+              </p>
+
+              {/* Línea 3 — RIF Corporativo */}
+              <p style={{
+                color: 'rgba(255,255,255,0.65)',
+                fontSize: '22px',
+                fontStyle: 'italic',
+                fontWeight: 400,
+                margin: 0,
+                letterSpacing: '0.5px'
+              }}>
+                J-11055496-2
+              </p>
+            </div>
+
+            {/* Flecha derecha */}
+            <div style={{ flexShrink: 0, paddingBottom: '8px' }}>
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+
+
+        {/* ── Instagram – Plantilla B: Clean Gold 9:16 (Ultra-Minimalista) ───── */}
+        <div
+          ref={igBRef}
+          style={{
+            position: 'relative',
+            width: '1080px',
+            height: '1920px',
+            background: '#0a0a0a',
+            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            overflow: 'hidden',
+            boxSizing: 'border-box'
+          }}
+        >
+          {/* FOTO FULL BLEED — sin distorsión */}
+          <img
+            src={base64Img || property.image}
+            crossOrigin="anonymous"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center'
+            }}
+            alt=""
+          />
+
+          {/* DEGRADADO SUTIL SOLO EN LA BASE */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.35) 35%, transparent 60%)',
+            pointerEvents: 'none'
+          }} />
+
+          {/* BADGE SUPERIOR DERECHO — Dorado */}
+          <div style={{
+            position: 'absolute',
+            top: 56,
+            right: 56,
+            zIndex: 20,
+            background: '#D4AF37',
+            padding: '18px 36px',
+            display: 'flex',
+            alignItems: 'center'
+          }}>
+            <span style={{
+              color: '#000000',
+              fontWeight: 900,
+              fontSize: '36px',
+              letterSpacing: '1px',
+              textTransform: 'uppercase',
+              lineHeight: 1
             }}>
-              <span style={{ color: '#D4AF37', fontSize: '20px' }}>✦</span>
-              <span style={{ color: '#FFFFFF', fontWeight: 900, fontSize: '22px', letterSpacing: '2px', textTransform: 'uppercase' }}>
+              {property.status === 'Vendida'
+                ? 'VENDIDO'
+                : `$${fmt(property.price)} USD`}
+            </span>
+          </div>
+
+          {/* BLOQUE INFERIOR MINIMALISTA */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: '60px 60px 72px',
+            zIndex: 10,
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            gap: '28px'
+          }}>
+            {/* Ícono izquierdo */}
+            <div style={{ flexShrink: 0, paddingBottom: '8px' }}>
+              <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
+                <path d="M9 21V12h6v9" />
+              </svg>
+            </div>
+
+            {/* Textos centrales */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {/* Línea 1 — Ubicación */}
+              <p style={{
+                color: '#FFFFFF',
+                fontSize: '32px',
+                fontWeight: 500,
+                letterSpacing: '2px',
+                textTransform: 'uppercase',
+                margin: '0 0 10px 0',
+                lineHeight: 1.2,
+                opacity: 0.9
+              }}>
+                {property.location.toUpperCase()}
+              </p>
+
+              {/* Línea 2 — Tipo + Atributos en dorado */}
+              <p style={{
+                color: '#D4AF37',
+                fontSize: '46px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                margin: '0 0 16px 0',
+                lineHeight: 1.1,
+                letterSpacing: '-0.5px'
+              }}>
+                {property.propertyType
+                  ? `${property.propertyType.toUpperCase()} ${property.status === 'Vendida' ? 'VENDIDA' : 'EN VENTA'}`
+                  : 'EN VENTA'}
+                {validSpecs.length > 0 && (
+                  <span style={{ fontSize: '34px', fontWeight: 700, opacity: 0.85, color: '#FFFFFF' }}>
+                    {' · '}{validSpecs.map(s => s.v).join(' | ')}
+                  </span>
+                )}
+              </p>
+
+              {/* Línea 3 — RIF Corporativo */}
+              <p style={{
+                color: 'rgba(255,255,255,0.65)',
+                fontSize: '22px',
+                fontStyle: 'italic',
+                fontWeight: 400,
+                margin: 0,
+                letterSpacing: '0.5px'
+              }}>
+                J-11055496-2
+              </p>
+            </div>
+
+            {/* Flecha derecha en dorado */}
+            <div style={{ flexShrink: 0, paddingBottom: '8px' }}>
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+
+
+        {/* ── WhatsApp – Plantilla A: Clean Full Photo 1:1 (Ultra-Minimalista) ─ */}
+        <div
+          ref={waARef}
+          style={{
+            position: 'relative',
+            width: '1080px',
+            height: '1080px',
+            background: '#0a0a0a',
+            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            overflow: 'hidden'
+          }}
+        >
+          {/* FOTO FULL BLEED sin distorsión */}
+          <img
+            src={base64Img || property.image}
+            crossOrigin="anonymous"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center'
+            }}
+            alt=""
+          />
+
+          {/* DEGRADADO SUTIL SOLO EN LA BASE */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.32) 35%, transparent 60%)',
+            pointerEvents: 'none'
+          }} />
+
+          {/* BADGE SUPERIOR DERECHO — Precio */}
+          <div style={{
+            position: 'absolute',
+            top: 48,
+            right: 48,
+            zIndex: 20,
+            background: '#8B0000',
+            padding: '16px 32px'
+          }}>
+            <span style={{
+              color: '#FFFFFF',
+              fontWeight: 900,
+              fontSize: '34px',
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              lineHeight: 1
+            }}>
+              {property.status === 'Vendida'
+                ? 'VENDIDO'
+                : `$${fmt(property.price)} USD`}
+            </span>
+          </div>
+
+          {/* BLOQUE INFERIOR MINIMALISTA */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: '52px 52px 60px',
+            zIndex: 10,
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            gap: '24px'
+          }}>
+            {/* Ícono izquierdo */}
+            <div style={{ flexShrink: 0, paddingBottom: '6px' }}>
+              <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
+                <path d="M9 21V12h6v9" />
+              </svg>
+            </div>
+
+            {/* Textos centrales */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{
+                color: '#FFFFFF',
+                fontSize: '28px',
+                fontWeight: 500,
+                letterSpacing: '2px',
+                textTransform: 'uppercase',
+                margin: '0 0 8px 0',
+                lineHeight: 1.2,
+                opacity: 0.9
+              }}>
+                {property.location.toUpperCase()}
+              </p>
+              <p style={{
+                color: '#FFFFFF',
+                fontSize: '42px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                margin: '0 0 12px 0',
+                lineHeight: 1.1
+              }}>
+                {property.propertyType
+                  ? `${property.propertyType.toUpperCase()} ${property.status === 'Vendida' ? 'VENDIDA' : 'EN VENTA'}`
+                  : 'EN VENTA'}
+                {validSpecs.length > 0 && (
+                  <span style={{ fontSize: '30px', fontWeight: 700, opacity: 0.85 }}>
+                    {' · '}{validSpecs.map(s => s.v).join(' | ')}
+                  </span>
+                )}
+              </p>
+              <p style={{
+                color: 'rgba(255,255,255,0.6)',
+                fontSize: '20px',
+                fontStyle: 'italic',
+                fontWeight: 400,
+                margin: 0
+              }}>
+                J-11055496-2
+              </p>
+            </div>
+
+            {/* Flecha derecha */}
+            <div style={{ flexShrink: 0, paddingBottom: '6px' }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* ── WhatsApp – Plantilla B: Clean Split 1:1 (Ultra-Minimalista) ──────── */}
+        <div
+          ref={waBRef}
+          style={{
+            width: '1080px',
+            height: '1080px',
+            background: '#FFFFFF',
+            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
+          {/* FOTO SUPERIOR — 58% del canvas, sin distorsión */}
+          <div style={{ position: 'relative', height: '626px', flexShrink: 0, overflow: 'hidden' }}>
+            <img
+              src={base64Img || property.image}
+              crossOrigin="anonymous"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center',
+                display: 'block'
+              }}
+              alt=""
+            />
+            {/* Gradiente sutil sobre la foto */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.12) 100%)'
+            }} />
+            {/* BADGE SUPERIOR DERECHO */}
+            <div style={{
+              position: 'absolute',
+              top: 36,
+              right: 36,
+              background: '#8B0000',
+              padding: '14px 28px',
+              zIndex: 10
+            }}>
+              <span style={{
+                color: '#FFFFFF',
+                fontWeight: 900,
+                fontSize: '28px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                lineHeight: 1
+              }}>
                 {property.status === 'Vendida' ? 'VENDIDO' : 'EN VENTA'}
               </span>
             </div>
           </div>
 
-          {/* TARJETA DE INFORMACIÓN FLOTANTE (GLASSMORPHISM) */}
-          <div style={{ 
-            position: 'absolute', 
-            bottom: 60, 
-            left: 24, 
-            right: 24, 
-            zIndex: 10,
-            background: 'rgba(16, 18, 27, 0.76)', 
-            backdropFilter: 'blur(30px)', 
-            WebkitBackdropFilter: 'blur(30px)',
-            border: '1.5px solid rgba(255, 255, 255, 0.18)', 
-            borderRadius: '38px', 
-            padding: '40px 42px',
-            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.65)',
+          {/* PANEL INFERIOR BLANCO — Info limpia */}
+          <div style={{
+            flex: 1,
+            padding: '36px 52px 40px',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            gap: '20px',
+            background: '#FFFFFF'
           }}>
-            {/* Tag de Categoría */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-              <div style={{ 
-                background: 'rgba(212, 175, 55, 0.18)', 
-                color: '#D4AF37', 
-                border: '1px solid rgba(212, 175, 55, 0.4)', 
-                borderRadius: '999px', 
-                padding: '6px 20px', 
-                fontSize: '18px', 
-                fontWeight: 800, 
-                letterSpacing: '1.5px',
-                textTransform: 'uppercase'
-              }}>
-                {property.propertyType || (isLand ? 'Terreno' : 'Inmueble')}
-              </div>
-              <div style={{ 
-                background: 'rgba(255, 255, 255, 0.1)', 
-                color: '#FFFFFF', 
-                borderRadius: '999px', 
-                padding: '6px 18px', 
-                fontSize: '16px', 
-                fontWeight: 700 
-              }}>
-                Exclusiva RIV
-              </div>
+            {/* Ícono casa */}
+            <div style={{ flexShrink: 0, paddingBottom: '4px' }}>
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
+                <path d="M9 21V12h6v9" />
+              </svg>
             </div>
 
-            {/* Título (Máximo 2 líneas) */}
-            <h1 style={{ 
-              fontSize: '50px', 
-              fontWeight: 900, 
-              color: '#FFFFFF', 
-              margin: '0 0 10px 0', 
-              lineHeight: 1.25, 
-              textTransform: 'uppercase',
-              letterSpacing: '-0.02em',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden'
-            }}>
-              {property.title}
-            </h1>
-
-            {/* Ubicación */}
-            <p style={{ 
-              color: 'rgba(255, 255, 255, 0.85)', 
-              fontSize: '26px', 
-              fontWeight: 600, 
-              margin: '0 0 22px 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
-              <MapPin size={28} color="#FFFFFF" /> {property.location}
-            </p>
-
-            {/* Precio */}
-            <div style={{ marginBottom: '22px' }}>
-              <p style={{ color: '#D4AF37', fontSize: '15px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', margin: 0 }}>
-                PRECIO DE INVERSIÓN
+            {/* Textos */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{
+                color: '#555555',
+                fontSize: '22px',
+                fontWeight: 500,
+                letterSpacing: '2px',
+                textTransform: 'uppercase',
+                margin: '0 0 6px 0',
+                lineHeight: 1.2
+              }}>
+                {property.location.toUpperCase()}
               </p>
-              <p style={{ fontSize: '76px', fontWeight: 900, color: '#FFFFFF', margin: '2px 0 0 0', lineHeight: 1 }}>
-                ${fmt(property.price)} <span style={{ fontSize: '32px', color: '#D4AF37', fontWeight: 700 }}>USD</span>
+              <p style={{
+                color: '#111111',
+                fontSize: '36px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                margin: '0 0 10px 0',
+                lineHeight: 1.1
+              }}>
+                {property.propertyType
+                  ? `${property.propertyType.toUpperCase()} ${property.status === 'Vendida' ? 'VENDIDA' : 'EN VENTA'}`
+                  : 'EN VENTA'}
+                {validSpecs.length > 0 && (
+                  <span style={{ fontSize: '26px', fontWeight: 600, color: '#444444' }}>
+                    {' · '}{validSpecs.map(s => s.v).join(' | ')}
+                  </span>
+                )}
+              </p>
+              <p style={{
+                color: '#999999',
+                fontSize: '17px',
+                fontStyle: 'italic',
+                fontWeight: 400,
+                margin: 0
+              }}>
+                J-11055496-2
               </p>
             </div>
 
-            {/* ATRIBUTOS DINÁMICOS: TERRENO O REGULAR */}
-            {isLand ? (
-              /* En Terreno / Parcela: NO muestra Habs ni Baños. Muestra solo Superficie en contenedor destacado central */
-              <div style={{ 
-                background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.18) 0%, rgba(128, 0, 32, 0.22) 100%)', 
-                border: '1.5px solid rgba(212, 175, 55, 0.5)', 
-                borderRadius: '24px', 
-                padding: '22px 28px', 
-                textAlign: 'center', 
-                marginBottom: '22px',
-                boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.15)'
+            {/* Precio y flecha */}
+            <div style={{ flexShrink: 0, textAlign: 'right', paddingBottom: '4px' }}>
+              <p style={{
+                fontSize: '38px',
+                fontWeight: 900,
+                color: '#8B0000',
+                margin: '0 0 6px 0',
+                lineHeight: 1
               }}>
-                <p style={{ color: '#D4AF37', fontSize: '16px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 4px 0' }}>
-                  SUPERFICIE TOTAL DEL TERRENO
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', color: '#FFFFFF', margin: 0, fontSize: '48px', fontWeight: 900 }}>
-                  <Ruler size={44} color="#FFFFFF" /> {property.sqm > 0 ? `${fmt(property.sqm)} m²` : 'Consultar'}
-                </div>
-              </div>
-            ) : (
-              /* Bloques para inmuebles normales */
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '22px' }}>
-                {validSpecs.map(s => {
-                  const Icon = s.icon;
-                  return (
-                  <div key={s.label} style={{ 
-                    flex: 1, 
-                    background: 'rgba(255, 255, 255, 0.08)', 
-                    border: '1px solid rgba(255, 255, 255, 0.15)', 
-                    borderRadius: '22px', 
-                    padding: '18px 12px', 
-                    textAlign: 'center',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center'
-                  }}>
-                    <Icon size={32} color="#FFFFFF" style={{ marginBottom: '8px' }} />
-                    <p style={{ color: '#FFFFFF', fontSize: '36px', fontWeight: 900, margin: 0 }}>{s.v}</p>
-                    <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '17px', margin: '4px 0 0 0', fontWeight: 600 }}>{s.label}</p>
-                  </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Asesor */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '18px', 
-              paddingTop: '20px', 
-              borderTop: '1px solid rgba(255, 255, 255, 0.12)' 
-            }}>
-              <div style={{ 
-                width: '62px', 
-                height: '62px', 
-                borderRadius: '50%', 
-                background: 'linear-gradient(135deg, #800020 0%, #D4AF37 100%)', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                color: '#FFFFFF', 
-                fontSize: '28px', 
-                fontWeight: 900, 
-                flexShrink: 0,
-                boxShadow: '0 6px 18px rgba(0,0,0,0.35)'
-              }}>
-                {property.captador ? property.captador.charAt(0).toUpperCase() : 'R'}
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '15px', fontWeight: 700, margin: 0, letterSpacing: '1px', textTransform: 'uppercase' }}>
-                  Asesor Comercial
-                </p>
-                <p style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: 900, margin: '2px 0 0 0' }}>
-                  {property.captador || 'RIV Margarita Premier'}
-                </p>
-              </div>
-              {advisorPhone && (
-                <div style={{ 
-                  background: 'rgba(37, 211, 102, 0.18)', 
-                  border: '1px solid rgba(37, 211, 102, 0.45)', 
-                  borderRadius: '18px', 
-                  padding: '10px 18px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <Smartphone size={22} color="#25D366" />
-                  <span style={{ color: '#25D366', fontSize: '19px', fontWeight: 800 }}>{advisorPhone}</span>
-                </div>
-              )}
-            </div>
-
-            {/* BOTÓN / INSIGNIA DE LLAMADO A LA ACCIÓN (CTA) - INTEGRADO */}
-            <div style={{ 
-              marginTop: '20px',
-              background: 'linear-gradient(90deg, #25D366 0%, #128C7E 100%)', 
-              color: '#FFFFFF', 
-              padding: '22px 32px', 
-              borderRadius: '999px', 
-              textAlign: 'center', 
-              boxShadow: '0 12px 36px rgba(37, 211, 102, 0.45)', 
-              border: '1.5px solid rgba(255, 255, 255, 0.35)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '14px'
-            }}>
-              <Smartphone size={28} color="#FFFFFF" />
-              <span style={{ fontSize: '25px', fontWeight: 900, letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-                ¡Escríbenos por WhatsApp / DM!
-              </span>
-            </div>
-          </div>
-        </div>
-
-
-
-        {/* ── Instagram – Plantilla B: Gold Premier 9:16 (Full Bleed) ───────── */}
-        <div 
-          ref={igBRef} 
-          style={{ 
-            position: 'relative', 
-            width: '1080px', 
-            height: '1920px', 
-            background: '#0F0F0F', 
-            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', 
-            overflow: 'hidden',
-            boxSizing: 'border-box'
-          }}
-        >
-          {/* FOTO DE FONDO FULL BLEED (9:16) */}
-          <img 
-            src={base64Img || property.image} 
-            crossOrigin="anonymous" 
-            style={{ 
-              position: 'absolute', 
-              inset: 0, 
-              width: '100%', 
-              height: '100%', 
-              objectFit: 'cover' 
-            }} 
-            alt="" 
-          />
-
-          {/* OVERLAY DE DEGRADADO DORADO OBSIDIANA DESDE LA BASE */}
-          <div 
-            style={{ 
-              position: 'absolute', 
-              inset: 0, 
-              background: 'linear-gradient(to top, rgba(10,8,6,0.95) 0%, rgba(15,12,10,0.80) 36%, rgba(0,0,0,0.28) 65%, rgba(0,0,0,0.65) 100%)',
-              pointerEvents: 'none'
-            }} 
-          />
-          
-          {/* HEADER TRANSPARENTE: [ RIV MARGARITA PREMIER ]   [ EN VENTA ] */}
-          <div style={{ position: 'absolute', top: 70, left: 60, right: 60, display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
-            <div style={{ 
-              background: 'rgba(255, 255, 255, 0.94)', 
-              backdropFilter: 'blur(20px)', 
-              WebkitBackdropFilter: 'blur(20px)',
-              border: '1.5px solid rgba(212, 175, 55, 0.6)', 
-              padding: '12px 28px', 
-              borderRadius: '24px', 
-              display: 'flex', 
-              alignItems: 'center',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.35)'
-            }}>
-              <img src="/logo-riv.svg" style={{ minWidth: '120px', height: 'auto', maxHeight: '36px', objectFit: 'contain' }} alt="RIV Margarita Premier" crossOrigin="anonymous" />
-            </div>
-            <div style={{ 
-              background: 'linear-gradient(135deg, #D4AF37 0%, #AA8010 100%)', 
-              border: '1.5px solid rgba(255,255,255,0.4)', 
-              padding: '14px 30px', 
-              borderRadius: '999px',
-              boxShadow: '0 8px 24px rgba(212,175,55,0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <span style={{ color: '#000000', fontSize: '20px' }}>★</span>
-              <span style={{ color: '#000000', fontWeight: 900, fontSize: '22px', letterSpacing: '2px', textTransform: 'uppercase' }}>
-                {property.status === 'Vendida' ? 'VENDIDO' : 'PREMIER'}
-              </span>
-            </div>
-          </div>
-
-          {/* TARJETA DE INFORMACIÓN FLOTANTE (FROSTED GLASS) */}
-          <div style={{ 
-            position: 'absolute', 
-            bottom: 60, 
-            left: 24, 
-            right: 24, 
-            zIndex: 10,
-            background: 'rgba(255, 255, 255, 0.92)', 
-            backdropFilter: 'blur(30px)', 
-            WebkitBackdropFilter: 'blur(30px)',
-            border: '1.5px solid rgba(212, 175, 55, 0.5)', 
-            borderRadius: '38px', 
-            padding: '40px 42px',
-            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.55)',
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
-            {/* Tag de Categoría */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-              <div style={{ 
-                background: 'rgba(128, 0, 32, 0.1)', 
-                color: '#800020', 
-                border: '1px solid rgba(128, 0, 32, 0.3)', 
-                borderRadius: '999px', 
-                padding: '6px 20px', 
-                fontSize: '18px', 
-                fontWeight: 800, 
-                letterSpacing: '1.5px',
-                textTransform: 'uppercase'
-              }}>
-                {property.propertyType || (isLand ? 'Terreno' : 'Inmueble')}
-              </div>
-              <div style={{ 
-                background: 'rgba(212, 175, 55, 0.18)', 
-                color: '#997300', 
-                borderRadius: '999px', 
-                padding: '6px 18px', 
-                fontSize: '16px', 
-                fontWeight: 700 
-              }}>
-                Colección Exclusiva
-              </div>
-            </div>
-
-            {/* Título en Mayúsculas */}
-            <h1 style={{ 
-              fontSize: '50px', 
-              fontWeight: 900, 
-              color: '#111827', 
-              margin: '0 0 10px 0', 
-              lineHeight: 1.25, 
-              textTransform: 'uppercase',
-              letterSpacing: '-0.02em',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden'
-            }}>
-              {property.title}
-            </h1>
-
-            {/* Ubicación */}
-            <p style={{ 
-              color: '#4B5563', 
-              fontSize: '26px', 
-              fontWeight: 600, 
-              margin: '0 0 22px 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
-              <MapPin size={28} color="#4B5563" /> {property.location}
-            </p>
-
-            {/* Precio */}
-            <div style={{ marginBottom: '22px' }}>
-              <p style={{ color: '#800020', fontSize: '15px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', margin: 0 }}>
-                PRECIO DE VENTA
+                ${fmt(property.price)}
+                <span style={{ fontSize: '18px', fontWeight: 600, color: '#999999', display: 'block' }}>USD</span>
               </p>
-              <p style={{ fontSize: '76px', fontWeight: 900, color: '#800020', margin: '2px 0 0 0', lineHeight: 1 }}>
-                ${fmt(property.price)} <span style={{ fontSize: '32px', color: '#6B7280', fontWeight: 700 }}>USD</span>
-              </p>
-            </div>
-
-            {/* ATRIBUTOS DINÁMICOS: TERRENO O REGULAR */}
-            {isLand ? (
-              /* En Terreno / Parcela: NO muestra Habs ni Baños. Muestra solo Superficie en contenedor destacado central */
-              <div style={{ 
-                background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(243, 244, 246, 0.9) 100%)', 
-                border: '1.5px solid rgba(212, 175, 55, 0.5)', 
-                borderRadius: '24px', 
-                padding: '22px 28px', 
-                textAlign: 'center', 
-                marginBottom: '22px'
-              }}>
-                <p style={{ color: '#800020', fontSize: '16px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 4px 0' }}>
-                  SUPERFICIE TOTAL DEL TERRENO
-                </p>
-                <p style={{ color: '#111827', fontSize: '48px', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-                  <Ruler size={44} color="#111827" /> {property.sqm > 0 ? `${fmt(property.sqm)} m²` : 'Consultar metraje'}
-                </p>
-              </div>
-            ) : (
-              /* Bloques para inmuebles normales */
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '22px' }}>
-                {validSpecs.map(s => {
-                  const Icon = s.icon;
-                  return (
-                  <div key={s.label} style={{ 
-                    flex: 1, 
-                    background: '#F9FAFB', 
-                    border: '1px solid #E5E7EB', 
-                    borderRadius: '22px', 
-                    padding: '18px 12px', 
-                    textAlign: 'center',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center'
-                  }}>
-                    <Icon size={32} color="#111827" style={{ marginBottom: '8px' }} />
-                    <p style={{ color: '#111827', fontSize: '36px', fontWeight: 900, margin: 0 }}>{s.v}</p>
-                    <p style={{ color: '#6B7280', fontSize: '17px', margin: '4px 0 0 0', fontWeight: 600 }}>{s.label}</p>
-                  </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Asesor */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '18px', 
-              paddingTop: '20px', 
-              borderTop: '1px solid #E5E7EB' 
-            }}>
-              <div style={{ 
-                width: '62px', 
-                height: '62px', 
-                borderRadius: '50%', 
-                background: '#800020', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                color: '#FFFFFF', 
-                fontSize: '28px', 
-                fontWeight: 900, 
-                flexShrink: 0,
-                boxShadow: '0 4px 14px rgba(128,0,32,0.3)'
-              }}>
-                {property.captador ? property.captador.charAt(0).toUpperCase() : 'R'}
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ color: '#9CA3AF', fontSize: '15px', fontWeight: 700, margin: 0, letterSpacing: '1px', textTransform: 'uppercase' }}>
-                  Asesor Inmobiliario
-                </p>
-                <p style={{ color: '#111827', fontSize: '26px', fontWeight: 900, margin: '2px 0 0 0' }}>
-                  {property.captador || 'RIV Margarita Premier'}
-                </p>
-              </div>
-              {advisorPhone && (
-                <div style={{ 
-                  background: 'rgba(37, 211, 102, 0.15)', 
-                  border: '1px solid rgba(37, 211, 102, 0.4)', 
-                  borderRadius: '18px', 
-                  padding: '10px 18px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <Smartphone size={22} color="#128C7E" />
-                  <span style={{ color: '#128C7E', fontSize: '19px', fontWeight: 800 }}>{advisorPhone}</span>
-                </div>
-              )}
-            </div>
-
-            {/* BOTÓN / INSIGNIA DE LLAMADO A LA ACCIÓN (CTA) - INTEGRADO */}
-            <div style={{ 
-              marginTop: '20px',
-              background: 'linear-gradient(90deg, #800020 0%, #D4AF37 100%)', 
-              color: '#FFFFFF', 
-              padding: '22px 32px', 
-              borderRadius: '999px', 
-              textAlign: 'center', 
-              boxShadow: '0 12px 36px rgba(128, 0, 32, 0.4)', 
-              border: '1.5px solid rgba(255, 255, 255, 0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '14px'
-            }}>
-              <Smartphone size={28} color="#FFFFFF" />
-              <span style={{ fontSize: '25px', fontWeight: 900, letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-                ¡Escríbenos por WhatsApp / DM!
-              </span>
-            </div>
-          </div>
-        </div>
-
-
-
-        {/* ── WhatsApp – Plantilla A: Full Foto 1:1 con Logo ───────────────── */}
-        <div ref={waARef} style={{ position: 'relative', width: '1080px', height: '1080px', background: '#000', fontFamily: 'system-ui, sans-serif', overflow: 'hidden' }}>
-          <img src={base64Img || property.image} crossOrigin="anonymous" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.75 }} alt="" />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(128,0,32,0.6) 0%, rgba(0,0,0,0.85) 100%)' }} />
-
-          {/* Top Bar con Logo */}
-          <div style={{ position: 'absolute', top: 56, left: 56, right: 56, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(212,175,55,0.4)', borderRadius: '20px', padding: '10px 24px' }}>
-              <img src="/logo-riv.svg" style={{ height: '44px', objectFit: 'contain' }} alt="RIV Margarita Premier" crossOrigin="anonymous" />
-            </div>
-            <div style={{ background: '#800020', borderRadius: '16px', padding: '10px 24px' }}>
-              <p style={{ color: '#fff', fontWeight: 800, fontSize: '22px', margin: 0 }}>En Venta</p>
-            </div>
-          </div>
-
-          {/* Bottom Content */}
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '56px' }}>
-            <h1 style={{ fontSize: '64px', fontWeight: 900, color: '#fff', margin: '0 0 12px', lineHeight: 1.1 }}>{property.title}</h1>
-            <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '26px', margin: '0 0 28px' }}>📍 {property.location}</p>
-            <p style={{ fontSize: '84px', fontWeight: 900, color: '#fff', margin: '0 0 36px', lineHeight: 1 }}>${fmt(property.price)} <span style={{ fontSize: '28px', fontWeight: 400, color: '#D4AF37' }}>USD</span></p>
-
-            <div style={{ display: 'flex', gap: '16px' }}>
-              {validSpecs.map(s => (
-                <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(12px)', borderRadius: '20px', padding: '18px 12px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.2)' }}>
-                  <p style={{ color: '#fff', fontSize: '32px', fontWeight: 900, margin: 0 }}>{s.v}</p>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '16px', margin: '4px 0 0' }}>{s.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── WhatsApp – Plantilla B: Panel Premium 1:1 con Logo ───────────── */}
-        <div ref={waBRef} style={{ width: '1080px', height: '1080px', background: '#fff', fontFamily: 'system-ui, sans-serif', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          {/* Foto top */}
-          <div style={{ position: 'relative', height: '560px', overflow: 'hidden', flexShrink: 0 }}>
-            <img src={base64Img || property.image} crossOrigin="anonymous" style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-            <div style={{ position: 'absolute', top: 32, left: 32, background: 'rgba(255,255,255,0.92)', borderRadius: '20px', padding: '10px 24px', border: '1px solid rgba(128,0,32,0.15)' }}>
-              <img src="/logo-riv.svg" style={{ height: '42px', objectFit: 'contain' }} alt="RIV Margarita Premier" crossOrigin="anonymous" />
-            </div>
-            <div style={{ position: 'absolute', top: 32, right: 32, background: '#800020', borderRadius: '16px', padding: '10px 24px' }}>
-              <p style={{ color: '#fff', fontWeight: 900, fontSize: '20px', margin: 0 }}>En Venta</p>
-            </div>
-          </div>
-
-          {/* Panel */}
-          <div style={{ flex: 1, padding: '36px 56px 40px', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-              <div style={{ flex: 1, paddingRight: '20px' }}>
-                <h1 style={{ fontSize: '46px', fontWeight: 900, color: '#111', margin: 0, lineHeight: 1.1 }}>{property.title}</h1>
-                <p style={{ color: '#9CA3AF', fontSize: '22px', margin: '8px 0 0' }}>📍 {property.location}</p>
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <p style={{ fontSize: '48px', fontWeight: 900, color: '#800020', margin: 0, lineHeight: 1 }}>${fmt(property.price)}</p>
-                <p style={{ color: '#9CA3AF', fontSize: '18px', margin: '4px 0 0' }}>USD</p>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${validSpecs.length}, 1fr)`, gap: '16px', flex: 1 }}>
-              {validSpecs.map(s => {
-                const Icon = s.icon;
-                return (
-                <div key={s.label} style={{ background: '#F9FAFB', border: '2px solid #F3F4F6', borderRadius: '20px', padding: '20px 14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon size={36} color="#111" style={{ marginBottom: '8px' }} />
-                  <p style={{ color: '#111', fontSize: '36px', fontWeight: 900, margin: 0 }}>{s.v}</p>
-                  <p style={{ color: '#9CA3AF', fontSize: '15px', margin: '4px 0 0' }}>{s.label}</p>
-                </div>
-              )})}
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', borderTop: '2px solid #F3F4F6', paddingTop: '24px', marginTop: '24px' }}>
-              <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#800020', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '22px', fontWeight: 900, flexShrink: 0 }}>
-                {property.captador ? property.captador.charAt(0).toUpperCase() : 'R'}
-              </div>
-              <div>
-                <p style={{ color: '#9CA3AF', fontSize: '15px', margin: 0 }}>Asesor Inmobiliario</p>
-                <p style={{ color: '#111', fontSize: '24px', fontWeight: 800, margin: '2px 0 0' }}>{property.captador}</p>
-              </div>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto' }}>
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
             </div>
           </div>
         </div>
@@ -1685,71 +1614,91 @@ function TemplateThumbnail({ format, template, property }: { format: FormatType;
 
   if (format === 'instagram') {
     return isB ? (
-      <div style={{ width: '100%', aspectRatio: '0.56', background: '#0F0F0F', borderRadius: '10px', overflow: 'hidden', position: 'relative', fontSize: 0 }}>
+      // IG-B: Clean Gold thumbnail
+      <div style={{ width: '100%', aspectRatio: '0.56', background: '#0a0a0a', borderRadius: '10px', overflow: 'hidden', position: 'relative', fontSize: 0 }}>
         <img src={property.image} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="" />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(15,12,10,0.92) 0%, rgba(0,0,0,0.2) 65%, rgba(0,0,0,0.6) 100%)' }} />
-        {/* Top Header */}
-        <div style={{ position: 'absolute', top: '8px', left: '8px', right: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ width: '40px', height: '10px', background: 'rgba(255,255,255,0.9)', borderRadius: '3px' }} />
-          <div style={{ width: '32px', height: '10px', background: '#D4AF37', borderRadius: '5px' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.25) 40%, transparent 65%)' }} />
+        {/* Badge dorado top-right */}
+        <div style={{ position: 'absolute', top: '7px', right: '7px', background: '#D4AF37', padding: '3px 7px' }}>
+          <div style={{ width: '28px', height: '6px', background: '#000', borderRadius: '1px' }} />
         </div>
-        {/* Floating Card */}
-        <div style={{ position: 'absolute', bottom: '26px', left: '8px', right: '8px', background: 'rgba(255,255,255,0.92)', borderRadius: '8px', padding: '6px' }}>
-          <div style={{ width: '30%', height: '4px', background: '#800020', borderRadius: '2px', marginBottom: '3px' }} />
-          <div style={{ width: '85%', height: '6px', background: '#111', borderRadius: '2px', marginBottom: '3px' }} />
-          <div style={{ width: '50%', height: '4px', background: '#666', borderRadius: '2px', marginBottom: '4px' }} />
-          <div style={{ width: '100%', height: '11px', background: 'rgba(212,175,55,0.25)', borderRadius: '3px', border: '0.5px solid #D4AF37' }} />
+        {/* Bloque inferior minimalista */}
+        <div style={{ position: 'absolute', bottom: '10px', left: '8px', right: '8px', display: 'flex', alignItems: 'flex-end', gap: '5px' }}>
+          <div style={{ width: '10px', height: '10px', border: '1px solid rgba(255,255,255,0.8)', flexShrink: 0, marginBottom: '1px' }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ width: '70%', height: '3px', background: 'rgba(255,255,255,0.7)', borderRadius: '1px', marginBottom: '3px' }} />
+            <div style={{ width: '95%', height: '5px', background: '#D4AF37', borderRadius: '1px', marginBottom: '3px' }} />
+            <div style={{ width: '45%', height: '3px', background: 'rgba(255,255,255,0.4)', borderRadius: '1px' }} />
+          </div>
+          <div style={{ width: '8px', height: '8px', border: '1px solid rgba(212,175,55,0.8)', flexShrink: 0, marginBottom: '1px', borderRadius: '1px' }} />
         </div>
-        {/* CTA */}
-        <div style={{ position: 'absolute', bottom: '6px', left: '10px', right: '10px', height: '14px', background: 'linear-gradient(90deg, #800020, #D4AF37)', borderRadius: '999px' }} />
       </div>
     ) : (
-      <div style={{ width: '100%', aspectRatio: '0.56', background: '#0a0a0c', borderRadius: '10px', overflow: 'hidden', position: 'relative', fontSize: 0 }}>
+      // IG-A: Clean Dark thumbnail
+      <div style={{ width: '100%', aspectRatio: '0.56', background: '#0a0a0a', borderRadius: '10px', overflow: 'hidden', position: 'relative', fontSize: 0 }}>
         <img src={property.image} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="" />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.2) 65%, rgba(0,0,0,0.6) 100%)' }} />
-        {/* Top Header */}
-        <div style={{ position: 'absolute', top: '8px', left: '8px', right: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ width: '40px', height: '10px', background: 'rgba(12,12,16,0.7)', border: '0.5px solid #D4AF37', borderRadius: '3px' }} />
-          <div style={{ width: '32px', height: '10px', background: '#800020', borderRadius: '5px' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.25) 40%, transparent 65%)' }} />
+        {/* Badge vinotinto top-right */}
+        <div style={{ position: 'absolute', top: '7px', right: '7px', background: '#8B0000', padding: '3px 7px' }}>
+          <div style={{ width: '28px', height: '6px', background: '#fff', borderRadius: '1px' }} />
         </div>
-        {/* Floating Glass Card */}
-        <div style={{ position: 'absolute', bottom: '26px', left: '8px', right: '8px', background: 'rgba(16,18,27,0.78)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '6px' }}>
-          <div style={{ width: '30%', height: '4px', background: '#D4AF37', borderRadius: '2px', marginBottom: '3px' }} />
-          <div style={{ width: '85%', height: '6px', background: '#fff', borderRadius: '2px', marginBottom: '3px' }} />
-          <div style={{ width: '50%', height: '4px', background: 'rgba(255,255,255,0.7)', borderRadius: '2px', marginBottom: '4px' }} />
-          <div style={{ width: '100%', height: '11px', background: 'rgba(212,175,55,0.2)', borderRadius: '3px', border: '0.5px solid rgba(212,175,55,0.5)' }} />
+        {/* Bloque inferior minimalista */}
+        <div style={{ position: 'absolute', bottom: '10px', left: '8px', right: '8px', display: 'flex', alignItems: 'flex-end', gap: '5px' }}>
+          <div style={{ width: '10px', height: '10px', border: '1px solid rgba(255,255,255,0.8)', flexShrink: 0, marginBottom: '1px' }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ width: '70%', height: '3px', background: 'rgba(255,255,255,0.7)', borderRadius: '1px', marginBottom: '3px' }} />
+            <div style={{ width: '95%', height: '5px', background: '#fff', borderRadius: '1px', marginBottom: '3px' }} />
+            <div style={{ width: '45%', height: '3px', background: 'rgba(255,255,255,0.4)', borderRadius: '1px' }} />
+          </div>
+          <div style={{ width: '8px', height: '8px', border: '1px solid rgba(255,255,255,0.7)', flexShrink: 0, marginBottom: '1px', borderRadius: '1px' }} />
         </div>
-        {/* CTA */}
-        <div style={{ position: 'absolute', bottom: '6px', left: '10px', right: '10px', height: '14px', background: 'linear-gradient(90deg, #25D366, #128C7E)', borderRadius: '999px' }} />
       </div>
     );
   }
 
   if (format === 'whatsapp') {
     return isB ? (
-      <div style={{ width: '100%', aspectRatio: '1', background: '#fff', borderRadius: '10px', overflow: 'hidden', fontSize: 0, display: 'flex', flexDirection: 'column', border: '1px solid #EEE' }}>
-        <img src={property.image} style={{ width: '100%', height: '52%', objectFit: 'cover' }} alt="" />
-        <div style={{ flex: 1, padding: '6px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <div style={{ width: '55%', height: '8px', background: '#111', borderRadius: '3px' }} />
-            <div style={{ width: '25%', height: '8px', background: '#800020', borderRadius: '3px' }} />
+      // WA-B: Clean Split thumbnail
+      <div style={{ width: '100%', aspectRatio: '1', background: '#fff', borderRadius: '10px', overflow: 'hidden', fontSize: 0, display: 'flex', flexDirection: 'column', border: '1px solid #E5E7EB' }}>
+        {/* Foto */}
+        <div style={{ position: 'relative', height: '58%', overflow: 'hidden', flexShrink: 0 }}>
+          <img src={property.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+          <div style={{ position: 'absolute', top: '5px', right: '5px', background: '#8B0000', padding: '2px 6px' }}>
+            <div style={{ width: '22px', height: '5px', background: '#fff', borderRadius: '1px' }} />
           </div>
-          <div style={{ width: '70%', height: '4px', background: '#EEE', borderRadius: '3px', marginBottom: '5px' }} />
-          <div style={{ display: 'flex', gap: '3px' }}>
-            {[0,1,2].map(i => <div key={i} style={{ flex: 1, height: '18px', background: '#F9FAFB', borderRadius: '4px', border: '1px solid #EEE' }} />)}
+        </div>
+        {/* Panel blanco */}
+        <div style={{ flex: 1, padding: '7px 8px 8px', display: 'flex', alignItems: 'flex-end', gap: '5px' }}>
+          <div style={{ width: '9px', height: '9px', border: '1px solid #111', flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ width: '75%', height: '3px', background: '#999', borderRadius: '1px', marginBottom: '3px' }} />
+            <div style={{ width: '100%', height: '5px', background: '#111', borderRadius: '1px', marginBottom: '3px' }} />
+            <div style={{ width: '40%', height: '3px', background: '#CCC', borderRadius: '1px' }} />
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ width: '28px', height: '5px', background: '#8B0000', borderRadius: '1px', marginBottom: '3px', marginLeft: 'auto' }} />
+            <div style={{ width: '8px', height: '8px', border: '1px solid #111', borderRadius: '1px', marginLeft: 'auto' }} />
           </div>
         </div>
       </div>
     ) : (
-      <div style={{ width: '100%', aspectRatio: '1', background: '#111', borderRadius: '10px', overflow: 'hidden', position: 'relative', fontSize: 0 }}>
-        <img src={property.image} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.65, position: 'absolute' }} alt="" />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(128,0,32,0.5) 0%, rgba(0,0,0,0.75) 100%)' }} />
-        <div style={{ position: 'absolute', bottom: '8px', left: '8px', right: '8px' }}>
-          <div style={{ width: '70%', height: '8px', background: '#fff', borderRadius: '4px', marginBottom: '4px' }} />
-          <div style={{ width: '50%', height: '6px', background: 'rgba(255,255,255,0.6)', borderRadius: '3px', marginBottom: '6px' }} />
-          <div style={{ display: 'flex', gap: '3px' }}>
-            {[0,1,2,3].map(i => <div key={i} style={{ flex: 1, height: '16px', background: 'rgba(255,255,255,0.15)', borderRadius: '4px' }} />)}
+      // WA-A: Clean Full Photo thumbnail
+      <div style={{ width: '100%', aspectRatio: '1', background: '#0a0a0a', borderRadius: '10px', overflow: 'hidden', position: 'relative', fontSize: 0 }}>
+        <img src={property.image} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="" />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.70) 0%, rgba(0,0,0,0.20) 40%, transparent 60%)' }} />
+        {/* Badge top-right */}
+        <div style={{ position: 'absolute', top: '7px', right: '7px', background: '#8B0000', padding: '3px 7px' }}>
+          <div style={{ width: '28px', height: '5px', background: '#fff', borderRadius: '1px' }} />
+        </div>
+        {/* Bloque inferior */}
+        <div style={{ position: 'absolute', bottom: '8px', left: '8px', right: '8px', display: 'flex', alignItems: 'flex-end', gap: '5px' }}>
+          <div style={{ width: '9px', height: '9px', border: '1px solid rgba(255,255,255,0.8)', flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ width: '70%', height: '3px', background: 'rgba(255,255,255,0.6)', borderRadius: '1px', marginBottom: '3px' }} />
+            <div style={{ width: '95%', height: '5px', background: '#fff', borderRadius: '1px', marginBottom: '3px' }} />
+            <div style={{ width: '45%', height: '3px', background: 'rgba(255,255,255,0.35)', borderRadius: '1px' }} />
           </div>
+          <div style={{ width: '8px', height: '8px', border: '1px solid rgba(255,255,255,0.7)', flexShrink: 0, borderRadius: '1px' }} />
         </div>
       </div>
     );
