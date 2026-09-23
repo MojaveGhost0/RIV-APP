@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // =============================================================================
 // API ROUTE — /api/search
-// Recibe la query del usuario, la envía a Gemini Flash y devuelve filtros JSON.
+// Recibe la query del usuario, la envía a OpenRouter (LLaMA 3) y devuelve filtros JSON.
 // La API key se lee en el servidor (NUNCA exponer en el cliente con NEXT_PUBLIC_).
 // =============================================================================
 
@@ -14,15 +14,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Query demasiado corta' }, { status: 400 });
     }
 
-    const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-    if (!GROQ_API_KEY) {
-      // No hay API key configurada → el cliente debe hacer fallback a fuzzy
+    if (!OPENROUTER_API_KEY) {
       return NextResponse.json({ error: 'AI_NOT_CONFIGURED' }, { status: 503 });
     }
 
-    // Paso 3 — Sanitizar query: limitar longitud y eliminar comillas que podrían romper el prompt
-    const safeQuery = query.trim().slice(0, 200).replace(/["“”‘’`]/g, "'");
+    // Sanitizar query
+    const safeQuery = query.trim().slice(0, 200).replace(/[\u201c\u201d\u2018\u2019`]/g, "'");
 
     const prompt = `Eres un asistente de búsqueda para "RIV Margarita Premier", una agencia inmobiliaria en la Isla de Margarita, Venezuela.
 Tu tarea es analizar la consulta del usuario y extraer filtros estructurados para buscar propiedades. Los precios son en USD.
@@ -87,32 +86,33 @@ Comodidades (amenities exactas disponibles):
 "Área de BBQ", "Área de Oficinas", "Baño de Visitas"
 
 Ubicación:
-- "cerca del mar" / "frente al mar" / "vista al mar" / "playa" → keywords: ["mar", "playa"] 
+- "cerca del mar" / "frente al mar" / "vista al mar" / "playa" → keywords: ["mar", "playa"]
 - Nombre de zona → keywords: [nombre de zona normalizado]
 
 Si no puedes extraer un filtro, déjalo null o array vacío [].
 Responde SOLO el JSON sin explicación adicional.`;
 
-    // Modelos ordenados por preferencia — el primero disponible en el plan gratuito de Groq
-    const GROQ_MODELS = [
-      'llama-3.3-70b-versatile',   // Recomendado: disponible en todos los planes
-      'llama3-8b-8192',            // Fallback ligero
-      'mixtral-8x7b-32768',        // Fallback alternativo
+    // Modelos de OpenRouter (plan gratuito, sin restricciones geográficas)
+    const OR_MODELS = [
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'meta-llama/llama-3.1-8b-instruct:free',
+      'mistralai/mistral-7b-instruct:free',
     ];
 
-    let groqRes: Response | null = null;
-    let lastError = '';
+    let aiRes: Response | null = null;
 
-    for (const model of GROQ_MODELS) {
+    for (const model of OR_MODELS) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       try {
-        groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${GROQ_API_KEY}`,
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'https://rivmargaritapremier.com',
+            'X-Title': 'RIV Margarita Premier',
           },
           signal: controller.signal,
           body: JSON.stringify({
@@ -123,56 +123,49 @@ Responde SOLO el JSON sin explicación adicional.`;
         });
         clearTimeout(timeoutId);
 
-        // Si el modelo no existe o no está permitido, probar el siguiente
-        if (groqRes.status === 404 || groqRes.status === 400) {
-          const errBody = await groqRes.text();
-          console.warn(`[search] Modelo ${model} no disponible:`, errBody);
-          lastError = errBody;
-          groqRes = null;
+        if (aiRes.status === 404 || aiRes.status === 400 || aiRes.status === 429) {
+          const errBody = await aiRes.text();
+          console.warn(`[search] Modelo ${model} no disponible (${aiRes.status}):`, errBody);
+          aiRes = null;
           continue;
         }
 
-        break; // Modelo válido — salir del loop
+        break;
       } catch (fetchErr) {
         clearTimeout(timeoutId);
         if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
           console.warn(`[search] Timeout con modelo ${model}`);
-          lastError = 'TIMEOUT';
+          aiRes = null;
           continue;
         }
         throw fetchErr;
       }
     }
 
-    if (!groqRes) {
-      if (lastError === 'TIMEOUT') {
-        return NextResponse.json({ error: 'TIMEOUT' }, { status: 504 });
-      }
+    if (!aiRes) {
       return NextResponse.json({ error: 'NO_MODEL_AVAILABLE' }, { status: 502 });
     }
 
-    if (!groqRes.ok) {
-      const errBody = await groqRes.text();
-      console.error(`[search] Groq API error: ${groqRes.status}`);
-      console.error(`[search] Groq error body:`, errBody);
+    if (!aiRes.ok) {
+      const errBody = await aiRes.text();
+      console.error(`[search] OpenRouter error ${aiRes.status}:`, errBody);
       return NextResponse.json({ error: 'API_ERROR' }, { status: 502 });
     }
 
-    const data = await groqRes.json();
+    const data = await aiRes.json();
     const rawText: string = data.choices?.[0]?.message?.content ?? '';
 
     if (!rawText) {
-      console.error('[search] Groq devolvió respuesta vacía');
+      console.error('[search] OpenRouter devolvió respuesta vacía');
       return NextResponse.json({ error: 'EMPTY_RESPONSE' }, { status: 502 });
     }
 
-    // Paso 1 — Proteger JSON.parse: limpiar posible markdown envolvente y capturar errores
     let filters: Record<string, unknown>;
     try {
       const cleaned = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
       filters = JSON.parse(cleaned);
     } catch (parseErr) {
-      console.error('[search] Gemini no devolvió JSON válido:', rawText, parseErr);
+      console.error('[search] Respuesta no es JSON válido:', rawText, parseErr);
       return NextResponse.json({ error: 'PARSE_ERROR' }, { status: 502 });
     }
 
