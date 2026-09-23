@@ -2,10 +2,275 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // =============================================================================
 // API ROUTE — /api/search
-// Recibe la query del usuario, la envía a OpenRouter (LLaMA 3) y devuelve filtros JSON.
-// La API key se lee en el servidor (NUNCA exponer en el cliente con NEXT_PUBLIC_).
+// Parser semántico determinístico para búsqueda inmobiliaria.
+// Sin dependencias de API externas — 0 costo, 0ms de latencia de red.
 // =============================================================================
 
+// ── Tipos ──────────────────────────────────────────────────────────────────
+interface SearchFilters {
+  precio_min: number | null;
+  precio_max: number | null;
+  beds_min: number | null;
+  baths_min: number | null;
+  sqm_min: number | null;
+  sqm_max: number | null;
+  property_type: string | null;
+  keywords: string[];
+  amenities: string[];
+  status: string | null;
+  interpretacion: string;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+/** Normaliza la query: minúsculas, quita tildes, colapsa espacios */
+function normalize(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Parsea expresiones de precio en USD: "80k", "80.000", "medio millon", "$150 mil" */
+function parsePriceToken(token: string): number | null {
+  const t = token.replace(/[$,.]/g, '').trim();
+
+  if (/^(\d+)k$/i.test(t)) return parseInt(t) * 1000;
+  if (/^\d+$/.test(t)) {
+    const n = parseInt(t);
+    // Heurística: si es menor a 10000 y viene precedido de contexto de precio → asumimos miles
+    return n < 1000 ? n * 1000 : n;
+  }
+  return null;
+}
+
+// ── Parser principal ───────────────────────────────────────────────────────
+function parseQuery(raw: string): SearchFilters {
+  const q = normalize(raw);
+  const filters: SearchFilters = {
+    precio_min: null,
+    precio_max: null,
+    beds_min: null,
+    baths_min: null,
+    sqm_min: null,
+    sqm_max: null,
+    property_type: null,
+    keywords: [],
+    amenities: [],
+    status: null,
+    interpretacion: '',
+  };
+
+  const interp: string[] = [];
+
+  // ── 1. PRECIO ─────────────────────────────────────────────────────────────
+
+  // "menos de X" / "hasta X" / "máximo X" / "max X" / "no mas de X"
+  const precioMaxMatch = q.match(
+    /(?:menos de|hasta|maximo?|max|no mas de|por menos de)\s*\$?\s*(\d[\d.,]*k?)/i
+  );
+  if (precioMaxMatch) {
+    filters.precio_max = parsePriceToken(precioMaxMatch[1]);
+  }
+
+  // "mas de X" / "desde X" / "minimo X" / "min X"
+  const precioMinMatch = q.match(
+    /(?:mas de|desde|minimo?|min|a partir de)\s*\$?\s*(\d[\d.,]*k?)/i
+  );
+  if (precioMinMatch) {
+    filters.precio_min = parsePriceToken(precioMinMatch[1]);
+  }
+
+  // "entre X y Y"
+  const precioEntreMatch = q.match(
+    /entre\s*\$?\s*(\d[\d.,]*k?)\s*y\s*\$?\s*(\d[\d.,]*k?)/i
+  );
+  if (precioEntreMatch) {
+    filters.precio_min = parsePriceToken(precioEntreMatch[1]);
+    filters.precio_max = parsePriceToken(precioEntreMatch[2]);
+  }
+
+  // Número suelto con "$" o seguido de "k": "$80k", "$120.000", "80 mil"
+  if (!filters.precio_max && !filters.precio_min) {
+    const precioSueltoMatch = q.match(/\$\s*(\d[\d.,]*k?)/);
+    if (precioSueltoMatch) {
+      const v = parsePriceToken(precioSueltoMatch[1]);
+      if (v) filters.precio_max = v;
+    }
+  }
+
+  // "X mil" / "X millones"
+  const milMatch = q.match(/(\d+(?:[.,]\d+)?)\s*mil(?:es)?(?:\s*de\s*dolares?)?/i);
+  if (milMatch && !filters.precio_max && !filters.precio_min) {
+    filters.precio_max = Math.round(parseFloat(milMatch[1].replace(',', '.')) * 1000);
+  }
+  const millonMatch = q.match(/(?:medio\s*)?mill[oó]n/i);
+  if (millonMatch) {
+    if (q.includes('medio millon')) filters.precio_max = 500000;
+    else filters.precio_min = 1000000;
+  }
+
+  // Palabras clave de rango
+  if (!filters.precio_max && !filters.precio_min) {
+    if (/\b(?:barato|economico|modico|asequible|accesible)\b/.test(q)) {
+      filters.precio_max = 50000;
+      interp.push('Económico');
+    } else if (/\b(?:precio medio|mediano|moderado)\b/.test(q)) {
+      filters.precio_min = 50000;
+      filters.precio_max = 120000;
+      interp.push('Precio medio');
+    } else if (/\b(?:lujoso|exclusivo|premium|alto standing|lujo)\b/.test(q)) {
+      filters.precio_min = 120000;
+      interp.push('Premium');
+    }
+  }
+
+  if (filters.precio_max) interp.push(`Máx $${(filters.precio_max / 1000).toFixed(0)}k`);
+  else if (filters.precio_min) interp.push(`Desde $${(filters.precio_min / 1000).toFixed(0)}k`);
+
+  // ── 2. HABITACIONES ───────────────────────────────────────────────────────
+  const bedsMatch = q.match(
+    /(\d+)\s*(?:hab(?:itaciones?)?|cuartos?|dormitorios?|recamaras?|habs?|bedroom)/i
+  );
+  if (bedsMatch) {
+    filters.beds_min = parseInt(bedsMatch[1]);
+    interp.push(`${filters.beds_min}hab`);
+  }
+
+  // ── 3. BAÑOS ──────────────────────────────────────────────────────────────
+  const bathsMatch = q.match(/(\d+)\s*(?:banos?|bathrooms?)/i);
+  if (bathsMatch) {
+    filters.baths_min = parseInt(bathsMatch[1]);
+    interp.push(`${filters.baths_min}baños`);
+  }
+
+  // ── 4. METRAJE ────────────────────────────────────────────────────────────
+  const sqmMinMatch = q.match(
+    /(?:mas de|minimo?|desde)\s*(\d+)\s*(?:m2|metros?(?:\s*cuadrados?)?|mts?)/i
+  );
+  if (sqmMinMatch) filters.sqm_min = parseInt(sqmMinMatch[1]);
+
+  const sqmMaxMatch = q.match(
+    /(?:menos de|hasta|maximo?)\s*(\d+)\s*(?:m2|metros?(?:\s*cuadrados?)?|mts?)/i
+  );
+  if (sqmMaxMatch) filters.sqm_max = parseInt(sqmMaxMatch[1]);
+
+  // Número suelto con m2
+  if (!filters.sqm_min && !filters.sqm_max) {
+    const sqmSuelto = q.match(/(\d+)\s*(?:m2|m²|metros?\s*cuadrados?)/i);
+    if (sqmSuelto) filters.sqm_min = parseInt(sqmSuelto[1]);
+  }
+
+  if (/\b(?:grande|espacioso|amplio)\b/.test(q) && !filters.sqm_min) filters.sqm_min = 150;
+  if (/\b(?:pequeno|compacto|chico)\b/.test(q) && !filters.sqm_max) filters.sqm_max = 80;
+
+  // ── 5. TIPO DE PROPIEDAD ──────────────────────────────────────────────────
+  const typeMap: [RegExp, string][] = [
+    [/\b(?:apto|apartamento|piso|flat|depto)\b/, 'Apartamento'],
+    [/\b(?:casa|quinta|villa|chalet|residencia)\b/, 'Casa / Quinta'],
+    [/\b(?:townhouse|town\s*house|duplex|triplex)\b/, 'Townhouse'],
+    [/\b(?:penthouse|ph|atico|pent\s*house)\b/, 'Penthouse'],
+    [/\b(?:local|comercial|tienda|negocio|fondo\s*de\s*comercio)\b/, 'Local Comercial'],
+    [/\b(?:oficina|despacho|consultorio)\b/, 'Oficina'],
+    [/\b(?:terreno|lote|parcela|solar)\b/, 'Terreno'],
+  ];
+  for (const [pattern, type] of typeMap) {
+    if (pattern.test(q)) {
+      filters.property_type = type;
+      interp.push(type);
+      break;
+    }
+  }
+
+  // ── 6. STATUS ─────────────────────────────────────────────────────────────
+  if (/\b(?:vendid[ao]|vendidos?|ya\s*vendid[ao])\b/.test(q)) {
+    filters.status = 'Vendida';
+  } else if (/\b(?:suspendid[ao]|inactiv[ao]|retirad[ao])\b/.test(q)) {
+    filters.status = 'Suspendida';
+  } else if (/\b(?:activ[ao]|disponible|en\s*venta|a\s*la\s*venta)\b/.test(q)) {
+    filters.status = 'Activa';
+  }
+
+  // ── 7. ZONAS DE MARGARITA ─────────────────────────────────────────────────
+  const zonas: [RegExp, string][] = [
+    [/\bpampatar\b/, 'Pampatar'],
+    [/\bel\s*cardon\b/, 'El Cardón'],
+    [/\bguarame\b/, 'Guarame'],
+    [/\bporlamar\b/, 'Porlamar'],
+    [/\blos\s*robles\b/, 'Los Robles'],
+    [/\bcosta\s*azul\b/, 'Costa Azul'],
+    [/\bel\s*valle\b/, 'El Valle'],
+    [/\bjuan\s*griego\b/, 'Juan Griego'],
+    [/\bel\s*maco\b/, 'El Maco'],
+    [/\bsan\s*juan\b/, 'San Juan Bautista'],
+    [/\bla\s*asuncion\b/, 'La Asunción'],
+    [/\bsanta\s*ana\b/, 'Santa Ana'],
+    [/\bel\s*cercado\b/, 'El Cercado'],
+    [/\bel\s*agua\b/, 'El Agua'],
+    [/\bplaya\s*el\s*agua\b/, 'Playa El Agua'],
+    [/\bmanzanillo\b/, 'Manzanillo'],
+    [/\bpedro\s*gonzalez\b/, 'Pedro González'],
+    [/\bplaya\s*el\s*angel\b/, 'Playa El Ángel'],
+    [/\bparguito\b/, 'Playa Parguito'],
+    [/\bguacuco\b/, 'Playa Guacuco'],
+    [/\bla\s*restinga\b/, 'La Restinga'],
+    [/\bpunta\s*de\s*piedras\b/, 'Punta de Piedras'],
+    [/\bvilla\s*rosa\b/, 'Villa Rosa'],
+    [/\bcoche\b/, 'San Pedro de Coche'],
+    [/\bmaneiro\b/, 'Pampatar'],
+    [/\bmarino\b/, 'Porlamar'],
+  ];
+
+  const foundZones: string[] = [];
+  for (const [pattern, zona] of zonas) {
+    if (pattern.test(q)) foundZones.push(zona);
+  }
+
+  // Keywords de playa / mar
+  if (/\b(?:playa|mar|frente\s*al\s*mar|vista\s*al\s*mar|cerca\s*del\s*mar)\b/.test(q)) {
+    if (!foundZones.includes('mar')) filters.keywords.push('mar');
+    if (!foundZones.includes('playa')) filters.keywords.push('playa');
+  }
+
+  filters.keywords = [...filters.keywords, ...foundZones].slice(0, 5);
+  if (foundZones.length) interp.push(foundZones[0]);
+
+  // ── 8. AMENITIES ──────────────────────────────────────────────────────────
+  const amenityMap: [RegExp, string][] = [
+    [/\bpiscina\b/, 'Piscina'],
+    [/\b(?:planta\s*electrica|planta)\b/, 'Planta Eléctrica'],
+    [/\b(?:pozo\s*de\s*agua|pozo)\b/, 'Pozo de Agua'],
+    [/\b(?:vigilancia|seguridad\s*24|24\/7)\b/, 'Vigilancia 24/7'],
+    [/\b(?:amoblado|amueblado|con\s*muebles)\b/, 'Amoblado'],
+    [/\b(?:vista\s*al\s*mar|frente\s*al\s*mar|vista\s*mar)\b/, 'Vista al Mar'],
+    [/\bgimnasio\b/, 'Gimnasio'],
+    [/\b(?:ascensor|elevador)\b/, 'Ascensor'],
+    [/\b(?:estacionamiento\s*techado|garaje\s*techado)\b/, 'Estacionamiento Techado'],
+    [/\b(?:terraza\s*privada|terraza)\b/, 'Terraza Privada'],
+    [/\bjacuzzi\b/, 'Jacuzzi'],
+    [/\b(?:area\s*de\s*bbq|bbq|parrillera)\b/, 'Área de BBQ'],
+    [/\bbano\s*de\s*visitas\b/, 'Baño de Visitas'],
+  ];
+
+  for (const [pattern, amenity] of amenityMap) {
+    if (pattern.test(q) && filters.amenities.length < 4) {
+      filters.amenities.push(amenity);
+    }
+  }
+
+  // ── 9. INTERPRETACIÓN RESUMEN ─────────────────────────────────────────────
+  if (interp.length === 0) {
+    // Fallback: usar las primeras palabras significativas de la query
+    interp.push(raw.trim().slice(0, 50));
+  }
+  filters.interpretacion = interp.join(' · ').slice(0, 60);
+
+  return filters;
+}
+
+// ── Handler HTTP ───────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const { query } = await req.json();
@@ -14,161 +279,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Query demasiado corta' }, { status: 400 });
     }
 
-    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-
-    if (!OPENROUTER_API_KEY) {
-      return NextResponse.json({ error: 'AI_NOT_CONFIGURED' }, { status: 503 });
-    }
-
-    // Sanitizar query
-    const safeQuery = query.trim().slice(0, 200).replace(/[\u201c\u201d\u2018\u2019`]/g, "'");
-
-    const prompt = `Eres un asistente de búsqueda para "RIV Margarita Premier", una agencia inmobiliaria en la Isla de Margarita, Venezuela.
-Tu tarea es analizar la consulta del usuario y extraer filtros estructurados para buscar propiedades. Los precios son en USD.
-
-Consulta del usuario: "${safeQuery}"
-
-Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin markdown, sin texto extra):
-{
-  "precio_min": <número en USD o null>,
-  "precio_max": <número en USD o null>,
-  "beds_min": <número mínimo de habitaciones o null>,
-  "baths_min": <número mínimo de baños o null>,
-  "sqm_min": <metros cuadrados mínimos o null>,
-  "sqm_max": <metros cuadrados máximos o null>,
-  "property_type": <"Apartamento" | "Casa / Quinta" | "Townhouse" | "Penthouse" | "Local Comercial" | "Oficina" | "Terreno" | null>,
-  "keywords": <array de strings para buscar en título/descripción/ubicación, máximo 5>,
-  "amenities": <array de comodidades exactas, máximo 4>,
-  "status": <"Activa" | "Vendida" | "Suspendida" | null>,
-  "interpretacion": <resumen corto de qué se buscó, ej: "Apto 3hab · Pampatar · Máx $80k", máximo 60 caracteres>
-}
-
-=== ZONAS DE MARGARITA ===
-Municipio Maneiro: Pampatar, El Cardón, Guarame
-Municipio Mariño: Porlamar, Los Robles, Costa Azul, El Valle
-Municipio Arismendi: Juan Griego, El Maco
-Municipio Díaz: San Juan Bautista
-Municipio García: La Asunción, Santa Ana, El Cercado
-Municipio Marcano: El Agua, Playa El Agua, Manzanillo, Pedro González
-Playas: Playa El Ángel, Playa Parguito, Playa Guacuco, Playa Caribe, La Restinga
-Otras: Punta de Piedras, Villa Rosa, San Pedro de Coche
-
-=== REGLAS DE INTERPRETACIÓN ===
-Precio:
-- "barato" / "económico" / "módico" / "asequible" → precio_max: 50000
-- "precio medio" / "mediano" → precio_min: 50000, precio_max: 120000
-- "lujoso" / "exclusivo" / "premium" / "alto standing" → precio_min: 120000
-- "80k" = 80000, "medio millón" = 500000, "150 mil" = 150000
-
-Habitaciones / Baños:
-- "cuartos" / "habs" / "habitaciones" / "dormitorios" / "recámaras" = beds
-- "3 cuartos" → beds_min: 3
-
-Metraje:
-- "más de 100 metros" / "100m2" / "100 m²" → sqm_min: 100
-- "menos de 80 metros" → sqm_max: 80
-- "grande" / "espacioso" → sqm_min: 150
-- "pequeño" / "compacto" → sqm_max: 80
-
-Tipo de propiedad:
-- "apto" / "apartamento" / "piso" / "flat" → property_type: "Apartamento"
-- "casa" / "quinta" / "villa" / "chalet" → property_type: "Casa / Quinta"
-- "townhouse" / "town house" / "dúplex" → property_type: "Townhouse"
-- "penthouse" / "ph" / "ático" → property_type: "Penthouse"
-- "local" / "comercial" / "tienda" / "negocio" → property_type: "Local Comercial"
-- "oficina" / "despacho" → property_type: "Oficina"
-- "terreno" / "lote" / "parcela" → property_type: "Terreno"
-
-Comodidades (amenities exactas disponibles):
-"Piscina", "Planta Eléctrica", "Pozo de Agua", "Vigilancia 24/7",
-"Amoblado", "Vista al Mar", "Gimnasio", "Ascensor",
-"Estacionamiento Techado", "Terraza Privada", "Jacuzzi",
-"Área de BBQ", "Área de Oficinas", "Baño de Visitas"
-
-Ubicación:
-- "cerca del mar" / "frente al mar" / "vista al mar" / "playa" → keywords: ["mar", "playa"]
-- Nombre de zona → keywords: [nombre de zona normalizado]
-
-Si no puedes extraer un filtro, déjalo null o array vacío [].
-Responde SOLO el JSON sin explicación adicional.`;
-
-    // Modelos de OpenRouter (plan gratuito, sin restricciones geográficas)
-    const OR_MODELS = [
-      'meta-llama/llama-3.3-70b-instruct:free',
-      'meta-llama/llama-3.1-8b-instruct:free',
-      'mistralai/mistral-7b-instruct:free',
-    ];
-
-    let aiRes: Response | null = null;
-
-    for (const model of OR_MODELS) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      try {
-        aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-            'HTTP-Referer': 'https://rivmargaritapremier.com',
-            'X-Title': 'RIV Margarita Premier',
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            model,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.05,
-          }),
-        });
-        clearTimeout(timeoutId);
-
-        if (aiRes.status === 404 || aiRes.status === 400 || aiRes.status === 429) {
-          const errBody = await aiRes.text();
-          console.warn(`[search] Modelo ${model} no disponible (${aiRes.status}):`, errBody);
-          aiRes = null;
-          continue;
-        }
-
-        break;
-      } catch (fetchErr) {
-        clearTimeout(timeoutId);
-        if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
-          console.warn(`[search] Timeout con modelo ${model}`);
-          aiRes = null;
-          continue;
-        }
-        throw fetchErr;
-      }
-    }
-
-    if (!aiRes) {
-      return NextResponse.json({ error: 'NO_MODEL_AVAILABLE' }, { status: 502 });
-    }
-
-    if (!aiRes.ok) {
-      const errBody = await aiRes.text();
-      console.error(`[search] OpenRouter error ${aiRes.status}:`, errBody);
-      return NextResponse.json({ error: 'API_ERROR' }, { status: 502 });
-    }
-
-    const data = await aiRes.json();
-    const rawText: string = data.choices?.[0]?.message?.content ?? '';
-
-    if (!rawText) {
-      console.error('[search] OpenRouter devolvió respuesta vacía');
-      return NextResponse.json({ error: 'EMPTY_RESPONSE' }, { status: 502 });
-    }
-
-    let filters: Record<string, unknown>;
-    try {
-      const cleaned = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
-      filters = JSON.parse(cleaned);
-    } catch (parseErr) {
-      console.error('[search] Respuesta no es JSON válido:', rawText, parseErr);
-      return NextResponse.json({ error: 'PARSE_ERROR' }, { status: 502 });
-    }
-
+    const filters = parseQuery(query);
     return NextResponse.json(filters);
 
   } catch (err) {
