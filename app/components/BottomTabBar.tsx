@@ -42,10 +42,15 @@ export default function BottomTabBar() {
             {active && (
               <span className="absolute top-0 left-1/2 -translate-x-1/2 w-7 h-0.5 bg-vinotinto rounded-b-full" />
             )}
-            <Icon size={21} strokeWidth={active ? 2.2 : 1.8} />
-            <span className={`text-[10px] font-semibold leading-none ${active ? 'text-vinotinto' : ''}`}>
-              {label}
-            </span>
+            {/* Fondo suave activo */}
+            <div className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-xl transition-all ${
+              active ? 'bg-vinotinto/8' : ''
+            }`}>
+              <Icon size={21} strokeWidth={active ? 2.2 : 1.8} />
+              <span className={`text-[10px] font-semibold leading-none ${active ? 'text-vinotinto' : ''}`}>
+                {label}
+              </span>
+            </div>
           </Link>
         );
       })}

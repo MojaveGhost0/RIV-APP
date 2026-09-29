@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useRef } from 'react';
 import { useAuth, AuthUser, UserRole } from '../context/AuthContext';
@@ -589,7 +589,7 @@ export default function Perfil() {
                     onChange={e => setPhoneInput(e.target.value)}
                     placeholder="Ej: 0414-1234567 o +58 414 1234567"
                     required
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm font-mono font-bold"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-mono font-bold"
                   />
                   <p className="text-[11px] text-gray-400 mt-1">
                     Este número aparecerá en tus inmuebles captados para que clientes y asesores te contacten directamente.
@@ -743,3 +743,4 @@ export default function Perfil() {
     </motion.div>
   );
 }
+

@@ -20,6 +20,8 @@ export const MARGARITA_LOCATIONS: string[] = [
   'Urb. Paraíso 2, Maneiro, Isla de Margarita',
   'Playa Pampatar, Maneiro, Isla de Margarita',
   'Los Uveros, Maneiro, Isla de Margarita',
+  'Apostadero, Maneiro, Isla de Margarita',
+  'Agua de Vaca, Maneiro, Isla de Margarita',
 
   // Municipio Mariño
   'Porlamar, Mariño, Isla de Margarita',
@@ -144,10 +146,13 @@ export interface Property {
   propietarioTelefono?: string;
   formasNegociacion?: string;
   metodosPago?: string;
+  /** URL personalizada de Google Maps para la ubicación exacta del inmueble */
+  mapsUrl?: string;
   /** ISO date string — se asigna automáticamente al registrar */
   createdAt?: string;
   created_at?: string;
 }
+
 
 export interface Appointment {
   id: string;          // FIX #3 — Unificado a string (antes string|number causaba fallos en delete/update)
@@ -309,12 +314,12 @@ const DEFAULT_PROPERTIES: Property[] = [
 
 const today = localToday();
 const DEFAULT_CITAS: Appointment[] = [
-  { id: '10000000-0000-0000-0000-000000000001', tipo: 'Mostrar Propiedad',  titulo: 'Villa Exclusiva Costa Azul', cliente: 'María López',        fecha: '2026-07-16', hora: '14:30', asesores: ['Juan García'],                         estado: 'Pendiente'  },
-  { id: '10000000-0000-0000-0000-000000000002', tipo: 'Captar Propiedad',   titulo: 'Apto Pampatar',              cliente: 'Juan Gómez',          fecha: '2026-07-17', hora: '10:00', asesores: ['Amado Lovera'],                       estado: 'Pendiente'  },
-  { id: '10000000-0000-0000-0000-000000000003', tipo: 'Cita en Oficina',    titulo: 'Firma de Contrato',          cliente: 'Familia Rodríguez',   fecha: '2026-07-14', hora: '16:00', asesores: ['Juan García'],                         estado: 'Completada' },
-  { id: '10000000-0000-0000-0000-000000000004', tipo: 'Mostrar Propiedad',  titulo: 'Penthouse Playa El Agua',    cliente: 'Luis Fernández',      fecha: '2026-07-13', hora: '09:00', asesores: ['Amado Lovera', 'Gerardo Garcia'],     estado: 'Completada' },
-  { id: '10000000-0000-0000-0000-000000000005', tipo: 'Mostrar Propiedad',  titulo: 'Visita Local Comercial',     cliente: 'Pedro Sánchez',       fecha: today,        hora: '15:00', asesores: ['Gerardo Garcia'],                     estado: 'Pendiente'  },
-  { id: '10000000-0000-0000-0000-000000000006', tipo: 'Firma',              titulo: 'Firma Opción a Compra',      cliente: 'Carlos Roa',          fecha: today,        hora: '17:30', asesores: ['Juan García', 'Amado Lovera'],        estado: 'Pendiente'  },
+  { id: '10000000-0000-0000-0000-000000000001', tipo: 'Mostrar Propiedad', titulo: 'Villa Exclusiva Costa Azul', cliente: 'María López', fecha: '2026-07-16', hora: '14:30', asesores: ['Juan García'], estado: 'Pendiente' },
+  { id: '10000000-0000-0000-0000-000000000002', tipo: 'Captar Propiedad', titulo: 'Apto Pampatar', cliente: 'Juan Gómez', fecha: '2026-07-17', hora: '10:00', asesores: ['Amado Lovera'], estado: 'Pendiente' },
+  { id: '10000000-0000-0000-0000-000000000003', tipo: 'Cita en Oficina', titulo: 'Firma de Contrato', cliente: 'Familia Rodríguez', fecha: '2026-07-14', hora: '16:00', asesores: ['Juan García'], estado: 'Completada' },
+  { id: '10000000-0000-0000-0000-000000000004', tipo: 'Mostrar Propiedad', titulo: 'Penthouse Playa El Agua', cliente: 'Luis Fernández', fecha: '2026-07-13', hora: '09:00', asesores: ['Amado Lovera', 'Gerardo Garcia'], estado: 'Completada' },
+  { id: '10000000-0000-0000-0000-000000000005', tipo: 'Mostrar Propiedad', titulo: 'Visita Local Comercial', cliente: 'Pedro Sánchez', fecha: today, hora: '15:00', asesores: ['Gerardo Garcia'], estado: 'Pendiente' },
+  { id: '10000000-0000-0000-0000-000000000006', tipo: 'Firma', titulo: 'Firma Opción a Compra', cliente: 'Carlos Roa', fecha: today, hora: '17:30', asesores: ['Juan García', 'Amado Lovera'], estado: 'Pendiente' },
 ];
 
 // =============================================================================

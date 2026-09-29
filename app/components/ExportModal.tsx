@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import {
@@ -743,7 +743,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setStep('export')}
-                        className="w-full py-4 bg-gradient-to-r from-vinotinto to-[#a60029] text-white rounded-2xl font-bold shadow-lg shadow-vinotinto/25 flex items-center justify-center gap-2 mt-2"
+                        className="w-full py-4 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-2xl font-bold shadow-lg shadow-vinotinto/25 flex items-center justify-center gap-2 mt-2"
                       >
                         <Sparkles size={16} />
                         Continuar con Plantilla {selectedTemplate}
@@ -838,7 +838,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
                           done
                             ? 'bg-green-500 text-white shadow-green-500/25'
-                            : 'bg-gradient-to-r from-vinotinto to-[#a60029] text-white shadow-vinotinto/25 disabled:opacity-60'
+                            : 'bg-gradient-to-r from-vinotinto to-vinotinto-light text-white shadow-vinotinto/25 disabled:opacity-60'
                         }`}
                       >
                         {isExporting ? (
@@ -1740,3 +1740,4 @@ function drawRoundRect(
     ctx.stroke();
   }
 }
+

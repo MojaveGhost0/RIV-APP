@@ -53,7 +53,7 @@ export default function LoginScreen() {
       </div>
 
       {/* HEADER VINOTINTO (Con Gradiente Premium) */}
-      <div className="bg-gradient-to-br from-[#800020] via-[#990026] to-[#4a0012] pt-16 pb-14 px-8 flex flex-col items-center relative z-10 shadow-lg">
+      <div className="bg-gradient-to-br from-vinotinto-dark via-vinotinto to-vinotinto-dark pt-16 pb-14 px-8 flex flex-col items-center relative z-10 shadow-lg">
         <motion.div 
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -83,7 +83,7 @@ export default function LoginScreen() {
       </div>
 
       {/* WAVE SEPARATOR */}
-      <div className="bg-gradient-to-br from-[#4a0012] to-[#800020] h-8 relative z-10">
+      <div className="bg-gradient-to-br from-vinotinto-dark to-vinotinto h-8 relative z-10">
         <div className="absolute bottom-0 left-0 right-0 h-8 bg-gray-50 rounded-t-[2rem] shadow-[0_-10px_20px_rgba(0,0,0,0.1)]" />
       </div>
 
@@ -111,7 +111,7 @@ export default function LoginScreen() {
                   value={username}
                   onChange={e => { setUsername(e.target.value); setError(''); }}
                   placeholder="Ingresa tu usuario"
-                  className="w-full pl-10 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#800020]/40 focus:border-[#800020] transition-all shadow-sm"
+                  className="w-full pl-10 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto transition-all shadow-sm"
                   autoCapitalize="off"
                   autoCorrect="off"
                 />
@@ -128,7 +128,7 @@ export default function LoginScreen() {
                   value={password}
                   onChange={e => { setPassword(e.target.value); setError(''); }}
                   placeholder="Ingresa tu contraseña"
-                  className="w-full pl-10 pr-11 py-3.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#800020]/40 focus:border-[#800020] transition-all shadow-sm"
+                  className="w-full pl-10 pr-11 py-3.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto transition-all shadow-sm"
                 />
                 <button
                   type="button"
@@ -164,7 +164,7 @@ export default function LoginScreen() {
                 whileTap={{ scale: 0.97 }}
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 bg-gradient-to-r from-[#800020] to-[#b3002d] text-white rounded-xl font-bold text-base shadow-lg shadow-[#800020]/30 disabled:opacity-70 flex items-center justify-center gap-2 transition-all relative overflow-hidden"
+                className="w-full py-3.5 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold text-base shadow-lg shadow-vinotinto/30 disabled:opacity-70 flex items-center justify-center gap-2 transition-all relative overflow-hidden"
               >
                 {/* Efecto de brillo interior (glass) */}
                 <div className="absolute inset-0 bg-white/20 opacity-0 hover:opacity-100 transition-opacity" />
@@ -181,8 +181,9 @@ export default function LoginScreen() {
             </motion.div>
           </form>
 
-          <motion.p variants={itemVariants} className="text-center text-xs text-gray-400 mt-10">
-            RIV Margarita Premier · v1.0{'\n'}Sistema de uso exclusivo interno
+          <motion.p variants={itemVariants} className="text-center text-xs text-gray-400 mt-10 leading-relaxed">
+            RIV Margarita Premier · v1.0<br />
+            Sistema de uso exclusivo interno
           </motion.p>
         </motion.div>
       </div>

@@ -6,7 +6,7 @@ import {
   ArrowLeft, MapPin, Bed, Bath, Maximize, User, ChevronLeft, ChevronRight,
   Share2, Trash2, ShieldAlert, Download, CheckCircle, Phone, MessageCircle,
   CircleDollarSign, CreditCard, Edit3, X, Save, AlertTriangle, Camera,
-  UploadCloud, Loader2, Star, ImagePlus
+  UploadCloud, Loader2, Star, ImagePlus, ExternalLink, Map,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useData } from '../../context/DataContext';
@@ -57,6 +57,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
     title: '',
     price: '',
     location: '',
+    mapsUrl: '',
     beds: '',
     baths: '',
     sqm: '',
@@ -108,6 +109,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
       title: property.title,
       price: String(property.price),
       location: property.location,
+      mapsUrl: property.mapsUrl || '',
       beds: String(property.beds),
       baths: String(property.baths),
       sqm: String(property.sqm),
@@ -187,6 +189,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
         title: newTitle,
         price: Number(editFormData.price.replace(/\D/g, '')) || property.price,
         location: editFormData.location.trim(),
+        mapsUrl: editFormData.mapsUrl.trim() || undefined,
         beds: Number(editFormData.beds) || 0,
         baths: Number(editFormData.baths) || 0,
         sqm: Number(editFormData.sqm) || 0,
@@ -364,9 +367,25 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
         </motion.div>
 
         {/* Ubicación */}
-        <motion.div variants={itemVariants} className="flex items-center gap-2 text-gray-500">
-          <MapPin size={16} className="text-vinotinto shrink-0" />
-          <p className="text-sm">{property.location}</p>
+        <motion.div variants={itemVariants} className="space-y-2">
+          <div className="flex items-center gap-2 text-gray-500">
+            <MapPin size={16} className="text-vinotinto shrink-0" />
+            <p className="text-sm">{property.location}</p>
+          </div>
+          <a
+            href={
+              property.mapsUrl?.trim()
+                ? property.mapsUrl.trim()
+                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.location + ', Venezuela')}`
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-100 text-blue-600 rounded-xl font-bold text-sm transition-all active:scale-95 group"
+          >
+            <Map size={16} className="group-hover:scale-110 transition-transform" />
+            {property.mapsUrl?.trim() ? 'Ver ubicación exacta en Google Maps' : 'Ver en Google Maps'}
+            <ExternalLink size={13} className="opacity-60" />
+          </a>
         </motion.div>
 
         {/* Características */}
@@ -695,7 +714,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                     value={editFormData.title}
                     onChange={e => setEditFormData({ ...editFormData, title: e.target.value })}
                     required
-                    className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm font-medium"
+                    className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium"
                   />
                 </div>
 
@@ -707,7 +726,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                       value={editFormData.price}
                       onChange={e => setEditFormData({ ...editFormData, price: e.target.value })}
                       required
-                      className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm font-black text-vinotinto"
+                      className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-black text-vinotinto"
                     />
                   </div>
                   <div>
@@ -716,7 +735,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                       type="number"
                       value={editFormData.sqm}
                       onChange={e => setEditFormData({ ...editFormData, sqm: e.target.value })}
-                      className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm"
+                      className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm"
                     />
                   </div>
                 </div>
@@ -728,8 +747,44 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                     value={editFormData.location}
                     onChange={e => setEditFormData({ ...editFormData, location: e.target.value })}
                     required
-                    className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm"
+                    className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm"
                   />
+                </div>
+
+                {/* URL de Google Maps */}
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
+                    <Map size={13} className="text-blue-500" />
+                    Enlace de Google Maps
+                    <span className="text-gray-400 font-normal text-[10px] ml-1">(opcional)</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={editFormData.mapsUrl}
+                    onChange={e => setEditFormData({ ...editFormData, mapsUrl: e.target.value })}
+                    placeholder="https://maps.app.goo.gl/..."
+                    className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400/40 focus:border-blue-400 outline-none text-sm font-mono"
+                  />
+                  {editFormData.mapsUrl.trim() && (
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <p className="text-[10px] text-green-600 font-semibold flex items-center gap-1">
+                        ✓ Enlace personalizado guardado
+                      </p>
+                      <a
+                        href={editFormData.mapsUrl.trim()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-blue-500 font-bold underline underline-offset-2 hover:text-blue-700"
+                      >
+                        Verificar enlace →
+                      </a>
+                    </div>
+                  )}
+                  {!editFormData.mapsUrl.trim() && (
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Si no se ingresa, se usará la búsqueda automática por nombre de zona.
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -739,7 +794,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                       type="number"
                       value={editFormData.beds}
                       onChange={e => setEditFormData({ ...editFormData, beds: e.target.value })}
-                      className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm"
+                      className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm"
                     />
                   </div>
                   <div>
@@ -748,7 +803,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                       type="number"
                       value={editFormData.baths}
                       onChange={e => setEditFormData({ ...editFormData, baths: e.target.value })}
-                      className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm"
+                      className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm"
                     />
                   </div>
                 </div>
@@ -759,7 +814,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                     rows={3}
                     value={editFormData.description}
                     onChange={e => setEditFormData({ ...editFormData, description: e.target.value })}
-                    className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm leading-relaxed"
+                    className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm leading-relaxed"
                   />
                 </div>
 
@@ -775,7 +830,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                         type="text"
                         value={editFormData.propietarioNombre}
                         onChange={e => setEditFormData({ ...editFormData, propietarioNombre: e.target.value })}
-                        className="w-full p-2 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-xs"
+                        className="w-full p-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-xs"
                       />
                     </div>
                     <div>
@@ -784,7 +839,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                         type="text"
                         value={editFormData.propietarioTelefono}
                         onChange={e => setEditFormData({ ...editFormData, propietarioTelefono: e.target.value })}
-                        className="w-full p-2 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-xs font-mono"
+                        className="w-full p-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-xs font-mono"
                       />
                     </div>
                   </div>
@@ -796,7 +851,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                       value={editFormData.formasNegociacion}
                       onChange={e => setEditFormData({ ...editFormData, formasNegociacion: e.target.value })}
                       placeholder="Ej: Precio negociable, acepta financiamiento..."
-                      className="w-full p-2 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-xs"
+                      className="w-full p-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-xs"
                     />
                   </div>
 
@@ -807,7 +862,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                       value={editFormData.metodosPago}
                       onChange={e => setEditFormData({ ...editFormData, metodosPago: e.target.value })}
                       placeholder="Ej: Efectivo USD, Zelle, Transferencia..."
-                      className="w-full p-2 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-xs"
+                      className="w-full p-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-xs"
                     />
                   </div>
                 </div>

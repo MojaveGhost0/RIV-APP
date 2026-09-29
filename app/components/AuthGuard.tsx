@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from './LoginScreen';
@@ -13,7 +13,7 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
   // Mientras se carga la sesión guardada, mostrar splash oficial corporativo
   if (isLoading) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-gradient-to-b from-[#800020] via-[#5c0017] to-[#3a000e] text-white p-6 relative overflow-hidden">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-gradient-to-b from-vinotinto-dark via-vinotinto to-vinotinto-dark text-white p-6 relative overflow-hidden">
         {/* Glow ambient background */}
         <div className="absolute w-72 h-72 rounded-full bg-amber-400/10 blur-3xl pointer-events-none" />
 
@@ -49,3 +49,4 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
   // Si hay sesión, mostrar la app
   return <>{children}</>;
 }
+

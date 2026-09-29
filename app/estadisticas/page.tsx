@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -1441,7 +1441,7 @@ export default function Estadisticas() {
               setIsExportModalOpen(true);
             }}
             disabled={isExporting}
-            className="flex items-center gap-1.5 text-xs font-bold bg-gradient-to-r from-vinotinto to-[#a60029] text-white px-3.5 py-2.5 rounded-xl shadow-md shadow-vinotinto/20 transition-all hover:opacity-95 active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-1.5 text-xs font-bold bg-gradient-to-r from-vinotinto to-vinotinto-light text-white px-3.5 py-2.5 rounded-xl shadow-md shadow-vinotinto/20 transition-all hover:opacity-95 active:scale-95 disabled:opacity-50"
           >
             <Download size={14} />
             {isExporting ? 'Generando...' : 'Exportar Informe'}
@@ -2261,7 +2261,7 @@ export default function Estadisticas() {
                     <select
                       value={exportSelectedAdvisor || allUsers[0]?.nombre || ''}
                       onChange={e => setExportSelectedAdvisor(e.target.value)}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 outline-none focus:ring-1 focus:ring-vinotinto cursor-pointer"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto cursor-pointer"
                     >
                       {allUsers.map(u => (
                         <option key={u.id} value={u.nombre}>
@@ -2334,7 +2334,7 @@ export default function Estadisticas() {
                   type="button"
                   onClick={handleRunExport}
                   disabled={isExporting}
-                  className="w-full sm:w-1/2 py-3 bg-gradient-to-r from-vinotinto to-[#a60029] text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all text-sm flex items-center justify-center gap-2 hover:opacity-95 active:scale-95 disabled:opacity-50 text-center"
+                  className="w-full sm:w-1/2 py-3 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all text-sm flex items-center justify-center gap-2 hover:opacity-95 active:scale-95 disabled:opacity-50 text-center"
                 >
                   <Download size={15} />
                   {isExporting ? 'Generando PDF...' : 'Descargar PDF'}
@@ -2348,3 +2348,5 @@ export default function Estadisticas() {
     </div>
   );
 }
+
+

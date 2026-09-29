@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { Calendar as CalendarIcon, Clock, Plus, X, User, ShieldAlert, Trash2, CheckCheck, AlertCircle, Edit2, Save } from 'lucide-react';
@@ -353,7 +353,7 @@ export default function GestorCitas() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Cita</label>
                   <select name="tipo" value={formData.tipo} onChange={handleInputChange}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none font-medium text-gray-800">
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none font-medium text-gray-800">
                     <option value="Cita en Oficina">🏢 Cita en Oficina</option>
                     <option value="Mostrar Propiedad">🏡 Mostrar Propiedad</option>
                     <option value="Captar Propiedad">📝 Captar Propiedad</option>
@@ -364,7 +364,7 @@ export default function GestorCitas() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Propiedad o Asunto</label>
                   <input type="text" name="titulo" value={formData.titulo} onChange={handleInputChange} required
                     placeholder="Ej: Visita Villa Costa Azul"
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none" />
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none" />
                 </div>
 
                 <div>
@@ -377,7 +377,7 @@ export default function GestorCitas() {
                     value={formData.cliente}
                     onChange={handleInputChange}
                     placeholder="Ej: María López (dejar vacío si no aplica)"
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none"
                   />
                 </div>
 
@@ -385,12 +385,12 @@ export default function GestorCitas() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
                     <input type="date" name="fecha" value={formData.fecha} onChange={handleInputChange} required
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none" />
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
                     <input type="time" name="hora" value={formData.hora} onChange={handleInputChange} required
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none" />
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none" />
                   </div>
                 </div>
 
@@ -434,7 +434,7 @@ export default function GestorCitas() {
                   whileTap={{ scale: 0.98 }}
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-4 bg-gradient-to-r from-vinotinto to-[#a60029] text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all disabled:opacity-50"
+                  className="w-full py-4 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all disabled:opacity-50"
                 >
                   {isSubmitting ? 'Guardando...' : 'Guardar Cita'}
                 </motion.button>
@@ -479,7 +479,7 @@ export default function GestorCitas() {
                   name="tipo"
                   value={editFormData.tipo}
                   onChange={e => setEditFormData({ ...editFormData, tipo: e.target.value })}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none font-medium text-gray-800"
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none font-medium text-gray-800"
                 >
                   <option value="Cita en Oficina">🏢 Cita en Oficina</option>
                   <option value="Mostrar Propiedad">🏡 Mostrar Propiedad</option>
@@ -496,7 +496,7 @@ export default function GestorCitas() {
                   onChange={e => setEditFormData({ ...editFormData, titulo: e.target.value })}
                   required
                   placeholder="Ej: Visita Villa Costa Azul"
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm font-medium"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium"
                 />
               </div>
 
@@ -510,7 +510,7 @@ export default function GestorCitas() {
                   value={editFormData.cliente}
                   onChange={e => setEditFormData({ ...editFormData, cliente: e.target.value })}
                   placeholder="Ej: María López (dejar vacío si no aplica)"
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm font-medium"
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium"
                 />
               </div>
 
@@ -523,7 +523,7 @@ export default function GestorCitas() {
                     value={editFormData.fecha}
                     onChange={e => setEditFormData({ ...editFormData, fecha: e.target.value })}
                     required
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm font-medium"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium"
                   />
                 </div>
                 <div>
@@ -534,7 +534,7 @@ export default function GestorCitas() {
                     value={editFormData.hora}
                     onChange={e => setEditFormData({ ...editFormData, hora: e.target.value })}
                     required
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm font-medium"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium"
                   />
                 </div>
               </div>
@@ -585,7 +585,7 @@ export default function GestorCitas() {
                 <button
                   type="submit"
                   disabled={isSavingEdit}
-                  className="flex-[2] py-3.5 bg-gradient-to-r from-vinotinto to-[#a60029] text-white rounded-xl font-bold shadow-md hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className="flex-[2] py-3.5 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-md hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
                   <Save size={16} />
                   {isSavingEdit ? 'Guardando...' : 'Guardar Cambios'}
@@ -599,3 +599,5 @@ export default function GestorCitas() {
     </div>
   );
 }
+
+

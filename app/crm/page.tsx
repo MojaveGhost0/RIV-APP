@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
@@ -599,7 +599,7 @@ export default function CRMPage() {
             placeholder="Buscar por cliente o nota..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm font-medium"
+            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium"
           />
         </div>
 
@@ -946,13 +946,13 @@ export default function CRMPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Cliente</label>
                 <input type="text" name="cliente" value={formData.cliente} onChange={e => setFormData({...formData, cliente: e.target.value})} required
                   placeholder="Ej: María López"
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none" />
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none" />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Interacción</label>
                 <select name="tipo_interaccion" value={formData.tipo_interaccion} onChange={e => setFormData({...formData, tipo_interaccion: e.target.value})}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none font-medium text-gray-800">
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none font-medium text-gray-800">
                   <option value="Llamada">📞 Llamada</option>
                   <option value="Captación de Inmueble">🏠 Captación de Inmueble</option>
                   <option value="Mensaje (WhatsApp)">💬 Mensaje (WhatsApp)</option>
@@ -969,14 +969,14 @@ export default function CRMPage() {
                 <textarea name="notas" value={formData.notas} onChange={e => setFormData({...formData, notas: e.target.value})} required
                   placeholder="Detalles de la conversación o avances..."
                   rows={4}
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none resize-none" />
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none resize-none" />
               </div>
 
               <motion.button 
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 type="submit"
-                className="w-full py-4 bg-gradient-to-r from-vinotinto to-[#a60029] text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all"
+                className="w-full py-4 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all"
               >
                 Guardar Registro
               </motion.button>
@@ -1025,7 +1025,7 @@ export default function CRMPage() {
                   onChange={e => setEditingLog({ ...editingLog, cliente: e.target.value })} 
                   required
                   placeholder="Ej: María López"
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none text-sm" 
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm" 
                 />
               </div>
 
@@ -1034,7 +1034,7 @@ export default function CRMPage() {
                 <select 
                   value={editingLog.tipo_interaccion} 
                   onChange={e => setEditingLog({ ...editingLog, tipo_interaccion: e.target.value })}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none font-medium text-gray-800 text-sm"
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none font-medium text-gray-800 text-sm"
                 >
                   <option value="Llamada">📞 Llamada</option>
                   <option value="Captación de Inmueble">🏠 Captación de Inmueble</option>
@@ -1055,7 +1055,7 @@ export default function CRMPage() {
                   required
                   placeholder="Detalles de la conversación o avances..."
                   rows={4}
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none resize-none text-sm" 
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none resize-none text-sm" 
                 />
               </div>
 
@@ -1072,7 +1072,7 @@ export default function CRMPage() {
                   whileTap={{ scale: 0.98 }}
                   type="submit"
                   disabled={isSubmittingEdit}
-                  className="w-full sm:w-1/2 py-3 bg-gradient-to-r from-vinotinto to-[#a60029] text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all text-sm disabled:opacity-50 text-center"
+                  className="w-full sm:w-1/2 py-3 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all text-sm disabled:opacity-50 text-center"
                 >
                   {isSubmittingEdit ? 'Guardando...' : 'Guardar Cambios'}
                 </motion.button>
@@ -1119,7 +1119,7 @@ export default function CRMPage() {
                 <select
                   value={selectedClientForExport}
                   onChange={e => setSelectedClientForExport(e.target.value)}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-vinotinto outline-none font-medium text-gray-800 text-sm"
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none font-medium text-gray-800 text-sm"
                 >
                   {clientData.map(c => (
                     <option key={c.name} value={c.name}>
@@ -1185,7 +1185,7 @@ export default function CRMPage() {
                       setIsExportModalOpen(false);
                     }
                   }}
-                  className="w-full sm:w-1/2 py-3 bg-gradient-to-r from-vinotinto to-[#a60029] text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all text-sm flex items-center justify-center gap-1.5 hover:opacity-95 active:scale-95 text-center"
+                  className="w-full sm:w-1/2 py-3 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all text-sm flex items-center justify-center gap-1.5 hover:opacity-95 active:scale-95 text-center"
                 >
                   <Download size={14} />
                   Descargar PDF
@@ -1199,3 +1199,5 @@ export default function CRMPage() {
     </div>
   );
 }
+
+

@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
-import { Search, MapPin, CheckCircle, ArrowRight, Calendar } from 'lucide-react';
+import { Search, MapPin, CheckCircle, ArrowRight, Calendar, Home, Users, Settings, CalendarPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 
@@ -10,6 +10,13 @@ import { useData } from './context/DataContext';
 import { containerVariants, itemVariants } from './lib/motion';
 import { normalize } from './lib/searchEngine';
 import BrandLogo from './components/BrandLogo';
+
+/** Convierte "2026-07-16" → "16 Jul 2026" en español */
+function formatFecha(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 export default function Dashboard() {
   const router = useRouter();
@@ -76,15 +83,15 @@ export default function Dashboard() {
         />
         <button
           type="submit"
-          className="absolute right-3 top-1/2 -translate-y-1/2 bg-gradient-to-r from-vinotinto to-[#a60029] text-white px-5 py-3 rounded-xl text-sm font-bold flex items-center gap-1 hover:shadow-md hover:shadow-vinotinto/20 active:scale-95 transition-all z-10"
+          className="absolute right-3 top-1/2 -translate-y-1/2 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white px-5 py-3 rounded-xl text-sm font-bold flex items-center gap-1 hover:shadow-md hover:shadow-vinotinto/20 active:scale-95 transition-all z-10"
         >
           Buscar
         </button>
       </motion.form>
 
       {/* KPIs */}
-      <motion.h2 variants={itemVariants} className="text-base font-bold text-gray-800 mb-3">
-        Resumen
+      <motion.h2 variants={itemVariants} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+        Resumen del día
       </motion.h2>
       <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4 mb-8">
 
@@ -92,7 +99,7 @@ export default function Dashboard() {
           whileHover={{ y: -4, scale: 1.01 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => router.push('/citas')}
-          className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex flex-col justify-between cursor-pointer hover:shadow-[0_8px_25px_rgba(0,0,0,0.07)] transition-all"
+          className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[100px] cursor-pointer hover:shadow-[0_8px_25px_rgba(0,0,0,0.07)] transition-all"
         >
           <div className="flex items-center justify-between mb-2">
             <div className="bg-vinotinto/10 p-2 rounded-xl">
@@ -110,11 +117,11 @@ export default function Dashboard() {
           whileHover={{ y: -4, scale: 1.01 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => router.push('/inventario')}
-          className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex flex-col justify-between cursor-pointer hover:shadow-[0_8px_25px_rgba(0,0,0,0.07)] transition-all"
+          className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex flex-col justify-between min-h-[100px] cursor-pointer hover:shadow-[0_8px_25px_rgba(0,0,0,0.07)] transition-all"
         >
           <div className="flex items-center justify-between mb-2">
             <div className="bg-dorado/10 p-2 rounded-xl">
-              <CheckCircle className="text-dorado-dark" size={20} />
+              <CheckCircle className="text-dorado" size={20} />
             </div>
             <span className="text-3xl font-black text-gray-800">{totalPropiedades}</span>
           </div>
@@ -126,7 +133,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* PRÓXIMA CITA */}
-      <motion.h2 variants={itemVariants} className="text-base font-bold text-gray-800 mb-3">
+      <motion.h2 variants={itemVariants} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
         Próxima Cita
       </motion.h2>
       <motion.div variants={itemVariants}>
@@ -135,7 +142,7 @@ export default function Dashboard() {
             whileHover={{ y: -3, scale: 1.01 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => router.push('/citas')}
-            className="bg-gradient-to-br from-[#800020] via-[#990026] to-[#4a0012] p-5 rounded-2xl shadow-lg shadow-vinotinto/20 text-white cursor-pointer relative overflow-hidden"
+            className="bg-gradient-to-br from-vinotinto-dark via-vinotinto to-vinotinto-dark p-5 rounded-2xl shadow-lg shadow-vinotinto/20 text-white cursor-pointer relative overflow-hidden"
           >
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -162,8 +169,8 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center text-sm text-white/80 mt-3 relative z-10">
-              <MapPin size={15} className="mr-1.5" />
-              {proximaCita.fecha}
+              <Calendar size={15} className="mr-1.5" />
+              {formatFecha(proximaCita.fecha)}
             </div>
           </motion.div>
         ) : (
@@ -180,7 +187,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* ACCIONES RÁPIDAS */}
-      <motion.h2 variants={itemVariants} className="text-base font-bold text-gray-800 mb-3 mt-8">
+      <motion.h2 variants={itemVariants} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 mt-8">
         Acciones Rápidas
       </motion.h2>
       <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3">
@@ -190,7 +197,9 @@ export default function Dashboard() {
           onClick={() => router.push('/inventario/registro')}
           className="bg-white border border-gray-100 rounded-2xl p-4 text-left shadow-sm hover:shadow-md transition-shadow"
         >
-          <p className="text-xl mb-1">🏠</p>
+          <div className="bg-vinotinto/10 p-2 rounded-xl w-fit mb-2">
+            <Home size={18} className="text-vinotinto" />
+          </div>
           <p className="text-sm font-bold text-gray-800">Registrar Inmueble</p>
           <p className="text-xs text-gray-400 mt-0.5">Captar propiedad nueva</p>
         </motion.button>
@@ -201,17 +210,22 @@ export default function Dashboard() {
           onClick={() => router.push('/citas')}
           className="bg-white border border-gray-100 rounded-2xl p-4 text-left shadow-sm hover:shadow-md transition-shadow"
         >
-          <p className="text-xl mb-1">📅</p>
+          <div className="bg-blue-50 p-2 rounded-xl w-fit mb-2">
+            <CalendarPlus size={18} className="text-blue-500" />
+          </div>
           <p className="text-sm font-bold text-gray-800">Nueva Cita</p>
           <p className="text-xs text-gray-400 mt-0.5">Agendar visita o reunión</p>
         </motion.button>
+
         <motion.button
           whileHover={{ y: -2, scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => router.push('/crm')}
           className="bg-white border border-gray-100 rounded-2xl p-4 text-left shadow-sm hover:shadow-md transition-shadow"
         >
-          <p className="text-xl mb-1">👥</p>
+          <div className="bg-emerald-50 p-2 rounded-xl w-fit mb-2">
+            <Users size={18} className="text-emerald-600" />
+          </div>
           <p className="text-sm font-bold text-gray-800">CRM</p>
           <p className="text-xs text-gray-400 mt-0.5">Gestión de clientes</p>
         </motion.button>
@@ -222,7 +236,9 @@ export default function Dashboard() {
           onClick={() => router.push('/perfil')}
           className="bg-white border border-gray-100 rounded-2xl p-4 text-left shadow-sm hover:shadow-md transition-shadow"
         >
-          <p className="text-xl mb-1">⚙️</p>
+          <div className="bg-dorado/10 p-2 rounded-xl w-fit mb-2">
+            <Settings size={18} className="text-dorado-dark" />
+          </div>
           <p className="text-sm font-bold text-gray-800">Mi Perfil</p>
           <p className="text-xs text-gray-400 mt-0.5">Ajustes y equipo</p>
         </motion.button>
@@ -230,3 +246,4 @@ export default function Dashboard() {
     </motion.div>
   );
 }
+

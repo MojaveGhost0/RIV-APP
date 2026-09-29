@@ -5,7 +5,7 @@ import {
   MapPin, Bed, Bath, Maximize,
   Plus, Search, Download, X, ChevronRight,
   Wand2, Loader2, AlertCircle, Home, Building2, Store, Layers, Maximize2, TreePine, Briefcase, FileText,
-  SlidersHorizontal, Filter, Check, RotateCcw,
+  SlidersHorizontal, Filter, Check, RotateCcw, ExternalLink,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -800,9 +800,22 @@ export default function Inventario() {
                   </span>
                 </div>
 
-                <div className="flex items-center text-xs text-gray-500 mb-3">
-                  <MapPin size={12} className="mr-1 text-vinotinto/60" />
-                  {prop.location}
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                  <div className="flex items-center gap-1 flex-1 min-w-0">
+                    <MapPin size={12} className="mr-1 text-vinotinto/60 shrink-0" />
+                    <span className="truncate">{prop.location}</span>
+                  </div>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.location + ', Venezuela')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    title="Ver en Google Maps"
+                    className="ml-2 shrink-0 flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg font-semibold transition-colors active:scale-95"
+                  >
+                    <ExternalLink size={11} />
+                    <span className="text-[10px]">Maps</span>
+                  </a>
                 </div>
 
                 <div className="flex justify-between items-center pt-3 border-t border-gray-50">
@@ -924,7 +937,7 @@ export default function Inventario() {
                         <select
                           value={exportType}
                           onChange={e => setExportType(e.target.value)}
-                          className="w-full text-xs sm:text-sm font-medium border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-vinotinto"
+                          className="w-full text-xs sm:text-sm font-medium border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto"
                         >
                           <option value="Todos">Todos los tipos</option>
                           {PROPERTY_TYPES.map(type => (
@@ -940,7 +953,7 @@ export default function Inventario() {
                         <select
                           value={exportMunicipio}
                           onChange={e => setExportMunicipio(e.target.value)}
-                          className="w-full text-xs sm:text-sm font-medium border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-vinotinto"
+                          className="w-full text-xs sm:text-sm font-medium border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto"
                         >
                           {MUNICIPIOS_MARGARITA.map(mun => (
                             <option key={mun} value={mun}>
@@ -961,7 +974,7 @@ export default function Inventario() {
                         value={exportZoneKeyword}
                         onChange={e => setExportZoneKeyword(e.target.value)}
                         placeholder="Ej: Pampatar, Costa Azul, Playa El Ángel..."
-                        className="w-full text-xs sm:text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-vinotinto"
+                        className="w-full text-xs sm:text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto"
                       />
                     </div>
 
@@ -980,7 +993,7 @@ export default function Inventario() {
                             placeholder="Mínimo"
                             value={exportMinPrice}
                             onChange={e => setExportMinPrice(e.target.value)}
-                            className="w-full text-xs sm:text-sm pl-6 pr-2 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-vinotinto"
+                            className="w-full text-xs sm:text-sm pl-6 pr-2 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto"
                           />
                         </div>
                         <div className="relative">
@@ -992,7 +1005,7 @@ export default function Inventario() {
                             placeholder="Máximo"
                             value={exportMaxPrice}
                             onChange={e => setExportMaxPrice(e.target.value)}
-                            className="w-full text-xs sm:text-sm pl-6 pr-2 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-vinotinto"
+                            className="w-full text-xs sm:text-sm pl-6 pr-2 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto"
                           />
                         </div>
                       </div>
@@ -1007,7 +1020,7 @@ export default function Inventario() {
                         <select
                           value={exportMinBeds}
                           onChange={e => setExportMinBeds(e.target.value)}
-                          className="w-full text-xs sm:text-sm font-medium border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-vinotinto"
+                          className="w-full text-xs sm:text-sm font-medium border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto"
                         >
                           <option value="Todos">Cualquier cantidad</option>
                           <option value="1">1 o más habitaciones</option>
@@ -1025,7 +1038,7 @@ export default function Inventario() {
                         <select
                           value={exportStatus}
                           onChange={e => setExportStatus(e.target.value)}
-                          className="w-full text-xs sm:text-sm font-medium border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-vinotinto"
+                          className="w-full text-xs sm:text-sm font-medium border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto"
                         >
                           <option value="Activa">Solo Activas (Disponibles)</option>
                           <option value="Todas">Todas (Activas, Vendidas, etc.)</option>
@@ -1089,3 +1102,4 @@ export default function Inventario() {
     </div>
   );
 }
+
