@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { Calendar as CalendarIcon, Clock, Plus, X, User, ShieldAlert, Trash2, CheckCheck, AlertCircle, Edit2, Save } from 'lucide-react';
@@ -334,7 +334,7 @@ export default function GestorCitas() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto pb-safe"
+              className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl max-h-[85dvh] overflow-y-auto pb-safe"
             >
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-800">Agendar Cita</h2>
@@ -385,12 +385,12 @@ export default function GestorCitas() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
                     <input type="date" name="fecha" value={formData.fecha} onChange={handleInputChange} required
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none" />
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none touch-manipulation" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
                     <input type="time" name="hora" value={formData.hora} onChange={handleInputChange} required
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none" />
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none touch-manipulation" />
                   </div>
                 </div>
 
@@ -429,15 +429,17 @@ export default function GestorCitas() {
                   </div>
                 )}
 
-                <motion.button 
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-4 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all disabled:opacity-50"
-                >
-                  {isSubmitting ? 'Guardando...' : 'Guardar Cita'}
-                </motion.button>
+                <div className="modal-submit-sticky">
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full py-4 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all disabled:opacity-50"
+                  >
+                    {isSubmitting ? 'Guardando...' : 'Guardar Cita'}
+                  </motion.button>
+                </div>
               </form>
             </motion.div>
           </motion.div>
@@ -454,7 +456,7 @@ export default function GestorCitas() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto pb-safe"
+            className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl max-h-[85dvh] overflow-y-auto pb-safe"
           >
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-2">
@@ -523,7 +525,7 @@ export default function GestorCitas() {
                     value={editFormData.fecha}
                     onChange={e => setEditFormData({ ...editFormData, fecha: e.target.value })}
                     required
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium touch-manipulation"
                   />
                 </div>
                 <div>
@@ -534,7 +536,7 @@ export default function GestorCitas() {
                     value={editFormData.hora}
                     onChange={e => setEditFormData({ ...editFormData, hora: e.target.value })}
                     required
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium touch-manipulation"
                   />
                 </div>
               </div>

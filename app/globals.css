@@ -87,3 +87,39 @@ textarea {
   outline: 2px solid var(--color-vinotinto);
   outline-offset: 2px;
 }
+
+/* ============================================================
+   MODALES MÓVIL — fixes para iOS Safari
+   ============================================================ */
+
+/* Bloquea el scroll del body cuando hay un modal abierto */
+body.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+/* Padding seguro en el bottom de los modales tipo bottom-sheet */
+.modal-sheet {
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+}
+
+/* Evita que el picker nativo de iOS quede solapado dentro del modal.
+   Al usar position: sticky en el botón de submit se garantiza que
+   siempre sea visible sin importar cuánto espacio tome el picker. */
+.modal-submit-sticky {
+  position: sticky;
+  bottom: 0;
+  background: white;
+  padding-top: 0.75rem;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  margin-top: 0.5rem;
+}
+
+/* Asegura que los inputs date/time en iOS no desborden el modal */
+input[type="date"],
+input[type="time"] {
+  min-height: 48px;
+  -webkit-appearance: none;
+  appearance: none;
+}
