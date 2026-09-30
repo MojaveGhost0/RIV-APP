@@ -77,6 +77,70 @@ async function urlToBase64(url: string): Promise<string> {
   });
 }
 
+/** Convierte un HTMLCanvasElement en un objeto File y Blob de forma cross-browser */
+async function canvasToFile(canvas: HTMLCanvasElement, filename: string): Promise<{ file: File; blob: Blob }> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], filename, { type: 'image/png' });
+        resolve({ file, blob });
+      } else {
+        // Respaldo para browsers antiguos
+        const dataUrl = canvas.toDataURL('image/png');
+        const byteString = atob(dataUrl.split(',')[1]);
+        const mimeString = dataUrl.split(',')[0].split(':')[1].split(';')[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+        }
+        const fallbackBlob = new Blob([ab], { type: mimeString });
+        const file = new File([fallbackBlob], filename, { type: 'image/png' });
+        resolve({ file, blob: fallbackBlob });
+      }
+    }, 'image/png', 0.95);
+  });
+}
+
+/** 
+ * Dispara la descarga o apertura nativa en móviles (Web Share API) o link de descarga estándar
+ * En iOS Safari / Android, Web Share permite "Guardar imagen en Fotos", enviar a WhatsApp, etc.
+ */
+async function triggerDownloadOrShare(file: File, blob: Blob, title: string): Promise<'shared' | 'downloaded'> {
+  // 1. Probar Web Share API (Nativo en iPhone y Android modernos)
+  if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: file.name,
+        text: title,
+      });
+      return 'shared';
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        return 'shared';
+      }
+      console.warn('Web Share API falló o fue cancelado, probando descarga clásica:', err);
+    }
+  }
+
+  // 2. Descarga estándar vía Blob ObjectURL añadido al DOM
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = file.name;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+
+  setTimeout(() => {
+    try { document.body.removeChild(link); } catch {}
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  }, 1000);
+
+  return 'downloaded';
+}
+
 /** Filtro dinámico de atributos para evitar mostrar 0 Habs / Baños en Terrenos o Locales */
 function getValidSpecs(p: Property) {
   const specs: Array<{ label: string; v: string | number; emoji: string; icon: any }> = [];
@@ -152,6 +216,9 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
   const [done, setDone] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
   const [base64Img, setBase64Img] = useState<string>('');
+  const [generatedPreviewUrl, setGeneratedPreviewUrl] = useState<string | null>(null);
+  const [generatedFile, setGeneratedFile] = useState<File | null>(null);
+  const [generatedBlob, setGeneratedBlob] = useState<Blob | null>(null);
 
   const advisorPhone = property.captador ? getAdvisorPhone(property.captador) : '';
 
@@ -197,6 +264,12 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
   };
 
   const handleClose = () => {
+    if (generatedPreviewUrl) {
+      URL.revokeObjectURL(generatedPreviewUrl);
+    }
+    setGeneratedPreviewUrl(null);
+    setGeneratedFile(null);
+    setGeneratedBlob(null);
     setStep('format');
     setSelectedFormat(null);
     setSelectedTemplate('A');
@@ -206,6 +279,12 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
   };
 
   const handleSelectFormat = (format: FormatType) => {
+    if (generatedPreviewUrl) {
+      URL.revokeObjectURL(generatedPreviewUrl);
+    }
+    setGeneratedPreviewUrl(null);
+    setGeneratedFile(null);
+    setGeneratedBlob(null);
     setSelectedFormat(format);
     setSelectedTemplate('A');
     setDone(false);
@@ -288,14 +367,20 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
         // Clean standard A4 portrait (210mm x 297mm)
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-        pdf.save(`${property.title.replace(/\s+/g, '_')}_Ficha_RIV.pdf`);
+        const filename = `${property.title.replace(/\s+/g, '_')}_Ficha_RIV.pdf`;
+        pdf.save(filename);
       } else {
-        const imgData = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.href = imgData;
         const suffix = selectedFormat === 'instagram' ? 'Historia_IG' : 'WhatsApp';
-        link.download = `${property.title.replace(/\s+/g, '_')}_${suffix}_Plantilla_${selectedTemplate}.png`;
-        link.click();
+        const filename = `${property.title.replace(/\s+/g, '_')}_${suffix}_Plantilla_${selectedTemplate}.png`;
+        
+        // Conversión a File y Blob nativo para evitar bloqueo de descarga en móviles
+        const { file, blob } = await canvasToFile(canvas, filename);
+        const previewUrl = URL.createObjectURL(blob);
+        setGeneratedPreviewUrl(previewUrl);
+        setGeneratedFile(file);
+        setGeneratedBlob(blob);
+
+        await triggerDownloadOrShare(file, blob, `Plantilla RIV - ${property.title}`);
       }
       setDone(true);
     } catch (e) {
@@ -356,12 +441,30 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
       const photoFrames = imgs.length * SLIDE_FRAMES;
       const totalFrames = photoFrames + OUTRO_FRAMES;
 
+      // Detección de códec de video compatible (mp4 en Safari, webm en Chrome/Edge)
+      let mimeType = 'video/webm';
+      if (typeof MediaRecorder !== 'undefined') {
+        const testTypes = [
+          'video/mp4;codecs=avc1',
+          'video/mp4',
+          'video/webm;codecs=vp9',
+          'video/webm;codecs=vp8',
+          'video/webm',
+        ];
+        for (const t of testTypes) {
+          if (MediaRecorder.isTypeSupported(t)) {
+            mimeType = t;
+            break;
+          }
+        }
+      }
+
       // Configurar grabación multimedia
       const stream = canvas.captureStream(FPS);
       let recorder: MediaRecorder;
       try {
         recorder = new MediaRecorder(stream, {
-          mimeType: 'video/webm;codecs=vp9',
+          mimeType,
           videoBitsPerSecond: 8_000_000,
         });
       } catch {
@@ -372,14 +475,19 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
       await new Promise<void>((resolve) => {
-        recorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'video/webm' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `${property.title.replace(/\s+/g, '_')}_Reel_RIV.webm`;
-          link.click();
-          URL.revokeObjectURL(url);
+        recorder.onstop = async () => {
+          const isMp4 = mimeType.includes('mp4');
+          const ext = isMp4 ? 'mp4' : 'webm';
+          const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+          const filename = `${property.title.replace(/\s+/g, '_')}_Reel_RIV.${ext}`;
+          const file = new File([blob], filename, { type: blob.type });
+
+          const previewUrl = URL.createObjectURL(blob);
+          setGeneratedPreviewUrl(previewUrl);
+          setGeneratedFile(file);
+          setGeneratedBlob(blob);
+
+          await triggerDownloadOrShare(file, blob, `Reel Video 9:16 - ${property.title}`);
           resolve();
         };
 
@@ -823,9 +931,64 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                           </div>
                           <div>
                             <p className="font-bold text-green-700 text-sm">¡Generación Completada!</p>
-                            <p className="text-xs text-green-600 mt-0.5">El archivo fue descargado a tu dispositivo</p>
+                            <p className="text-xs text-green-600 mt-0.5">
+                              {selectedFormat === 'pdf'
+                                ? 'Ficha PDF generada correctamente para tu dispositivo'
+                                : 'Tu archivo está listo para guardar en fotos o compartir'}
+                            </p>
                           </div>
                         </motion.div>
+                      )}
+
+                      {/* Tarjeta de visualización y guardado directo en móviles */}
+                      {done && generatedPreviewUrl && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
+                          <div className="flex justify-center">
+                            {selectedFormat === 'video' ? (
+                              <video
+                                src={generatedPreviewUrl}
+                                controls
+                                playsInline
+                                className="max-h-60 rounded-xl shadow-md border border-gray-200 bg-black"
+                              />
+                            ) : (
+                              <img
+                                src={generatedPreviewUrl}
+                                alt="Plantilla Generada"
+                                className="max-h-60 rounded-xl object-contain shadow-md border border-gray-200 bg-white"
+                              />
+                            )}
+                          </div>
+
+                          <div className="space-y-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (generatedFile && generatedBlob) {
+                                  await triggerDownloadOrShare(generatedFile, generatedBlob, `Plantilla RIV - ${property.title}`);
+                                }
+                              }}
+                              className="w-full py-3.5 bg-vinotinto hover:bg-[#a60029] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md shadow-vinotinto/25 active:scale-95 transition"
+                            >
+                              <Share2 size={18} />
+                              Guardar en Fotos / Compartir
+                            </button>
+
+                            <a
+                              href={generatedPreviewUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition text-center"
+                            >
+                              <ExternalLink size={14} />
+                              Abrir archivo en pestaña nueva
+                            </a>
+
+                            <p className="text-[11px] text-gray-500 text-center leading-relaxed">
+                              📱 <strong>En iPhone o Android:</strong> Toca <em>"Guardar en Fotos / Compartir"</em> o mantén presionada la imagen para guardarla en tu galería.
+                            </p>
+                          </div>
+                        </div>
                       )}
 
                       {/* Download button */}
@@ -836,14 +999,14 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         disabled={isExporting}
                         className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
                           done
-                            ? 'bg-green-500 text-white shadow-green-500/25'
+                            ? 'bg-gray-800 hover:bg-gray-900 text-white shadow-gray-800/25'
                             : 'bg-gradient-to-r from-vinotinto to-vinotinto-light text-white shadow-vinotinto/25 disabled:opacity-60'
                         }`}
                       >
                         {isExporting ? (
                           <><Loader2 size={18} className="animate-spin" /> Procesando…</>
                         ) : done ? (
-                          <><Check size={18} /> Descargar de nuevo</>
+                          <><Check size={18} /> Regenerar archivo</>
                         ) : selectedFormat === 'whatsapp' ? (
                           <><Download size={18} /> Descargar Imagen 1:1 de WhatsApp</>
                         ) : selectedFormat === 'video' ? (
