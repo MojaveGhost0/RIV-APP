@@ -327,14 +327,14 @@ export default function GestorCitas() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
+            className="modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
           >
             <motion.div 
               initial={{ opacity: 0, y: 50, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl max-h-[85dvh] overflow-y-auto pb-safe"
+              className="modal-container bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl max-h-[85dvh] overflow-y-auto"
             >
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-800">Agendar Cita</h2>
@@ -343,7 +343,7 @@ export default function GestorCitas() {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="modal-form-content space-y-4">
                 {submitError && (
                   <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
                     <AlertCircle size={16} className="shrink-0 text-red-500" />
@@ -429,17 +429,15 @@ export default function GestorCitas() {
                   </div>
                 )}
 
-                <div className="modal-submit-sticky">
-                  <motion.button 
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full py-4 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all disabled:opacity-50"
-                  >
-                    {isSubmitting ? 'Guardando...' : 'Guardar Cita'}
-                  </motion.button>
-                </div>
+                <motion.button 
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-4 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Guardando...' : 'Guardar Cita'}
+                </motion.button>
               </form>
             </motion.div>
           </motion.div>
@@ -450,13 +448,13 @@ export default function GestorCitas() {
       {/* MODAL DE EDICIÓN DE CITA */}
       <AnimatePresence>
       {isEditModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
+        <div className="modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
           <motion.div 
             initial={{ opacity: 0, y: 50, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl max-h-[85dvh] overflow-y-auto pb-safe"
+            className="modal-container bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl max-h-[85dvh] overflow-y-auto"
           >
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-2">
@@ -468,7 +466,7 @@ export default function GestorCitas() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="space-y-4">
+            <form onSubmit={handleSaveEdit} className="modal-form-content space-y-4">
               {editSubmitError && (
                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
                   <AlertCircle size={16} className="shrink-0 text-red-500" />
@@ -576,7 +574,7 @@ export default function GestorCitas() {
                 </div>
               )}
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 pt-2 pb-1">
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
