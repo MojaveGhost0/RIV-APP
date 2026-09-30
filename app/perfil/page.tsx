@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useRef } from 'react';
 import { useAuth, AuthUser, UserRole } from '../context/AuthContext';
@@ -549,13 +549,13 @@ export default function Perfil() {
       {/* MODAL EDITAR TELÉFONO */}
       <AnimatePresence>
         {isEditPhoneModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0, y: 50, scale: 0.95 }}
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl"
+              className="modal-container bg-white w-full max-w-sm rounded-3xl p-5 sm:p-6 shadow-2xl overflow-y-auto"
             >
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
@@ -621,13 +621,13 @@ export default function Perfil() {
         {/* MODAL GESTION DE USUARIO */}
       <AnimatePresence>
         {isUserManageModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0, y: 50, scale: 0.95 }}
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl my-auto"
+              className="modal-container bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl overflow-y-auto"
             >
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">

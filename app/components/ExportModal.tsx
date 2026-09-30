@@ -626,15 +626,14 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+            className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm"
           >
             <motion.div
-              initial={{ opacity: 0, y: 60, scale: 0.96 }}
+              initial={{ opacity: 0, y: 20, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 30, scale: 0.95 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
               transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              className="modal-container bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
-              style={{ maxHeight: '85dvh', overflowY: 'auto' }}
+              className="modal-container bg-white w-full sm:max-w-lg rounded-3xl shadow-2xl overflow-y-auto"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">

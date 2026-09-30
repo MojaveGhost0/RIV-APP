@@ -852,12 +852,12 @@ export default function Inventario() {
       {/* MODAL DE EXPORTACIÓN PERSONALIZADA */}
       <AnimatePresence>
         {isExportModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100 max-h-[92vh] flex flex-col my-0 sm:my-8"
+              className="modal-container bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100 flex flex-col"
               onClick={e => e.stopPropagation()}
             >
               {/* Encabezado del Modal */}
@@ -1077,7 +1077,7 @@ export default function Inventario() {
               </div>
 
               {/* Botones del Modal */}
-              <div className="p-3.5 sm:p-4 bg-gray-50 border-t border-gray-100 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-2.5 pb-safe shrink-0">
+              <div className="p-3.5 sm:p-4 bg-gray-50 border-t border-gray-100 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsExportModalOpen(false)}

@@ -89,29 +89,35 @@ textarea {
 }
 
 /* ============================================================
-   MODALES MÓVIL — fixes para iOS Safari
-   Principio: NO usar position:sticky dentro de overflow-y:auto
-   en iOS — bug conocido que pega el elemento a la barra del browser.
+   MODALES Y DIÁLOGOS (CENTRADO Y COMPATIBILIDAD MÓVIL/iOS)
+   Principio: 
+   1. Centrados en medio de la pantalla (evita choques con BottomTabBar).
+   2. Flotan con separación segura por encima de la barra inferior de items.
+   3. NO usar position:sticky dentro de scrollables (bug en iOS).
    ============================================================ */
 
-/* El overlay bloquea el scroll del fondo con touch-action
-   sin necesitar position:fixed en body (que causaba saltos de scroll) */
+/* El overlay bloquea el scroll del fondo y centra el modal,
+   reservando padding inferior para que el modal flote arriba de
+   la barra de navegación inferior de items */
 .modal-overlay {
   touch-action: none;
   overscroll-behavior: none;
+  padding: 1rem;
+  padding-bottom: calc(var(--bottom-bar-height) + var(--safe-area-bottom) + 1.25rem) !important;
 }
 
-/* El contenedor del modal aisla su propio scroll */
+/* El contenedor del modal aisla su propio scroll y respeta
+   el espacio vertical para nunca colisionar con la barra de abajo */
 .modal-container {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  max-height: calc(100dvh - var(--bottom-bar-height) - var(--safe-area-bottom) - 3rem) !important;
 }
 
 /* Padding inferior del form: garantiza que el botón de submit
-   nunca quede tapado por la barra de navegación del browser ni
-   el safe-area del iPhone. NO usar sticky — usar padding. */
+   tenga espacio suficiente y no quede cortado */
 .modal-form-content {
-  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
 }
 
 /* Asegura que los inputs date/time en iOS sean tocables */
