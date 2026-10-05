@@ -4,6 +4,7 @@ import { useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 import { useData, type Property } from '../context/DataContext';
+import { useToast } from '../context/ToastContext';
 import {
   ShieldAlert, Plus, User, Calendar, FileText, Download, X, Search,
   ChevronDown, ChevronUp, Briefcase, Phone, MessageCircle, Home,
@@ -12,6 +13,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
 import { normalize } from '../lib/searchEngine';
+import Combobox, { type ComboboxOption } from '../components/Combobox';
 
 // SEC-05: Sanitización preventiva de texto contra scripts o tags HTML maliciosos
 function sanitizeText(str: string): string {
@@ -247,17 +249,24 @@ function exportClientPDF(
 
   // 2. INMUEBLES ASOCIADOS
   if (clientProps.length > 0) {
-    checkPageBreak(15);
+    checkPageBreak(18);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(10);
     pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
     pdf.text(`INMUEBLES VINCULADOS EN INVENTARIO (${clientProps.length})`, marginX, currentY);
-    currentY += 4;
+    currentY += 6;
 
     clientProps.forEach((prop) => {
-      checkPageBreak(28);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      const negStr = `Negociación: ${prop.formasNegociacion || 'No especificada'}`;
+      const pagoStr = `Pagos: ${prop.metodosPago || 'No especificado'}`;
+      const negLines = pdf.splitTextToSize(`${negStr} | ${pagoStr}`, contentWidth - 10);
+      const negHeight = negLines.length * 3.5;
+      const propBoxH = 16 + negHeight + 4;
+
+      checkPageBreak(propBoxH + 4);
       const propBoxY = currentY;
-      const propBoxH = 22;
 
       pdf.setFillColor(255, 255, 255);
       pdf.rect(marginX, propBoxY, contentWidth, propBoxH, 'F');
@@ -272,38 +281,36 @@ function exportClientPDF(
       const safePropTitle = (prop.title || 'Inmueble').length > 55
         ? (prop.title || '').slice(0, 52) + '...'
         : prop.title || 'Inmueble';
-      pdf.text(safePropTitle, marginX + 3, propBoxY + 5.5);
+      pdf.text(safePropTitle, marginX + 4, propBoxY + 5.5);
 
       pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
       const priceStr = typeof prop.price === 'number' ? `$${prop.price.toLocaleString('es-VE')} USD` : String(prop.price || '');
-      pdf.text(priceStr, pageWidth - marginX - 3, propBoxY + 5.5, { align: 'right' });
+      pdf.text(priceStr, pageWidth - marginX - 4, propBoxY + 5.5, { align: 'right' });
 
       // Ubicación y especificaciones
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7.5);
       pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
       const specs = `${prop.sqm || 0} m² · ${prop.beds || 0} hab · ${prop.baths || 0} baños · Estado: ${prop.status || 'Activa'}`;
-      pdf.text(`Ubicación: ${prop.location || 'No especificada'} (${specs})`, marginX + 3, propBoxY + 10.5);
+      pdf.text(`Ubicación: ${prop.location || 'No especificada'} (${specs})`, marginX + 4, propBoxY + 10.5);
 
       // Negociación y métodos de pago
       pdf.setFontSize(7);
-      const negStr = `Negociación: ${prop.formasNegociacion || 'No especificada'}`;
-      const pagoStr = `Pagos: ${prop.metodosPago || 'No especificado'}`;
-      pdf.text(pdf.splitTextToSize(`${negStr} | ${pagoStr}`, contentWidth - 6), marginX + 3, propBoxY + 15.5);
+      pdf.text(negLines, marginX + 4, propBoxY + 15.5);
 
-      currentY += propBoxH + 3;
+      currentY += propBoxH + 4;
     });
 
-    currentY += 5;
+    currentY += 4;
   }
 
   // 3. HISTORIAL DE INTERACCIONES
-  checkPageBreak(15);
+  checkPageBreak(22);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(10);
   pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
   pdf.text(`HISTORIAL DE SEGUIMIENTO Y ACTIVIDADES (${client.history.length})`, marginX, currentY);
-  currentY += 5;
+  currentY += 7;
 
   client.history.forEach((hist) => {
     const rawNotes = cleanInteractionNotes(hist.notas || '');
@@ -313,11 +320,12 @@ function exportClientPDF(
 
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7.5);
-    const lines = cleanNotes ? pdf.splitTextToSize(cleanNotes, contentWidth - 8) : [];
-    const notesHeight = lines.length * 3.5;
-    const itemHeight = 10 + notesHeight + 3;
+    // Padding interno: margenX + 8 a izquierda y derecha
+    const lines = cleanNotes ? pdf.splitTextToSize(cleanNotes, contentWidth - 14) : [];
+    const notesHeight = lines.length * 3.8;
+    const itemHeight = 11 + notesHeight + 4;
 
-    checkPageBreak(itemHeight);
+    checkPageBreak(itemHeight + 3);
 
     // Fondo del registro
     pdf.setFillColor(COLOR_BG_CARD[0], COLOR_BG_CARD[1], COLOR_BG_CARD[2]);
@@ -332,36 +340,36 @@ function exportClientPDF(
     } else {
       pdf.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
     }
-    pdf.circle(marginX + 3.5, currentY + 4.5, 1.3, 'F');
+    pdf.circle(marginX + 4, currentY + 5, 1.3, 'F');
 
     // Tipo y Asesor
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8);
     pdf.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
-    pdf.text(hist.tipo || 'Interacción', marginX + 7, currentY + 5.5);
+    pdf.text(hist.tipo || 'Interacción', marginX + 8, currentY + 6);
 
     if (hist.asesor) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7);
       pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-      pdf.text(`(Asesor: ${hist.asesor})`, marginX + 8 + pdf.getTextWidth(hist.tipo || 'Interacción'), currentY + 5.5);
+      pdf.text(`(Asesor: ${hist.asesor})`, marginX + 9 + pdf.getTextWidth(hist.tipo || 'Interacción'), currentY + 6);
     }
 
     // Fecha
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7);
     pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    pdf.text(dateFormatted, pageWidth - marginX - 3, currentY + 5.5, { align: 'right' });
+    pdf.text(dateFormatted, pageWidth - marginX - 4, currentY + 6, { align: 'right' });
 
-    // Notas
+    // Notas respetando padding interno
     if (lines.length > 0) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7.5);
       pdf.setTextColor(55, 65, 81);
-      pdf.text(lines, marginX + 7, currentY + 9.5);
+      pdf.text(lines, marginX + 8, currentY + 11.5);
     }
 
-    currentY += itemHeight + 2.5;
+    currentY += itemHeight + 3.5;
   });
 
   // Pie de página
@@ -386,6 +394,7 @@ function exportClientPDF(
 export default function CRMPage() {
   const { user, isAdmin } = useAuth();
   const { crmLogs, addCrmLog, updateCrmLog, deleteCrmLog, appointments, properties, updateAppointment } = useData();
+  const { showToast, confirm } = useToast();
 
   const [search, setSearch] = useState('');
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
@@ -487,24 +496,35 @@ export default function CRMPage() {
     // ROB-01: Validar tanto cliente como notas en la lógica JS antes de enviar
     if (!formData.cliente.trim() || !formData.notas.trim()) return;
     
-    await addCrmLog({
-      cliente: formData.cliente.trim(),
-      asesor: user?.nombre ?? 'Desconocido',
-      tipo_interaccion: formData.tipo_interaccion,
-      notas: formData.notas.trim()
-    });
-    
-    setIsModalOpen(false);
-    setFormData({ cliente: '', tipo_interaccion: 'Llamada', notas: '' });
+    try {
+      await addCrmLog({
+        cliente: formData.cliente.trim(),
+        asesor: user?.nombre ?? 'Desconocido',
+        tipo_interaccion: formData.tipo_interaccion,
+        notas: formData.notas.trim().slice(0, 1000)
+      });
+      setIsModalOpen(false);
+      setFormData({ cliente: '', tipo_interaccion: 'Llamada', notas: '' });
+      showToast('Registro guardado. Tus cambios han sido guardados.');
+    } catch (err) {
+      console.error('Error al guardar registro CRM:', err);
+      showToast('No se pudo guardar el registro. Revisa tu conexión.', 'error');
+    }
   };
 
   const handleDeleteLog = async (id: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar este registro de actividad?')) return;
+    const ok = await confirm({
+      title: '¿Eliminar este registro?',
+      message: 'Esta acción no se puede deshacer.',
+      confirmText: 'Eliminar'
+    });
+    if (!ok) return;
     try {
       await deleteCrmLog(id);
+      showToast('Registro de actividad eliminado.');
     } catch (err) {
       console.error('Error al eliminar registro:', err);
-      alert('No se pudo eliminar el registro.');
+      showToast('No se pudo eliminar el registro.', 'error');
     }
   };
 
@@ -516,12 +536,13 @@ export default function CRMPage() {
       await updateCrmLog(editingLog.id, {
         cliente: editingLog.cliente.trim(),
         tipo_interaccion: editingLog.tipo_interaccion,
-        notas: editingLog.notas.trim(),
+        notas: editingLog.notas.trim().slice(0, 1000),
       });
       setEditingLog(null);
+      showToast('Tus cambios han sido guardados.');
     } catch (err) {
       console.error('Error al actualizar registro:', err);
-      alert('No se pudo actualizar el registro.');
+      showToast('No se pudo actualizar el registro.', 'error');
     } finally {
       setIsSubmittingEdit(false);
     }
@@ -530,12 +551,16 @@ export default function CRMPage() {
   // Eliminar cliente del CRM (solo Admin)
   const handleDeleteClient = async (clientName: string) => {
     if (!isAdmin) {
-      alert('Solo los administradores pueden eliminar clientes del CRM.');
+      showToast('Solo los administradores pueden eliminar clientes del CRM.', 'error');
       return;
     }
 
-    const confirmMsg = `¿Estás seguro de que deseas eliminar permanentemente a "${clientName}" del CRM?\n\nEsta acción eliminará todos sus registros de seguimiento y desvinculará sus citas agendadas.`;
-    if (!confirm(confirmMsg)) return;
+    const ok = await confirm({
+      title: `¿Eliminar a "${clientName}" del CRM?`,
+      message: 'Esta acción eliminará todos sus registros de seguimiento y desvinculará sus citas agendadas.',
+      confirmText: 'Eliminar Cliente'
+    });
+    if (!ok) return;
 
     setIsDeletingClient(true);
     try {
@@ -557,9 +582,10 @@ export default function CRMPage() {
       if (selectedClientForExport === clientName) {
         setSelectedClientForExport('');
       }
+      showToast(`Cliente "${clientName}" eliminado del CRM.`);
     } catch (err) {
       console.error('Error al eliminar cliente del CRM:', err);
-      alert('No se pudo eliminar el cliente. Revisa tu conexión.');
+      showToast('No se pudo eliminar el cliente. Revisa tu conexión.', 'error');
     } finally {
       setIsDeletingClient(false);
     }
@@ -575,7 +601,7 @@ export default function CRMPage() {
         <button
           onClick={() => {
             if (clientData.length === 0) {
-              alert('No hay clientes registrados para exportar.');
+              showToast('No hay clientes registrados para exportar.', 'info');
               return;
             }
             setSelectedClientForExport(expandedClient || clientData[0]?.name || '');
@@ -965,11 +991,22 @@ export default function CRMPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notas / Detalles</label>
-                <textarea name="notas" value={formData.notas} onChange={e => setFormData({...formData, notas: e.target.value})} required
-                  placeholder="Detalles de la conversación o avances..."
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Notas / Detalles</label>
+                  <span className={`text-[11px] ${formData.notas.length > 900 ? 'text-amber-600 font-bold' : 'text-gray-400'}`}>
+                    {formData.notas.length} / 1000
+                  </span>
+                </div>
+                <textarea
+                  name="notas"
+                  value={formData.notas}
+                  onChange={e => setFormData({...formData, notas: e.target.value.slice(0, 1000)})}
+                  required
+                  maxLength={1000}
+                  placeholder="Detalles de la conversación o avances (máx. 1000 caracteres)..."
                   rows={4}
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none resize-none" />
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none resize-none"
+                />
               </div>
 
               <motion.button 
@@ -1048,12 +1085,18 @@ export default function CRMPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notas / Detalles</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Notas / Detalles</label>
+                  <span className={`text-[11px] ${editingLog.notas.length > 900 ? 'text-amber-600 font-bold' : 'text-gray-400'}`}>
+                    {editingLog.notas.length} / 1000
+                  </span>
+                </div>
                 <textarea 
                   value={editingLog.notas} 
-                  onChange={e => setEditingLog({ ...editingLog, notas: e.target.value })} 
+                  onChange={e => setEditingLog({ ...editingLog, notas: e.target.value.slice(0, 1000) })} 
                   required
-                  placeholder="Detalles de la conversación o avances..."
+                  maxLength={1000}
+                  placeholder="Detalles de la conversación o avances (máx. 1000 caracteres)..."
                   rows={4}
                   className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none resize-none text-sm" 
                 />
@@ -1083,7 +1126,7 @@ export default function CRMPage() {
       )}
       </AnimatePresence>
 
-      {/* MODAL SELECCIÓN DE CLIENTE PARA EXPORTAR PDF */}
+      {/* MODAL SELECCIÓN DE CLIENTE PARA EXPORTAR PDF (CON COMBOBOX CON BÚSQUEDA) */}
       <AnimatePresence>
       {isExportModalOpen && (
         <div className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -1092,7 +1135,7 @@ export default function CRMPage() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="modal-container bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl overflow-y-auto"
+            className="modal-container bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl overflow-visible"
           >
             <div className="flex justify-between items-center mb-5">
               <div className="flex items-center gap-2">
@@ -1113,20 +1156,19 @@ export default function CRMPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Cliente a Exportar
-                </label>
-                <select
+                <Combobox
+                  label="Cliente a Exportar"
                   value={selectedClientForExport}
-                  onChange={e => setSelectedClientForExport(e.target.value)}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none font-medium text-gray-800 text-sm"
-                >
-                  {clientData.map(c => (
-                    <option key={c.name} value={c.name}>
-                      {c.name} ({c.history.length} actividad{c.history.length === 1 ? '' : 'es'})
-                    </option>
-                  ))}
-                </select>
+                  onChange={val => setSelectedClientForExport(val)}
+                  placeholder="Selecciona o busca un cliente..."
+                  searchPlaceholder="Buscar por nombre de cliente..."
+                  options={clientData.map(c => ({
+                    value: c.name,
+                    label: c.name,
+                    description: `${c.history.length} interacción(es) registradas`,
+                    badge: `${c.history.length}`
+                  }))}
+                />
               </div>
 
               {/* Vista previa del cliente seleccionado */}

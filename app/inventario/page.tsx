@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useData, PROPERTY_TYPES } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import type { Property, PropertyType } from '../context/DataContext';
 import { fuzzySearch, applyAIFilters, normalize, type AIFilters } from '../lib/searchEngine';
 import { containerVariants, itemVariants } from '../lib/motion';
@@ -46,7 +47,6 @@ const MUNICIPIOS_MARGARITA = [
 // ─── Exportar Inventario a PDF ─────────────────────────────────────────────
 function exportToPDF(properties: Property[], filterDescription?: string) {
   if (!properties || properties.length === 0) {
-    alert('No hay propiedades para exportar.');
     return;
   }
 
@@ -321,6 +321,7 @@ export default function Inventario() {
   const searchParams = useSearchParams();
   const { properties } = useData();
   const { isAdmin } = useAuth();
+  const { showToast } = useToast();
 
   const [searchQuery, setSearchQuery]       = useState(searchParams.get('q') ?? '');
   const [activeFilter, setActiveFilter]     = useState('Todas');
@@ -570,7 +571,7 @@ export default function Inventario() {
 
   const handleExecuteExport = () => {
     if (exportTargetProperties.length === 0) {
-      alert('No hay inmuebles que coincidan con los filtros seleccionados.');
+      showToast('No hay inmuebles que coincidan con los filtros seleccionados.', 'info');
       return;
     }
 
@@ -578,9 +579,10 @@ export default function Inventario() {
     try {
       exportToPDF(exportTargetProperties, exportFilterDescription);
       setIsExportModalOpen(false);
+      showToast('Inventario PDF generado correctamente.');
     } catch (err) {
       console.error('Error al exportar inventario a PDF:', err);
-      alert('Hubo un error al generar el PDF del inventario.');
+      showToast('Hubo un error al generar el PDF del inventario.', 'error');
     } finally {
       setIsExporting(false);
     }
@@ -992,7 +994,10 @@ export default function Inventario() {
                             step="1000"
                             placeholder="Mínimo"
                             value={exportMinPrice}
-                            onChange={e => setExportMinPrice(e.target.value)}
+                            onChange={e => {
+                              const v = e.target.value;
+                              if (v === '' || (!v.startsWith('-') && Number(v) >= 0)) setExportMinPrice(v);
+                            }}
                             className="w-full text-xs sm:text-sm pl-6 pr-2 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto"
                           />
                         </div>
@@ -1004,7 +1009,10 @@ export default function Inventario() {
                             step="1000"
                             placeholder="Máximo"
                             value={exportMaxPrice}
-                            onChange={e => setExportMaxPrice(e.target.value)}
+                            onChange={e => {
+                              const v = e.target.value;
+                              if (v === '' || (!v.startsWith('-') && Number(v) >= 0)) setExportMaxPrice(v);
+                            }}
                             className="w-full text-xs sm:text-sm pl-6 pr-2 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto"
                           />
                         </div>

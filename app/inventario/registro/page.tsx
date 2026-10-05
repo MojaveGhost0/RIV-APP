@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import {
@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ImageUploader from '../../components/ImageUploader';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { normalize } from '../../lib/searchEngine';
 import {
   MARGARITA_LOCATIONS,
@@ -235,6 +236,7 @@ export default function RegistroPropiedad() {
   const router = useRouter();
   const { properties, crmLogs, addProperty, addCrmLog } = useData();
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   const [step, setStep] = useState(1);
   const totalSteps = 5;
@@ -558,6 +560,11 @@ export default function RegistroPropiedad() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
+    if (['area', 'habitaciones', 'banos'].includes(name)) {
+      if (value.startsWith('-')) return;
+      const num = Number(value);
+      if (!isNaN(num) && num < 0) return;
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -674,11 +681,14 @@ export default function RegistroPropiedad() {
 
       setIsSubmitting(false);
       setSubmitted(true);
+      showToast('Inmueble publicado con éxito. ¡Tus cambios han sido guardados!', 'success');
       setTimeout(() => router.push(`/inventario/${newId}`), 1500);
     } catch (err: any) {
       console.error('Error al registrar inmueble:', err);
       setIsSubmitting(false);
-      setSubmitError(err?.message || 'Error al guardar el inmueble. Revisa tu conexiÃ³n.');
+      const errMsg = err?.message || 'Error al guardar el inmueble. Revisa tu conexión.';
+      setSubmitError(errMsg);
+      showToast(errMsg, 'error');
     }
   };
 

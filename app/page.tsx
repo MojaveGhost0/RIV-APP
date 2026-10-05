@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { Search, MapPin, CheckCircle, ArrowRight, Calendar, Home, Users, Settings, CalendarPlus } from 'lucide-react';
@@ -9,6 +9,7 @@ import { useAuth } from './context/AuthContext';
 import { useData } from './context/DataContext';
 import { containerVariants, itemVariants } from './lib/motion';
 import { normalize } from './lib/searchEngine';
+import { getCitaTime, isCitaPasada, useNow } from './lib/citas';
 import BrandLogo from './components/BrandLogo';
 
 /** Convierte "2026-07-16" → "16 Jul 2026" en español */
@@ -37,13 +38,16 @@ export default function Dashboard() {
   const totalPropiedades = properties.length;
 
   // LOG-03: Comparación con normalize() para proximaCita
+  // Solo citas pendientes cuya fecha+hora aún no ha pasado, ordenadas por fecha+hora.
+  const now = useNow();
   const proximaCita = appointments
     .filter(c => {
       if (c.estado !== 'Pendiente') return false;
+      if (isCitaPasada(c, now)) return false;
       if (isAdmin) return true;
       return c.asesores.some(a => normalize(a) === myNombre);
     })
-    .sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+    .sort((a, b) => getCitaTime(a) - getCitaTime(b))[0];
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

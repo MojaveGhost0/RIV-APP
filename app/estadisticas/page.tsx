@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { Property } from '../context/DataContext';
+import { useToast } from '../context/ToastContext';
 import jsPDF from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
 import { normalize } from '../lib/searchEngine';
@@ -1096,6 +1097,7 @@ const BarTooltipZona = ({ active, payload, label }: any) => {
 export default function Estadisticas() {
   const { isAdmin, getAllUsers } = useAuth();
   const { properties, appointments } = useData();
+  const { showToast } = useToast();
   const router = useRouter();
   const [filtroAsesor, setFiltroAsesor] = useState('Todos');
   const [isExporting, setIsExporting] = useState(false);
@@ -1409,9 +1411,10 @@ export default function Estadisticas() {
         isCurrentMonth: isSelectedPeriod,
       });
       setIsExportModalOpen(false);
+      showToast('Reporte de estadísticas PDF generado.');
     } catch (err) {
       console.error('Error al generar PDF de KPIs:', err);
-      alert('Ocurrió un error al generar el PDF. Por favor intenta de nuevo.');
+      showToast('Ocurrió un error al generar el PDF. Por favor intenta de nuevo.', 'error');
     } finally {
       setIsExporting(false);
     }

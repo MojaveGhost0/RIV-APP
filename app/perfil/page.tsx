@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { useAuth, AuthUser, UserRole } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { useToast } from '../context/ToastContext';
 import { useRouter } from 'next/navigation';
 import {
   User, Shield, ChevronRight, LogOut, Home, Calendar, Phone,
@@ -18,6 +19,8 @@ export default function Perfil() {
   const { user, isAdmin, logout, updateUserPhone, updateAgencyLogo, getAllUsers, addUser, updateUser, deleteUser } = useAuth();
   const { properties, appointments } = useData();
   const router = useRouter();
+
+  const { showToast, confirm } = useToast();
 
   const [isEditPhoneModalOpen, setIsEditPhoneModalOpen] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
@@ -87,6 +90,7 @@ export default function Perfil() {
         }
         await updateUser(userToEdit.id, dataToUpdate);
         setManageUserSuccess('Usuario actualizado con éxito.');
+        showToast('Tus cambios han sido guardados.');
       } else {
         // Add
         if (!userForm.password) {
@@ -94,6 +98,7 @@ export default function Perfil() {
         }
         await addUser(userForm);
         setManageUserSuccess('Usuario creado con éxito.');
+        showToast('Usuario creado correctamente.');
       }
       setTimeout(() => {
         setIsUserManageModalOpen(false);
@@ -108,16 +113,21 @@ export default function Perfil() {
 
   const handleDeleteUser = async (id: string, name: string) => {
     if (id === user?.id) {
-      alert('No puedes eliminar tu propio usuario.');
+      showToast('No puedes eliminar tu propio usuario.', 'error');
       return;
     }
-    if (confirm(`¿Estás seguro de que deseas eliminar permanentemente al usuario ${name}?`)) {
-      try {
-        await deleteUser(id);
-        alert('Usuario eliminado.');
-      } catch (err: any) {
-        alert(err?.message || 'Error eliminando el usuario.');
-      }
+    const ok = await confirm({
+      title: `¿Eliminar al usuario ${name}?`,
+      message: 'Esta acción no se puede deshacer.',
+      confirmText: 'Eliminar'
+    });
+    if (!ok) return;
+
+    try {
+      await deleteUser(id);
+      showToast('Usuario eliminado correctamente.');
+    } catch (err: any) {
+      showToast(err?.message || 'Error eliminando el usuario.', 'error');
     }
   };
 

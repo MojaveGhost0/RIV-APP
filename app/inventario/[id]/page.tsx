@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useData } from '../../context/DataContext';
+import { useToast } from '../../context/ToastContext';
 import ExportModal from '../../components/ExportModal';
 import { useAuth } from '../../context/AuthContext';
 import { containerVariants, itemVariants } from '../../lib/motion';
@@ -29,6 +30,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
   const { id } = params;
   const router = useRouter();
   const { properties, deleteProperty, updatePropertyStatus, updateProperty, crmLogs, updateCrmLog } = useData();
+  const { showToast, confirm } = useToast();
   const { user, isAdmin, getAdvisorPhone } = useAuth();
 
   const property = properties.find(p => p.id === id);
@@ -91,9 +93,15 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
   const prevImage = () => setActiveImageIndex(i => (i - 1 + allImages.length) % allImages.length);
   const nextImage = () => setActiveImageIndex(i => (i + 1) % allImages.length);
 
-  const handleDelete = () => {
-    if (confirm(`¿Eliminar "${property.title}"? Esta acción no se puede deshacer.`)) {
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: `¿Eliminar "${property.title}"?`,
+      message: 'Esta acción no se puede deshacer.',
+      confirmText: 'Eliminar Inmueble'
+    });
+    if (ok) {
       deleteProperty(property.id);
+      showToast(`Inmueble "${property.title}" eliminado.`);
       router.replace('/inventario');
     }
   };
@@ -174,6 +182,30 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
       return;
     }
 
+    const numPrice = Number(editFormData.price.replace(/\D/g, ''));
+    if (isNaN(numPrice) || numPrice <= 0) {
+      setEditError('El precio debe ser un número mayor a 0.');
+      return;
+    }
+
+    const numBeds = Number(editFormData.beds);
+    if (!isNaN(numBeds) && numBeds < 0) {
+      setEditError('Las habitaciones no pueden ser un valor negativo.');
+      return;
+    }
+
+    const numBaths = Number(editFormData.baths);
+    if (!isNaN(numBaths) && numBaths < 0) {
+      setEditError('Los baños no pueden ser un valor negativo.');
+      return;
+    }
+
+    const numSqm = Number(editFormData.sqm);
+    if (!isNaN(numSqm) && numSqm < 0) {
+      setEditError('El área (m²) no puede ser un valor negativo.');
+      return;
+    }
+
     if (editImages.length === 0) {
       setEditError('El inmueble debe tener al menos una fotografía.');
       return;
@@ -218,6 +250,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
       }
 
       setIsEditModalOpen(false);
+      showToast('Tus cambios han sido guardados.');
     } catch (err: any) {
       console.error('Error al editar propiedad:', err);
       setEditError(err?.message || 'Error al guardar los cambios.');
@@ -232,14 +265,11 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
       if (navigator.share) {
         await navigator.share({ title: property.title, text });
       } else {
-        // FIX handleShare — navigator.clipboard requiere HTTPS o localhost.
-        // Envuelto en try/catch para evitar excepción no capturada en HTTP/dev.
         await navigator.clipboard.writeText(text);
-        alert('¡Información copiada al portapapeles!');
+        showToast('¡Información copiada al portapapeles!');
       }
     } catch {
-      // Fallback manual si la API de clipboard no está disponible
-      alert('No se pudo compartir. Copia manualmente:\n\n' + text);
+      showToast('No se pudo copiar la información al portapapeles.', 'error');
     }
   };
 
@@ -733,6 +763,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                     <label className="block font-bold text-gray-700 mb-1">Área (m²)</label>
                     <input
                       type="number"
+                      min="0"
                       value={editFormData.sqm}
                       onChange={e => setEditFormData({ ...editFormData, sqm: e.target.value })}
                       className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm"
@@ -792,6 +823,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                     <label className="block font-bold text-gray-700 mb-1">Habitaciones</label>
                     <input
                       type="number"
+                      min="0"
                       value={editFormData.beds}
                       onChange={e => setEditFormData({ ...editFormData, beds: e.target.value })}
                       className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm"
@@ -801,6 +833,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                     <label className="block font-bold text-gray-700 mb-1">Baños</label>
                     <input
                       type="number"
+                      min="0"
                       value={editFormData.baths}
                       onChange={e => setEditFormData({ ...editFormData, baths: e.target.value })}
                       className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm"

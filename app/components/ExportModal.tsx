@@ -12,6 +12,7 @@ import jsPDF from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Property } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import BrandLogo from './BrandLogo';
 import { DEFAULT_BRAND_LOGO } from '../lib/brandConfig';
 
@@ -207,6 +208,7 @@ const FORMAT_CONFIG = {
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function ExportModal({ property, isOpen, onClose }: ExportModalProps) {
   const { getAdvisorPhone } = useAuth();
+  const { showToast } = useToast();
   const [step, setStep] = useState<Step>('format');
   const [selectedFormat, setSelectedFormat] = useState<FormatType | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>('A');
@@ -316,9 +318,10 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
     try {
       await navigator.clipboard.writeText(buildWAText());
       setCopiedText(true);
+      showToast('Texto copiado al portapapeles', 'success');
       setTimeout(() => setCopiedText(false), 2500);
     } catch {
-      alert('Texto copiado al portapapeles');
+      showToast('No se pudo copiar el texto al portapapeles', 'error');
     }
   };
 
@@ -385,7 +388,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
       setDone(true);
     } catch (e) {
       console.error('Error al exportar plantilla:', e);
-      alert('Error al exportar la plantilla. Por favor intenta de nuevo.');
+      showToast('Error al exportar la plantilla. Por favor intenta de nuevo.', 'error');
     } finally {
       setIsExporting(false);
     }
@@ -433,7 +436,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
 
       const imgs = loadedPhotos.filter((img): img is HTMLImageElement => img !== null);
       if (imgs.length === 0) {
-        alert('No se pudieron cargar las fotos para generar el video.');
+        showToast('No se pudieron cargar las fotos para generar el video.', 'error');
         return;
       }
 
@@ -715,7 +718,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
       setDone(true);
     } catch (e) {
       console.error(e);
-      alert('Error al generar el video. Tu navegador debe soportar MediaRecorder (Chrome/Edge).');
+      showToast('Error al generar el video. Tu navegador debe soportar MediaRecorder (Chrome/Edge).', 'error');
     } finally {
       setIsExporting(false);
     }

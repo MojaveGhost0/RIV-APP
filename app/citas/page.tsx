@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { containerVariants, itemVariants } from '../lib/motion';
+import { useToast } from '../context/ToastContext';
 import { normalize } from '../lib/searchEngine';
+import { getCitaTime, isCitaPasada, useNow, todayISO, nowHHMM, validarFechaHoraCita } from '../lib/citas';
 
 const TIPO_COLOR: Record<string, string> = {
   'Cita en Oficina':   'bg-blue-500',
@@ -18,7 +19,9 @@ const TIPO_COLOR: Record<string, string> = {
 export default function GestorCitas() {
   const { user, isAdmin, getAllUsers } = useAuth();
   const { appointments, addAppointment, deleteAppointment, updateAppointmentStatus, updateAppointment } = useData();
+  const { showToast, confirm } = useToast();
   const allUsers = getAllUsers();
+  const now = useNow();
 
   const [activeTab, setActiveTab] = useState<'proximas' | 'historico'>('proximas');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,14 +39,21 @@ export default function GestorCitas() {
   // REGLA DE NEGOCIO (DT-04: normalize compartido desde searchEngine.ts):
   // - Asesor solo ve sus propias citas.
   // - Admin ve todas las citas de la agencia.
+  // - Próximas: pendientes cuya fecha+hora aún NO ha pasado (orden ascendente).
+  // - Histórico: completadas, canceladas o pendientes ya vencidas (orden descendente).
   const myNombre = normalize(user?.nombre ?? '');
-  const citasVisibles = appointments.filter(cita => {
-    const esMia = cita.asesores.some(a => normalize(a) === myNombre);
-    if (!isAdmin && !esMia) return false;
-    if (activeTab === 'proximas')  return cita.estado === 'Pendiente';
-    if (activeTab === 'historico') return cita.estado === 'Completada' || cita.estado === 'Cancelada';
-    return true;
-  });
+  const citasVisibles = appointments
+    .filter(cita => {
+      const esMia = cita.asesores.some(a => normalize(a) === myNombre);
+      if (!isAdmin && !esMia) return false;
+      const pasada = isCitaPasada(cita, now);
+      if (activeTab === 'proximas')  return cita.estado === 'Pendiente' && !pasada;
+      if (activeTab === 'historico') return cita.estado !== 'Pendiente' || pasada;
+      return true;
+    })
+    .sort((a, b) => activeTab === 'proximas'
+      ? getCitaTime(a) - getCitaTime(b)
+      : getCitaTime(b) - getCitaTime(a));
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -64,6 +74,13 @@ export default function GestorCitas() {
       return;
     }
 
+    // No se permiten citas en el pasado (validación en handler, además de min en inputs)
+    const fechaError = validarFechaHoraCita(formData.fecha, formData.hora, Date.now());
+    if (fechaError) {
+      setSubmitError(fechaError);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await addAppointment({
@@ -76,6 +93,7 @@ export default function GestorCitas() {
       });
       setIsModalOpen(false);
       setFormData({ tipo: 'Mostrar Propiedad', titulo: '', cliente: '', fecha: '', hora: '', asesoresIds: user?.id ? [user.id] : [] });
+      showToast('¡Cita agendada! Tus cambios han sido guardados.');
     } catch (err: any) {
       console.error('Error al guardar cita (LOG-04):', err);
       setSubmitError(err?.message || 'Error al guardar la cita en el servidor. Revisa tu conexión.');
@@ -84,13 +102,27 @@ export default function GestorCitas() {
     }
   };
 
-  const handleComplete = (id: string) => {
-    updateAppointmentStatus(id, 'Completada');
+  const handleComplete = async (id: string) => {
+    try {
+      await updateAppointmentStatus(id, 'Completada');
+      showToast('Cita marcada como completada.');
+    } catch {
+      showToast('No se pudo actualizar la cita. Inténtalo de nuevo.', 'error');
+    }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Eliminar esta cita?')) {
-      deleteAppointment(id);
+  const handleDelete = async (id: string) => {
+    const ok = await confirm({
+      title: '¿Eliminar esta cita?',
+      message: 'Esta acción no se puede deshacer.',
+      confirmText: 'Eliminar',
+    });
+    if (!ok) return;
+    try {
+      await deleteAppointment(id);
+      showToast('Cita eliminada correctamente.');
+    } catch {
+      showToast('No se pudo eliminar la cita. Inténtalo de nuevo.', 'error');
     }
   };
 
@@ -107,6 +139,13 @@ export default function GestorCitas() {
   });
   const [editSubmitError, setEditSubmitError] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  // Fecha/hora originales: solo se exige "no pasado" si el usuario reprograma la cita
+  const [editOriginal, setEditOriginal] = useState({ fecha: '', hora: '' });
+  const editReprogramada = editFormData.fecha !== editOriginal.fecha || editFormData.hora !== editOriginal.hora;
+
+  // Límites para los selectores (bloquean fechas/horas pasadas)
+  const minFecha = todayISO(now);
+  const minHora = nowHHMM(now);
 
   const handleOpenEditModal = (cita: any) => {
     setEditingCitaId(cita.id);
@@ -122,6 +161,7 @@ export default function GestorCitas() {
       hora: cita.hora,
       asesoresIds: matchedIds.length > 0 ? matchedIds : (user?.id ? [user.id] : []),
     });
+    setEditOriginal({ fecha: cita.fecha, hora: cita.hora });
     setEditSubmitError(null);
     setIsEditModalOpen(true);
   };
@@ -140,6 +180,14 @@ export default function GestorCitas() {
       return;
     }
 
+    if (editReprogramada) {
+      const fechaError = validarFechaHoraCita(editFormData.fecha, editFormData.hora, Date.now());
+      if (fechaError) {
+        setEditSubmitError(fechaError);
+        return;
+      }
+    }
+
     setIsSavingEdit(true);
     try {
       await updateAppointment(editingCitaId, {
@@ -152,6 +200,7 @@ export default function GestorCitas() {
       });
       setIsEditModalOpen(false);
       setEditingCitaId(null);
+      showToast('Tus cambios han sido guardados.');
     } catch (err: any) {
       console.error('Error al editar cita:', err);
       setEditSubmitError(err?.message || 'Error al guardar los cambios.');
@@ -171,23 +220,29 @@ export default function GestorCitas() {
         </div>
       </header>
 
-      {/* TABS */}
+      {/* TABS — indicador deslizante con layoutId (sin re-render brusco del fondo) */}
       <div className="px-4 py-4">
-        <div className="flex bg-gray-200/60 p-1 rounded-xl">
+        <div className="relative flex bg-gray-200/60 p-1 rounded-xl">
           <button
             onClick={() => setActiveTab('proximas')}
-            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${activeTab === 'proximas' ? 'bg-white text-vinotinto shadow-sm' : 'text-gray-500'}`}
+            className={`relative flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors ${activeTab === 'proximas' ? 'text-vinotinto' : 'text-gray-500'}`}
           >
-            Próximas
+            {activeTab === 'proximas' && (
+              <motion.span layoutId="citas-tab-pill" className="absolute inset-0 bg-white rounded-lg shadow-sm" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />
+            )}
+            <span className="relative z-10">Próximas</span>
           </button>
 
           {/* HISTÓRICO: SOLO visible para ADMIN */}
           {isAdmin ? (
             <button
               onClick={() => setActiveTab('historico')}
-              className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${activeTab === 'historico' ? 'bg-white text-vinotinto shadow-sm' : 'text-gray-500'}`}
+              className={`relative flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors ${activeTab === 'historico' ? 'text-vinotinto' : 'text-gray-500'}`}
             >
-              Histórico
+              {activeTab === 'historico' && (
+                <motion.span layoutId="citas-tab-pill" className="absolute inset-0 bg-white rounded-lg shadow-sm" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />
+              )}
+              <span className="relative z-10">Histórico</span>
             </button>
           ) : (
             <div className="flex-1 py-2.5 flex items-center justify-center gap-1.5 rounded-lg opacity-30 cursor-not-allowed" title="Solo para Administradores">
@@ -198,11 +253,18 @@ export default function GestorCitas() {
         </div>
       </div>
 
-      {/* LISTA DE CITAS */}
-      <motion.div 
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
+      {/* LISTA DE CITAS
+          FIX parpadeo: antes, al cambiar de tab, las tarjetas viejas hacían exit+layout
+          mientras las nuevas entraban con stagger, y `transition-all` (CSS) peleaba con
+          las transformaciones de framer-motion. Ahora la lista completa se reemplaza
+          con un crossfade corto (mode="wait") y las tarjetas solo animan al eliminarse. */}
+      <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={activeTab}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.16, ease: 'easeOut' }}
         className="px-4 pb-28 space-y-4"
       >
         {citasVisibles.length === 0 ? (
@@ -212,16 +274,17 @@ export default function GestorCitas() {
             <p className="text-sm text-gray-400 mt-1">Toca el botón + para agendar una.</p>
           </div>
         ) : (
-          <AnimatePresence>
-          {citasVisibles.map((cita) => (
+          <AnimatePresence initial={false}>
+          {citasVisibles.map((cita) => {
+            const vencida = cita.estado === 'Pendiente' && isCitaPasada(cita, now);
+            return (
             <motion.div 
-              layout
-              variants={itemVariants}
-              initial="hidden"
-              animate="visible"
-              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+              layout="position"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.18 } }}
               key={cita.id} 
-              className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] relative overflow-hidden transition-all hover:shadow-[0_8px_25px_rgba(0,0,0,0.06)]"
+              className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] relative overflow-hidden transition-shadow hover:shadow-[0_8px_25px_rgba(0,0,0,0.06)]"
             >
               <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl ${TIPO_COLOR[cita.tipo] ?? 'bg-gray-400'}`}></div>
 
@@ -230,8 +293,8 @@ export default function GestorCitas() {
                   <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
                     {cita.tipo}
                   </span>
-                  <span className={`text-xs font-bold ${cita.estado === 'Pendiente' ? 'text-amber-500' : 'text-green-600'}`}>
-                    ● {cita.estado}
+                  <span className={`text-xs font-bold ${vencida ? 'text-red-500' : cita.estado === 'Pendiente' ? 'text-amber-500' : cita.estado === 'Cancelada' ? 'text-gray-400' : 'text-green-600'}`}>
+                    ● {vencida ? 'Vencida' : cita.estado}
                   </span>
                 </div>
 
@@ -306,10 +369,12 @@ export default function GestorCitas() {
                 </div>
               </div>
             </motion.div>
-          ))}
+            );
+          })}
           </AnimatePresence>
         )}
       </motion.div>
+      </AnimatePresence>
 
       {/* FAB */}
       <button
@@ -384,12 +449,12 @@ export default function GestorCitas() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
-                    <input type="date" name="fecha" value={formData.fecha} onChange={handleInputChange} required
+                    <input type="date" name="fecha" value={formData.fecha} min={minFecha} onChange={handleInputChange} required
                       className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none touch-manipulation" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Hora</label>
-                    <input type="time" name="hora" value={formData.hora} onChange={handleInputChange} required
+                    <input type="time" name="hora" value={formData.hora} min={formData.fecha === minFecha ? minHora : undefined} onChange={handleInputChange} required
                       className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none touch-manipulation" />
                   </div>
                 </div>
@@ -521,6 +586,7 @@ export default function GestorCitas() {
                     type="date"
                     name="fecha"
                     value={editFormData.fecha}
+                    min={minFecha}
                     onChange={e => setEditFormData({ ...editFormData, fecha: e.target.value })}
                     required
                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium touch-manipulation"
@@ -532,6 +598,7 @@ export default function GestorCitas() {
                     type="time"
                     name="hora"
                     value={editFormData.hora}
+                    min={editFormData.fecha === minFecha ? minHora : undefined}
                     onChange={e => setEditFormData({ ...editFormData, hora: e.target.value })}
                     required
                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium touch-manipulation"
