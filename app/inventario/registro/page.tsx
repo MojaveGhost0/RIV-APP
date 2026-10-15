@@ -19,6 +19,7 @@ import {
   PROPERTY_TYPES,
   type PropertyType,
 } from '../../context/DataContext';
+import BrandLogo from '../../components/BrandLogo';
 
 // â”€â”€â”€ Icono por tipo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TYPE_ICONS: Record<PropertyType, React.ReactNode> = {
@@ -718,30 +719,35 @@ export default function RegistroPropiedad() {
   }
 
   return (
-    <div className="pb-24 min-h-screen bg-gray-50">
+    <div className="pb-28 min-h-screen bg-[#F3F4F6] relative overflow-hidden">
+      {/* Luces de fondo ambientales de lujo */}
+      <div className="absolute top-0 right-0 w-80 h-80 bg-vinotinto/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+      <div className="absolute top-1/2 left-0 w-72 h-72 bg-dorado/5 rounded-full blur-3xl pointer-events-none -ml-20" />
 
-      {/* HEADER */}
-      <header className="flex items-center justify-between px-4 pt-4 mb-3">
-        <button
+      {/* HEADER CON GLASSMORPHISM */}
+      <header className="flex items-center justify-between px-4 pt-safe pt-5 pb-3 mb-4 bg-white/85 backdrop-blur-md border-b border-gray-100 sticky top-0 z-30 transition-all shadow-xs">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={() => step > 1 ? setStep(step - 1) : router.back()}
-          className="p-2 -ml-2 text-gray-500 hover:text-vinotinto transition-colors"
+          className="p-2 -ml-1 text-gray-500 hover:text-vinotinto rounded-xl hover:bg-gray-100/60 transition-colors"
         >
-          <ArrowLeft size={24} />
-        </button>
+          <ArrowLeft size={22} />
+        </motion.button>
         <div className="text-center">
-          <h1 className="text-xl font-bold text-gray-800">Registrar Inmueble</h1>
-          <p className="text-[11px] text-gray-400 font-medium">Paso {step} de {totalSteps}</p>
+          <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 tracking-tight">Registrar Inmueble</h1>
+          <p className="text-[11px] text-gray-400 font-semibold">Paso {step} de {totalSteps}</p>
         </div>
-        <div className="w-8" />
+        <BrandLogo size="xs" className="shrink-0 drop-shadow-xs" />
       </header>
 
-      {/* â”€â”€ TABS DE TIPO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <div className="mb-4">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 px-4">
-          Tipo de propiedad *
+      {/* TABS DE TIPO */}
+      <div className="mb-4 relative z-10">
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-4 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-vinotinto" /> Tipo de propiedad *
         </p>
         <div className="relative">
-          <div className="absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-gray-50 to-transparent pointer-events-none z-10" />
+          <div className="absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-[#F3F4F6] to-transparent pointer-events-none z-10" />
           <div
             className="flex gap-2 overflow-x-auto px-4 pb-2"
             style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -749,18 +755,20 @@ export default function RegistroPropiedad() {
             {PROPERTY_TYPES.map((type) => {
               const active = selectedType === type;
               return (
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.95 }}
                   key={type}
                   onClick={() => handleTypeChange(type)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all whitespace-nowrap ${
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all whitespace-nowrap ${
                     active
-                      ? 'bg-vinotinto text-white border-vinotinto shadow-md shadow-vinotinto/20'
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-vinotinto/40'
+                      ? 'bg-gradient-to-r from-vinotinto to-vinotinto-light text-white border-vinotinto shadow-md shadow-vinotinto/20'
+                      : 'bg-white/80 backdrop-blur-sm text-gray-600 border-gray-200/80 hover:border-dorado/40 shadow-xs'
                   }`}
                 >
                   {TYPE_ICONS[type]}
                   <span>{type}</span>
-                </button>
+                </motion.button>
               );
             })}
             <div className="flex-shrink-0 w-8" />

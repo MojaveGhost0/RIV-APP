@@ -22,6 +22,7 @@ import { useToast } from '../context/ToastContext';
 import jsPDF from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
 import { normalize } from '../lib/searchEngine';
+import BrandLogo from '../components/BrandLogo';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
@@ -1424,31 +1425,39 @@ export default function Estadisticas() {
   // RENDER
   // =============================================================================
   return (
-    <div className="bg-gray-50 min-h-[100dvh] page-content">
+    <div className="bg-[#F3F4F6] min-h-[100dvh] page-content relative overflow-hidden">
+      {/* Luces de fondo ambientales de lujo */}
+      <div className="absolute top-0 right-0 w-80 h-80 bg-vinotinto/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+      <div className="absolute top-1/2 left-0 w-72 h-72 bg-dorado/5 rounded-full blur-3xl pointer-events-none -ml-20" />
 
-      {/* HEADER */}
-      <header className="bg-white px-5 pt-6 pb-4 sticky top-0 z-10 shadow-sm space-y-3">
+      {/* HEADER CON GLASSMORPHISM */}
+      <header className="bg-white/85 backdrop-blur-md px-5 pt-6 pb-4 sticky top-0 z-30 shadow-xs border-b border-gray-100 space-y-3 transition-all">
         <div className="flex justify-between items-end">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="bg-vinotinto/10 p-1.5 rounded-lg">
                 <TrendingUp size={16} className="text-vinotinto" />
               </div>
-              <p className="text-[10px] font-bold text-vinotinto uppercase tracking-widest">Solo Admin</p>
+              <p className="text-[10px] font-bold text-vinotinto uppercase tracking-widest">Panel Ejecutivo · Solo Admin</p>
             </div>
-            <h1 className="text-2xl font-extrabold text-gray-900">Estadísticas</h1>
+            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Estadísticas</h1>
           </div>
-          <button
-            onClick={() => {
-              setExportScope('global');
-              setIsExportModalOpen(true);
-            }}
-            disabled={isExporting}
-            className="flex items-center gap-1.5 text-xs font-bold bg-gradient-to-r from-vinotinto to-vinotinto-light text-white px-3.5 py-2.5 rounded-xl shadow-md shadow-vinotinto/20 transition-all hover:opacity-95 active:scale-95 disabled:opacity-50"
-          >
-            <Download size={14} />
-            {isExporting ? 'Generando...' : 'Exportar Informe'}
-          </button>
+          <div className="flex items-center gap-2">
+            <BrandLogo size="xs" className="shrink-0 drop-shadow-xs" />
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => {
+                setExportScope('global');
+                setIsExportModalOpen(true);
+              }}
+              disabled={isExporting}
+              className="flex items-center gap-1.5 text-xs font-bold bg-gradient-to-r from-vinotinto to-vinotinto-light text-white px-3.5 py-2.5 rounded-xl shadow-md shadow-vinotinto/20 transition-all hover:opacity-95 disabled:opacity-50"
+            >
+              <Download size={14} />
+              {isExporting ? 'Generando...' : 'Exportar Informe'}
+            </motion.button>
+          </div>
         </div>
 
         {/* BARRA SELECTORA DE PERÍODO / MES */}

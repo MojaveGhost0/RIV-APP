@@ -276,14 +276,17 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
   const PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\' viewBox=\'0 0 400 300\'%3E%3Crect width=\'400\' height=\'300\' fill=\'%23f3f4f6\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%239ca3af\' font-size=\'48\'%3E🏠%3C/text%3E%3C/svg%3E';
 
   return (
-    <div className="bg-white min-h-[100dvh]">
+    <div className="bg-[#F3F4F6] min-h-[100dvh] relative overflow-hidden pb-12">
+      {/* Luces de fondo ambientales de lujo */}
+      <div className="absolute top-0 right-0 w-80 h-80 bg-vinotinto/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+      <div className="absolute top-1/2 left-0 w-72 h-72 bg-dorado/5 rounded-full blur-3xl pointer-events-none -ml-20" />
 
       {/* GALERÍA DE FOTOS */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="relative w-full h-72 bg-gray-200"
+        className="relative w-full h-72 sm:h-80 bg-gray-900"
       >
         <img
           src={imgError[activeImageIndex] ? PLACEHOLDER : allImages[activeImageIndex]}
@@ -293,44 +296,50 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
         />
 
         {/* Overlay gradiente */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
 
         {/* Botón atrás y Logo */}
         <div className="absolute top-4 left-4 flex items-center gap-2 z-10">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => router.back()}
-            className="w-10 h-10 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full flex items-center justify-center text-white hover:bg-white/30 transition shadow-sm"
+            className="w-10 h-10 bg-black/40 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-black/60 transition shadow-sm"
           >
             <ArrowLeft size={20} />
-          </button>
-          <div className="bg-black/35 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/20 flex items-center">
+          </motion.button>
+          <div className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 flex items-center">
             <BrandLogo size="xs" variant="light" />
           </div>
         </div>
 
         {/* Botón compartir */}
-        <button
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={handleShare}
-          className="absolute top-4 right-16 w-10 h-10 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full flex items-center justify-center text-white hover:bg-white/30 transition"
+          className="absolute top-4 right-16 w-10 h-10 bg-black/40 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-black/60 transition"
         >
           <Share2 size={18} />
-        </button>
+        </motion.button>
 
         {/* Botón exportar */}
-        <button
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={() => setIsExportModalOpen(true)}
-          className="absolute top-4 right-4 w-10 h-10 bg-vinotinto/90 backdrop-blur-sm border border-vinotinto/30 rounded-full flex items-center justify-center text-white hover:bg-vinotinto transition shadow-md"
+          className="absolute top-4 right-4 w-10 h-10 bg-vinotinto backdrop-blur-md border border-dorado/40 rounded-full flex items-center justify-center text-white hover:bg-vinotinto-light transition shadow-md"
         >
           <Download size={18} />
-        </button>
+        </motion.button>
 
         {/* Navegación de imágenes */}
         {allImages.length > 1 && (
           <>
-            <button onClick={prevImage} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/30 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/50 transition">
+            <button onClick={prevImage} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/40 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center text-white hover:bg-black/60 transition">
               <ChevronLeft size={20} />
             </button>
-            <button onClick={nextImage} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/30 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/50 transition">
+            <button onClick={nextImage} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/40 backdrop-blur-md border border-white/10 rounded-full flex items-center justify-center text-white hover:bg-black/60 transition">
               <ChevronRight size={20} />
             </button>
           </>
@@ -343,27 +352,27 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
               <button
                 key={i}
                 onClick={() => setActiveImageIndex(i)}
-                className={`w-2 h-2 rounded-full transition-all ${i === activeImageIndex ? 'bg-white w-5' : 'bg-white/50'}`}
+                className={`w-2 h-2 rounded-full transition-all ${i === activeImageIndex ? 'bg-dorado w-5 shadow-xs' : 'bg-white/60'}`}
               />
             ))}
           </div>
         )}
 
         {/* Contador de fotos */}
-        <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-sm text-white text-xs font-bold px-2.5 py-1 rounded-full">
+        <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-md text-white text-xs font-bold px-3 py-1 rounded-full border border-white/10">
           {activeImageIndex + 1}/{allImages.length}
         </div>
       </motion.div>
 
       {/* THUMBNAILS */}
       {allImages.length > 1 && (
-        <div className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-hide bg-gray-50 border-b border-gray-100">
+        <div className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-hide bg-white/60 backdrop-blur-sm border-b border-gray-200/60 relative z-10">
           {allImages.map((img, i) => (
             <button
               key={i}
               onClick={() => setActiveImageIndex(i)}
               className={`relative shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
-                i === activeImageIndex ? 'border-vinotinto shadow-md' : 'border-transparent opacity-60'
+                i === activeImageIndex ? 'border-vinotinto shadow-md scale-105' : 'border-transparent opacity-60 hover:opacity-100'
               }`}
             >
               <img
@@ -382,25 +391,27 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="px-5 pt-5 pb-28 space-y-5"
+        className="px-4 sm:px-6 pt-5 pb-28 space-y-4 relative z-10"
       >
 
-        {/* Título y precio */}
-        <motion.div variants={itemVariants}>
+        {/* Tarjeta de Título y precio */}
+        <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-gray-100 shadow-xs hover:border-dorado/30 transition-all">
           <div className="flex justify-between items-start gap-2 mb-2">
-            <h1 className="text-2xl font-extrabold text-gray-900 leading-tight flex-1">{property.title}</h1>
-            <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 mt-1 border ${STATUS_STYLE[property.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+            <h1 className="text-2xl font-extrabold text-gray-900 leading-tight flex-1 tracking-tight">{property.title}</h1>
+            <span className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 mt-1 border shadow-xs ${STATUS_STYLE[property.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
               {property.status}
             </span>
           </div>
-          <p className="text-3xl font-black text-vinotinto">${property.price.toLocaleString()} <span className="text-base font-semibold text-gray-400">USD</span></p>
+          <p className="text-3xl font-black text-vinotinto tracking-tight">
+            ${property.price.toLocaleString()} <span className="text-base font-bold text-gray-400">USD</span>
+          </p>
         </motion.div>
 
         {/* Ubicación */}
-        <motion.div variants={itemVariants} className="space-y-2">
-          <div className="flex items-center gap-2 text-gray-500">
-            <MapPin size={16} className="text-vinotinto shrink-0" />
-            <p className="text-sm">{property.location}</p>
+        <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-md rounded-2xl p-4.5 border border-gray-100 shadow-xs space-y-3">
+          <div className="flex items-center gap-2 text-gray-600">
+            <MapPin size={17} className="text-vinotinto shrink-0" />
+            <p className="text-sm font-medium">{property.location}</p>
           </div>
           <a
             href={
@@ -410,7 +421,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
             }
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-100 text-blue-600 rounded-xl font-bold text-sm transition-all active:scale-95 group"
+            className="flex items-center justify-center gap-2 w-full py-2.5 bg-blue-50/80 hover:bg-blue-100 border border-blue-200/80 text-blue-600 rounded-xl font-bold text-sm transition-all active:scale-95 group"
           >
             <Map size={16} className="group-hover:scale-110 transition-transform" />
             {property.mapsUrl?.trim() ? 'Ver ubicación exacta en Google Maps' : 'Ver en Google Maps'}
@@ -423,20 +434,20 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
           {[
             { icon: <Bed size={20} className="text-vinotinto" />, value: property.beds, label: 'Habitaciones' },
             { icon: <Bath size={20} className="text-vinotinto" />, value: property.baths, label: 'Baños' },
-            { icon: <Maximize size={20} className="text-vinotinto" />, value: `${property.sqm}m²`, label: 'Área' },
+            { icon: <Maximize size={20} className="text-vinotinto" />, value: `${property.sqm}m²`, label: 'Área Total' },
           ].map((f, i) => (
-            <div key={i} className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-center">
-              <div className="flex justify-center mb-1">{f.icon}</div>
-              <p className="text-xl font-extrabold text-gray-800">{f.value}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{f.label}</p>
+            <div key={i} className="bg-white/90 backdrop-blur-md border border-gray-100 rounded-2xl p-4 text-center shadow-xs hover:border-dorado/40 transition-all">
+              <div className="flex justify-center mb-1.5">{f.icon}</div>
+              <p className="text-xl font-black text-gray-900 tracking-tight">{f.value}</p>
+              <p className="text-xs text-gray-500 mt-0.5 font-medium">{f.label}</p>
             </div>
           ))}
         </motion.div>
 
         {/* Descripción */}
-        <motion.div variants={itemVariants}>
-          <h2 className="text-base font-bold text-gray-800 mb-2">Descripción</h2>
-          <p className="text-sm text-gray-600 leading-relaxed">{property.description}</p>
+        <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-gray-100 shadow-xs">
+          <h2 className="text-base font-extrabold text-gray-900 mb-2">Descripción del Inmueble</h2>
+          <p className="text-sm text-gray-600 leading-relaxed font-normal">{property.description}</p>
         </motion.div>
 
         {/* Comodidades */}

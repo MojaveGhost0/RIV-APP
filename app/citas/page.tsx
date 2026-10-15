@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar as CalendarIcon, Clock, Plus, X, User, ShieldAlert, Trash2, CheckCheck, AlertCircle, Edit2, Save } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Plus, X, User, ShieldAlert, Trash2, CheckCheck, AlertCircle, Edit2, Save, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useAuth } from '../context/AuthContext';
@@ -9,11 +9,12 @@ import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import { normalize } from '../lib/searchEngine';
 import { getCitaTime, isCitaPasada, useNow, todayISO, nowHHMM, validarFechaHoraCita } from '../lib/citas';
+import BrandLogo from '../components/BrandLogo';
 
-const TIPO_COLOR: Record<string, string> = {
-  'Cita en Oficina':   'bg-blue-500',
-  'Mostrar Propiedad': 'bg-dorado',
-  'Captar Propiedad':  'bg-green-500',
+const TIPO_GRADIENTE: Record<string, string> = {
+  'Cita en Oficina':   'from-blue-500 to-blue-600',
+  'Mostrar Propiedad': 'from-[#D4AF37] to-[#E6C96C]',
+  'Captar Propiedad':  'from-emerald-500 to-emerald-600',
 };
 
 export default function GestorCitas() {
@@ -210,42 +211,46 @@ export default function GestorCitas() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-[100dvh] page-content">
+    <div className="bg-[#F3F4F6] min-h-[100dvh] page-content relative overflow-hidden">
+      {/* Luces de fondo ambientales de lujo */}
+      <div className="absolute top-0 right-0 w-80 h-80 bg-vinotinto/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+      <div className="absolute top-1/2 left-0 w-72 h-72 bg-dorado/5 rounded-full blur-3xl pointer-events-none -ml-20" />
 
-      {/* HEADER */}
-      <header className="bg-white px-4 pt-safe pt-6 pb-4 flex justify-between items-center shadow-sm sticky top-0 z-30">
+      {/* HEADER CON GLASSMORPHISM */}
+      <header className="bg-white/85 backdrop-blur-md px-4 pt-safe pt-6 pb-4 flex justify-between items-center shadow-xs border-b border-gray-100 sticky top-0 z-30 transition-all">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">Agenda</h1>
-          <p className="text-xs text-gray-400 mt-0.5">{isAdmin ? 'Vista de toda la agencia' : `Mis citas · ${user?.nombre}`}</p>
+          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Agenda</h1>
+          <p className="text-xs text-gray-500 font-medium mt-0.5">{isAdmin ? 'Vista global de la agencia' : `Mis citas · ${user?.nombre}`}</p>
         </div>
+        <BrandLogo size="xs" className="shrink-0 drop-shadow-xs" />
       </header>
 
-      {/* TABS — indicador deslizante con layoutId (sin re-render brusco del fondo) */}
-      <div className="px-4 py-4">
-        <div className="relative flex bg-gray-200/60 p-1 rounded-xl">
+      {/* TABS CON GLASSMORPHISM */}
+      <div className="px-4 py-4 relative z-10">
+        <div className="relative flex bg-white/80 backdrop-blur-md p-1 rounded-2xl border border-gray-200/80 shadow-xs">
           <button
             onClick={() => setActiveTab('proximas')}
-            className={`relative flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors ${activeTab === 'proximas' ? 'text-vinotinto' : 'text-gray-500'}`}
+            className={`relative flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${activeTab === 'proximas' ? 'text-vinotinto font-extrabold' : 'text-gray-500 hover:text-gray-800'}`}
           >
             {activeTab === 'proximas' && (
-              <motion.span layoutId="citas-tab-pill" className="absolute inset-0 bg-white rounded-lg shadow-sm" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />
+              <motion.span layoutId="citas-tab-pill" className="absolute inset-0 bg-white rounded-xl shadow-sm border border-gray-100" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />
             )}
-            <span className="relative z-10">Próximas</span>
+            <span className="relative z-10">Próximas Citas</span>
           </button>
 
           {/* HISTÓRICO: SOLO visible para ADMIN */}
           {isAdmin ? (
             <button
               onClick={() => setActiveTab('historico')}
-              className={`relative flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors ${activeTab === 'historico' ? 'text-vinotinto' : 'text-gray-500'}`}
+              className={`relative flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${activeTab === 'historico' ? 'text-vinotinto font-extrabold' : 'text-gray-500 hover:text-gray-800'}`}
             >
               {activeTab === 'historico' && (
-                <motion.span layoutId="citas-tab-pill" className="absolute inset-0 bg-white rounded-lg shadow-sm" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />
+                <motion.span layoutId="citas-tab-pill" className="absolute inset-0 bg-white rounded-xl shadow-sm border border-gray-100" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />
               )}
-              <span className="relative z-10">Histórico</span>
+              <span className="relative z-10">Histórico General</span>
             </button>
           ) : (
-            <div className="flex-1 py-2.5 flex items-center justify-center gap-1.5 rounded-lg opacity-30 cursor-not-allowed" title="Solo para Administradores">
+            <div className="flex-1 py-2.5 flex items-center justify-center gap-1.5 rounded-xl opacity-35 cursor-not-allowed" title="Solo para Administradores">
               <ShieldAlert size={13} className="text-gray-500" />
               <span className="text-xs font-bold text-gray-500">Histórico</span>
             </div>
@@ -253,11 +258,7 @@ export default function GestorCitas() {
         </div>
       </div>
 
-      {/* LISTA DE CITAS
-          FIX parpadeo: antes, al cambiar de tab, las tarjetas viejas hacían exit+layout
-          mientras las nuevas entraban con stagger, y `transition-all` (CSS) peleaba con
-          las transformaciones de framer-motion. Ahora la lista completa se reemplaza
-          con un crossfade corto (mode="wait") y las tarjetas solo animan al eliminarse. */}
+      {/* LISTA DE CITAS */}
       <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={activeTab}
@@ -265,104 +266,130 @@ export default function GestorCitas() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -6 }}
         transition={{ duration: 0.16, ease: 'easeOut' }}
-        className="px-4 pb-28 space-y-4"
+        className="px-4 pb-28 space-y-3.5 relative z-10"
       >
         {citasVisibles.length === 0 ? (
-          <div className="text-center py-14 bg-white rounded-2xl border border-gray-100 mt-4">
+          <div className="text-center py-16 bg-white/80 backdrop-blur-md rounded-2xl border border-gray-100 mt-2 shadow-xs">
             <CalendarIcon className="mx-auto text-gray-300 mb-3" size={44} />
-            <p className="text-gray-500 font-semibold">No hay citas en esta vista.</p>
-            <p className="text-sm text-gray-400 mt-1">Toca el botón + para agendar una.</p>
+            <p className="text-gray-700 font-bold">No hay citas en esta vista</p>
+            <p className="text-xs sm:text-sm text-gray-400 mt-1">Toca el botón + para agendar una nueva cita.</p>
           </div>
         ) : (
           <AnimatePresence initial={false}>
           {citasVisibles.map((cita) => {
             const vencida = cita.estado === 'Pendiente' && isCitaPasada(cita, now);
+            const gradiente = TIPO_GRADIENTE[cita.tipo] ?? 'from-gray-400 to-gray-500';
             return (
             <motion.div 
               layout="position"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.18 } }}
+              whileHover={{ y: -2 }}
               key={cita.id} 
-              className="bg-white p-4 rounded-2xl border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] relative overflow-hidden transition-shadow hover:shadow-[0_8px_25px_rgba(0,0,0,0.06)]"
+              className="bg-white/90 backdrop-blur-md p-4.5 rounded-2xl border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_10px_28px_rgba(128,0,32,0.06)] hover:border-dorado/30 relative overflow-hidden transition-all group"
             >
-              <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl ${TIPO_COLOR[cita.tipo] ?? 'bg-gray-400'}`}></div>
+              {/* Barra lateral indicadora de tipo con gradiente */}
+              <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl bg-gradient-to-b ${gradiente}`}></div>
 
               <div className="pl-3">
                 <div className="flex justify-between items-start mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600 bg-gray-100/80 px-2.5 py-0.5 rounded-full border border-gray-200/50">
                     {cita.tipo}
                   </span>
-                  <span className={`text-xs font-bold ${vencida ? 'text-red-500' : cita.estado === 'Pendiente' ? 'text-amber-500' : cita.estado === 'Cancelada' ? 'text-gray-400' : 'text-green-600'}`}>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                    vencida
+                      ? 'bg-rose-50 text-rose-600 border-rose-200'
+                      : cita.estado === 'Pendiente'
+                      ? 'bg-amber-50 text-amber-600 border-amber-200'
+                      : cita.estado === 'Cancelada'
+                      ? 'bg-gray-50 text-gray-400 border-gray-200'
+                      : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                  }`}>
                     ● {vencida ? 'Vencida' : cita.estado}
                   </span>
                 </div>
 
-                <h3 className="font-bold text-gray-800 text-base mb-3 leading-snug">{cita.titulo}</h3>
+                <h3 className="font-extrabold text-gray-900 text-base mb-3 leading-snug group-hover:text-vinotinto transition-colors">
+                  {cita.titulo}
+                </h3>
 
-                <div className="space-y-1.5 text-sm text-gray-500">
+                <div className="space-y-2 text-xs sm:text-sm text-gray-600">
                   {cita.cliente?.trim() ? (
                     <div className="flex items-center gap-2">
-                      <User size={14} className="text-vinotinto/60 shrink-0" />
-                      <span>Cliente: <span className="font-medium text-gray-700">{cita.cliente}</span></span>
+                      <div className="w-5 h-5 rounded-lg bg-vinotinto/10 flex items-center justify-center shrink-0">
+                        <User size={12} className="text-vinotinto" />
+                      </div>
+                      <span>Cliente: <strong className="text-gray-800">{cita.cliente}</strong></span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 text-gray-400">
-                      <User size={14} className="text-gray-300 shrink-0" />
-                      <span className="text-xs italic">Sin cliente asignado</span>
+                      <div className="w-5 h-5 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                        <User size={12} className="text-gray-400" />
+                      </div>
+                      <span className="italic text-xs">Sin cliente asignado</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2">
-                    <CalendarIcon size={14} className="text-vinotinto/60 shrink-0" />
-                    <span>{cita.fecha}</span>
+                    <div className="w-5 h-5 rounded-lg bg-vinotinto/10 flex items-center justify-center shrink-0">
+                      <CalendarIcon size={12} className="text-vinotinto" />
+                    </div>
+                    <span className="font-medium text-gray-700">{cita.fecha}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Clock size={14} className="text-vinotinto/60 shrink-0" />
-                    <span>{cita.hora}</span>
+                    <div className="w-5 h-5 rounded-lg bg-dorado/15 flex items-center justify-center shrink-0">
+                      <Clock size={12} className="text-dorado-dark" />
+                    </div>
+                    <span className="font-semibold text-gray-800">{cita.hora}</span>
                   </div>
                 </div>
 
                 {/* Asesor + Acciones */}
-                <div className="flex items-center gap-2 pt-3 mt-3 border-t border-gray-50">
+                <div className="flex items-center gap-2 pt-3 mt-3 border-t border-gray-100">
                   <div className="w-5 h-5 rounded-full bg-vinotinto/10 flex items-center justify-center shrink-0">
                     <User size={10} className="text-vinotinto" />
                   </div>
-                  <span className="text-xs text-gray-400 flex-1">
+                  <span className="text-xs text-gray-500 flex-1 truncate">
                     {isAdmin ? (
-                      <>Asesores: <span className="font-semibold text-gray-600">{cita.asesores.join(', ')}</span></>
+                      <>Asesores: <span className="font-semibold text-gray-700">{cita.asesores.join(', ')}</span></>
                     ) : (
-                      // FIX UI#2 — Muestra todos los asesores de la cita, no solo "Registrada por mí"
-                      <>Asesor(es): <span className="font-semibold text-gray-600">{cita.asesores.join(', ')}</span></>
+                      <>Asesor(es): <span className="font-semibold text-gray-700">{cita.asesores.join(', ')}</span></>
                     )}
                   </span>
 
                   {/* Acciones */}
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {cita.estado === 'Pendiente' && (
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => handleComplete(cita.id)}
-                        className="flex items-center gap-1 text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded-lg hover:bg-green-100 transition"
+                        className="flex items-center gap-1 text-xs text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-xl transition"
                       >
                         <CheckCheck size={12} />
                         Completar
-                      </button>
+                      </motion.button>
                     )}
                     {(isAdmin || cita.asesores.some(a => normalize(a) === myNombre)) && (
                       <>
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
                           onClick={() => handleOpenEditModal(cita)}
-                          className="flex items-center gap-1 text-xs text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100 transition"
+                          className="flex items-center justify-center w-7 h-7 text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition"
                           title="Editar cita"
                         >
                           <Edit2 size={12} />
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
                           onClick={() => handleDelete(cita.id)}
-                          className="flex items-center gap-1 text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded-lg hover:bg-red-100 transition"
+                          className="flex items-center justify-center w-7 h-7 text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition"
                           title="Eliminar cita"
                         >
                           <Trash2 size={12} />
-                        </button>
+                        </motion.button>
                       </>
                     )}
                   </div>
@@ -376,13 +403,16 @@ export default function GestorCitas() {
       </motion.div>
       </AnimatePresence>
 
-      {/* FAB */}
-      <button
+      {/* FAB FLOTANTE CON GRADIENTE VINOTINTO */}
+      <motion.button
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
         onClick={() => setIsModalOpen(true)}
-        className="fixed bottom-[calc(70px+env(safe-area-inset-bottom)+1rem)] right-5 w-14 h-14 bg-vinotinto text-white rounded-full flex items-center justify-center shadow-lg shadow-vinotinto/30 active:scale-90 transition-transform z-20"
+        className="fixed bottom-[calc(70px+env(safe-area-inset-bottom)+1rem)] right-5 w-14 h-14 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-full flex items-center justify-center shadow-xl shadow-vinotinto/35 border border-white/20 active:scale-90 transition-all z-20"
+        title="Agendar nueva cita"
       >
         <Plus size={28} />
-      </button>
+      </motion.button>
 
       {/* MODAL */}
       <AnimatePresence>

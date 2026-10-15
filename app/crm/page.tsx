@@ -8,12 +8,13 @@ import { useToast } from '../context/ToastContext';
 import {
   ShieldAlert, Plus, User, Calendar, FileText, Download, X, Search,
   ChevronDown, ChevronUp, Briefcase, Phone, MessageCircle, Home,
-  ExternalLink, CircleDollarSign, CreditCard, MapPin, Edit2, Trash2, Loader2
+  ExternalLink, CircleDollarSign, CreditCard, MapPin, Edit2, Trash2, Loader2, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
 import { normalize } from '../lib/searchEngine';
 import Combobox, { type ComboboxOption } from '../components/Combobox';
+import BrandLogo from '../components/BrandLogo';
 
 // SEC-05: Sanitización preventiva de texto contra scripts o tags HTML maliciosos
 function sanitizeText(str: string): string {
@@ -592,52 +593,64 @@ export default function CRMPage() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-[100dvh] page-content relative">
-      <header className="bg-white px-4 pt-safe pt-6 pb-4 flex justify-between items-center shadow-sm sticky top-0 z-30">
+    <div className="bg-[#F3F4F6] min-h-[100dvh] page-content relative overflow-hidden">
+      {/* Luces de fondo ambientales de lujo */}
+      <div className="absolute top-0 right-0 w-80 h-80 bg-vinotinto/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+      <div className="absolute top-1/2 left-0 w-72 h-72 bg-dorado/5 rounded-full blur-3xl pointer-events-none -ml-20" />
+
+      {/* HEADER CON GLASSMORPHISM */}
+      <header className="bg-white/85 backdrop-blur-md px-4 pt-safe pt-6 pb-4 flex justify-between items-center shadow-xs border-b border-gray-100 sticky top-0 z-30 transition-all">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">CRM Clientes</h1>
-          <p className="text-xs text-gray-400 mt-0.5">{isAdmin ? 'Registro general de agencia' : `Mis clientes · ${user?.nombre}`}</p>
+          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">CRM Clientes</h1>
+          <p className="text-xs text-gray-500 font-medium mt-0.5">{isAdmin ? 'Registro global de la agencia' : `Mis clientes · ${user?.nombre}`}</p>
         </div>
-        <button
-          onClick={() => {
-            if (clientData.length === 0) {
-              showToast('No hay clientes registrados para exportar.', 'info');
-              return;
-            }
-            setSelectedClientForExport(expandedClient || clientData[0]?.name || '');
-            setIsExportModalOpen(true);
-          }}
-          disabled={clientData.length === 0}
-          className="flex items-center gap-1.5 text-xs font-bold bg-vinotinto/10 text-vinotinto px-3 py-2 rounded-xl transition-all hover:bg-vinotinto/20 active:scale-95 disabled:opacity-50"
-          title="Exportar expediente de un cliente en PDF"
-        >
-          <FileText size={14} />
-          Exportar PDF
-        </button>
+        <div className="flex items-center gap-2">
+          <BrandLogo size="xs" className="shrink-0 drop-shadow-xs" />
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => {
+              if (clientData.length === 0) {
+                showToast('No hay clientes registrados para exportar.', 'info');
+                return;
+              }
+              setSelectedClientForExport(expandedClient || clientData[0]?.name || '');
+              setIsExportModalOpen(true);
+            }}
+            disabled={clientData.length === 0}
+            className="flex items-center gap-1.5 text-xs font-bold bg-gradient-to-r from-vinotinto/10 to-dorado/15 text-vinotinto border border-dorado/20 px-3 py-2 rounded-xl transition-all hover:bg-vinotinto hover:text-white disabled:opacity-50 shadow-xs"
+            title="Exportar expediente de un cliente en PDF"
+          >
+            <FileText size={14} />
+            Exportar PDF
+          </motion.button>
+        </div>
       </header>
 
-      <div className="px-4 py-4 space-y-4">
+      <div className="px-4 py-4 space-y-4 relative z-10">
         {/* Search */}
-        <div className="relative">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <div className="relative flex items-center bg-white/85 backdrop-blur-md border border-gray-200/80 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] focus-within:border-vinotinto/60 focus-within:ring-2 focus-within:ring-vinotinto/15 transition-all group">
+          <div className="pl-4 pr-2 flex items-center pointer-events-none text-gray-400 group-focus-within:text-vinotinto transition-colors">
+            <Search size={18} />
+          </div>
           <input
             type="text"
-            placeholder="Buscar por cliente o nota..."
+            placeholder="Buscar por cliente, notas o teléfono..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium"
+            className="w-full py-3.5 pr-4 bg-transparent text-gray-800 placeholder-gray-400 text-sm focus:outline-none font-medium"
           />
         </div>
 
         <div className="space-y-4">
           {clientData.length === 0 ? (
-            <div className="text-center py-14 bg-white rounded-2xl border border-gray-100 mt-4">
+            <div className="text-center py-16 bg-white/80 backdrop-blur-md rounded-2xl border border-gray-100 mt-2 shadow-xs">
               <Briefcase className="mx-auto text-gray-300 mb-3" size={44} />
-              <p className="text-gray-500 font-semibold">No hay clientes registrados.</p>
-              <p className="text-sm text-gray-400 mt-1">Registra una interacción para empezar.</p>
+              <p className="text-gray-700 font-bold">No hay clientes registrados</p>
+              <p className="text-xs sm:text-sm text-gray-400 mt-1">Registra una interacción para empezar a construir tu cartera.</p>
             </div>
           ) : (
-            <div className="space-y-3 pb-28">
+            <div className="space-y-3.5 pb-28">
               {clientData.map((client) => {
                 const clientProps = getClientProperties(client.name, client.history, properties);
                 const clientPhone = client.history.map(h => extractPhone(h.notas || '')).find(Boolean) || null;
@@ -934,15 +947,18 @@ export default function CRMPage() {
       </div>
 
       {/* FAB para nuevo cliente/registro global */}
-      <button
+      <motion.button
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
         onClick={() => {
           setFormData({ cliente: '', tipo_interaccion: 'Llamada', notas: '' });
           setIsModalOpen(true);
         }}
-        className="fixed bottom-[calc(70px+env(safe-area-inset-bottom)+1rem)] right-5 w-14 h-14 bg-vinotinto text-white rounded-full flex items-center justify-center shadow-lg shadow-vinotinto/30 active:scale-90 transition-transform z-20"
+        className="fixed bottom-[calc(70px+env(safe-area-inset-bottom)+1rem)] right-5 w-14 h-14 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-full flex items-center justify-center shadow-xl shadow-vinotinto/35 border border-white/20 active:scale-90 transition-all z-20"
+        title="Registrar nueva interacción en CRM"
       >
         <Plus size={28} />
-      </button>
+      </motion.button>
 
       {/* MODAL */}
       <AnimatePresence>

@@ -592,53 +592,58 @@ export default function Inventario() {
   const isAIActive = isAIResultSet && !isAILoading && !!searchQuery.trim();
 
   return (
-    <div className="bg-gray-50 min-h-[100dvh] page-content">
+    <div className="bg-[#F3F4F6] min-h-[100dvh] page-content relative overflow-hidden">
+      {/* Luces de fondo ambientales de lujo */}
+      <div className="absolute top-0 right-0 w-80 h-80 bg-vinotinto/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+      <div className="absolute top-1/2 left-0 w-72 h-72 bg-dorado/5 rounded-full blur-3xl pointer-events-none -ml-20" />
 
-      {/* HEADER */}
-      <header className="bg-white px-4 pt-6 pb-3 sticky top-0 z-30 shadow-sm">
+      {/* HEADER CON GLASSMORPHISM */}
+      <header className="bg-white/85 backdrop-blur-md px-4 pt-6 pb-3 sticky top-0 z-30 shadow-xs border-b border-gray-100 transition-all">
         <div className="flex justify-between items-center mb-3">
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">Inventario</h1>
-            <p className="text-xs text-gray-400 mt-0.5">{filteredProperties.length} inmuebles encontrados</p>
+            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Inventario</h1>
+            <p className="text-xs text-gray-500 font-medium mt-0.5">{filteredProperties.length} inmuebles en catálogo</p>
           </div>
           <div className="flex items-center gap-2">
-            <BrandLogo size="xs" className="shrink-0" />
-            <button
+            <BrandLogo size="xs" className="shrink-0 drop-shadow-xs" />
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.96 }}
               onClick={() => setIsExportModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-vinotinto/10 text-vinotinto rounded-xl text-xs font-bold hover:bg-vinotinto/20 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-vinotinto/10 to-dorado/15 text-vinotinto border border-dorado/20 rounded-xl text-xs font-bold hover:bg-vinotinto hover:text-white transition-all shadow-xs"
               title="Exportar inventario a PDF"
             >
               <SlidersHorizontal size={14} />
               Exportar PDF
-            </button>
+            </motion.button>
           </div>
         </div>
 
         {/* BARRA DE BÚSQUEDA */}
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => handleSearchChange(e.target.value)}
             placeholder="Busca: '3 hab cerca del mar con piscina menos de 80k'..."
-            className={`w-full pl-9 pr-10 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-1 transition bg-gray-100 ${
+            className={`w-full pl-10 pr-10 py-3 border rounded-2xl text-sm focus:outline-none transition-all ${
               isAIActive
-                ? 'border-vinotinto/40 bg-white focus:ring-vinotinto ring-1 ring-vinotinto/20'
-                : 'border-gray-200 focus:ring-vinotinto focus:bg-white'
+                ? 'border-vinotinto/50 bg-white/95 focus:ring-2 focus:ring-vinotinto/20 shadow-md shadow-vinotinto/10'
+                : 'border-gray-200/80 bg-white/80 focus:border-vinotinto focus:ring-2 focus:ring-vinotinto/15 shadow-xs'
             }`}
           />
 
           {/* Icono derecho: spinner, X o Wand */}
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
             {isAILoading ? (
-              <Loader2 size={15} className="text-vinotinto animate-spin" />
+              <Loader2 size={16} className="text-vinotinto animate-spin" />
             ) : searchQuery ? (
-              <button onClick={handleClear} className="text-gray-400 hover:text-gray-600 transition">
+              <button onClick={handleClear} className="text-gray-400 hover:text-gray-600 transition p-0.5">
                 <X size={15} />
               </button>
             ) : (
-              <Wand2 size={15} className="text-gray-300" />
+              <Wand2 size={16} className="text-gray-300" />
             )}
           </div>
         </div>
@@ -646,8 +651,8 @@ export default function Inventario() {
         {/* CHIP DE BÚSQUEDA IA */}
         {isAIActive && aiFilters?.interpretacion && (
           <div className="flex items-center gap-2 mt-2 px-1 animate-fade-in-up">
-            <div className="flex items-center gap-1.5 bg-vinotinto/5 border border-vinotinto/20 rounded-full px-3 py-1">
-              <Wand2 size={11} className="text-vinotinto shrink-0" />
+            <div className="flex items-center gap-1.5 bg-gradient-to-r from-vinotinto/10 to-dorado/10 border border-vinotinto/20 rounded-full px-3.5 py-1.5 shadow-xs">
+              <Wand2 size={12} className="text-vinotinto shrink-0" />
               <p className="text-xs text-vinotinto font-semibold leading-none">
                 {aiFilters.interpretacion}
               </p>
@@ -665,7 +670,7 @@ export default function Inventario() {
         {/* AVISO si IA no disponible y se usó fuzzy */}
         {isAIActive && !aiFilters?.interpretacion && (
           <div className="flex items-center gap-1.5 mt-2 px-1">
-            <Wand2 size={11} className="text-vinotinto" />
+            <Wand2 size={12} className="text-vinotinto" />
             <p className="text-xs text-vinotinto font-semibold">Búsqueda inteligente activa</p>
           </div>
         )}
@@ -677,10 +682,10 @@ export default function Inventario() {
           </p>
         )}
 
-        {/* ERROR de IA (API no configurada o fallo) */}
+        {/* ERROR de IA */}
         {aiError && searchQuery && shouldUseAI(searchQuery) && (
           <div className="flex items-center gap-1.5 mt-1.5 px-1">
-            <AlertCircle size={11} className="text-amber-500 shrink-0" />
+            <AlertCircle size={12} className="text-amber-500 shrink-0" />
             <p className="text-[10px] text-amber-600 font-medium">
               IA no disponible · Usando búsqueda local
             </p>
@@ -689,17 +694,17 @@ export default function Inventario() {
       </header>
 
       {/* FILTROS DE ESTADO */}
-      <div className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-hide">
+      <div className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-hide relative z-10">
         {STATUS_FILTERS.map(f => (
           <motion.button
-            whileHover={{ scale: 1.05 }}
+            whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.95 }}
             key={f}
             onClick={() => setActiveFilter(f)}
-            className={`px-4 py-1.5 text-sm font-bold rounded-full whitespace-nowrap border transition-all ${
+            className={`px-4 py-1.5 text-xs sm:text-sm font-bold rounded-full whitespace-nowrap border transition-all ${
               activeFilter === f
-                ? 'bg-vinotinto text-white border-vinotinto shadow-sm shadow-vinotinto/20'
-                : 'bg-white border-gray-200 text-gray-600 hover:border-vinotinto/40'
+                ? 'bg-gradient-to-r from-vinotinto to-vinotinto-light text-white border-vinotinto shadow-md shadow-vinotinto/20'
+                : 'bg-white/80 backdrop-blur-sm border-gray-200/80 text-gray-700 hover:border-dorado/40 shadow-xs'
             }`}
           >
             {f}
@@ -712,13 +717,13 @@ export default function Inventario() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="px-4 pb-28 space-y-4"
+        className="px-4 pb-28 space-y-4 relative z-10"
       >
         {filteredProperties.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 mt-2">
+          <div className="text-center py-16 bg-white/80 backdrop-blur-md rounded-2xl border border-gray-100 mt-2 shadow-xs">
             <Search className="mx-auto text-gray-300 mb-3" size={44} />
-            <p className="text-gray-500 font-semibold">Sin resultados</p>
-            <p className="text-sm text-gray-400 mt-1 px-6">
+            <p className="text-gray-700 font-bold">Sin resultados</p>
+            <p className="text-xs sm:text-sm text-gray-400 mt-1 px-6">
               {isAIActive
                 ? 'La búsqueda inteligente no encontró propiedades con esos criterios.'
                 : activeFilter !== 'Todas'
@@ -757,54 +762,56 @@ export default function Inventario() {
               whileTap={{ scale: 0.98 }}
               key={prop.id}
               onClick={() => router.push(`/inventario/${prop.id}`)}
-              className="bg-white rounded-2xl overflow-hidden shadow-[0_4px_15px_rgba(0,0,0,0.04)] border border-gray-100 cursor-pointer hover:shadow-[0_8px_25px_rgba(0,0,0,0.08)] transition-shadow"
+              className="bg-white/90 backdrop-blur-md rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 hover:border-dorado/40 hover:shadow-[0_12px_30px_rgba(128,0,32,0.08)] transition-all duration-300 group cursor-pointer"
             >
               {/* IMAGEN */}
-              <div className="relative w-full h-48 bg-gray-200">
+              <div className="relative w-full h-48 bg-gray-200 overflow-hidden">
                 <img
                   src={prop.image}
                   alt={prop.title}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 {/* BADGE ESTADO */}
-                <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-sm shadow-sm ${
+                <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-md shadow-xs border ${
                   prop.status === 'Activa'
-                    ? 'bg-green-500/90 text-white'
+                    ? 'bg-emerald-600/90 text-white border-emerald-400/30'
                     : prop.status === 'Vendida'
-                    ? 'bg-gray-700/90 text-white'
-                    : 'bg-amber-400/90 text-white'
+                    ? 'bg-gray-800/90 text-white border-gray-600/30'
+                    : 'bg-amber-500/90 text-white border-amber-300/30'
                 }`}>
                   {prop.status}
                 </span>
 
                 {/* BADGE TIPO DE PROPIEDAD */}
                 {prop.propertyType && TYPE_BADGE[prop.propertyType] && (
-                  <span className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-0.5 bg-black/50 backdrop-blur-sm text-white rounded-full text-[9px] font-bold">
+                  <span className="absolute bottom-3 left-3 flex items-center gap-1.5 px-2.5 py-1 bg-black/60 backdrop-blur-md text-white border border-white/20 rounded-xl text-[10px] font-bold shadow-xs">
                     {TYPE_BADGE[prop.propertyType]!.icon}
                     {TYPE_BADGE[prop.propertyType]!.label}
                   </span>
                 )}
 
-                {/* BADGE IA — solo cuando la IA encontró esta propiedad */}
+                {/* BADGE IA */}
                 {isAIActive && (
-                  <span className="absolute top-3 left-3 flex items-center gap-1 px-2 py-0.5 bg-vinotinto/80 backdrop-blur-sm text-white rounded-full text-[9px] font-bold">
-                    <Wand2 size={9} /> IA
+                  <span className="absolute top-3 left-3 flex items-center gap-1 px-2.5 py-1 bg-vinotinto/90 backdrop-blur-md text-dorado-light border border-dorado/30 rounded-xl text-[10px] font-bold shadow-xs">
+                    <Wand2 size={10} /> IA
                   </span>
                 )}
               </div>
 
               {/* INFO */}
-              <div className="p-4">
-                <div className="flex justify-between items-start mb-1">
-                  <h3 className="font-bold text-base text-gray-800 leading-tight flex-1 pr-2">{prop.title}</h3>
-                  <span className="font-extrabold text-base text-vinotinto whitespace-nowrap">
+              <div className="p-4.5">
+                <div className="flex justify-between items-start mb-1.5">
+                  <h3 className="font-bold text-base text-gray-900 leading-tight flex-1 pr-2 group-hover:text-vinotinto transition-colors">
+                    {prop.title}
+                  </h3>
+                  <span className="font-black text-lg text-vinotinto tracking-tight whitespace-nowrap">
                     ${prop.price.toLocaleString()}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-3.5">
                   <div className="flex items-center gap-1 flex-1 min-w-0">
-                    <MapPin size={12} className="mr-1 text-vinotinto/60 shrink-0" />
+                    <MapPin size={13} className="text-vinotinto/70 shrink-0" />
                     <span className="truncate">{prop.location}</span>
                   </div>
                   <a
@@ -813,29 +820,29 @@ export default function Inventario() {
                     rel="noopener noreferrer"
                     onClick={e => e.stopPropagation()}
                     title="Ver en Google Maps"
-                    className="ml-2 shrink-0 flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg font-semibold transition-colors active:scale-95"
+                    className="ml-2 shrink-0 flex items-center gap-1 px-2 py-1 bg-blue-50/80 hover:bg-blue-100 text-blue-600 rounded-lg font-semibold transition-all active:scale-95 border border-blue-100"
                   >
                     <ExternalLink size={11} />
                     <span className="text-[10px]">Maps</span>
                   </a>
                 </div>
 
-                <div className="flex justify-between items-center pt-3 border-t border-gray-50">
-                  <div className="flex gap-4 text-sm text-gray-600 font-medium">
-                    <div className="flex items-center gap-1">
-                      <Bed size={14} className="text-gray-400" />
+                <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+                  <div className="flex gap-4 text-xs sm:text-sm text-gray-600 font-semibold">
+                    <div className="flex items-center gap-1.5">
+                      <Bed size={15} className="text-gray-400" />
                       <span>{prop.beds}</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Bath size={14} className="text-gray-400" />
+                    <div className="flex items-center gap-1.5">
+                      <Bath size={15} className="text-gray-400" />
                       <span>{prop.baths}</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Maximize size={14} className="text-gray-400" />
+                    <div className="flex items-center gap-1.5">
+                      <Maximize size={15} className="text-gray-400" />
                       <span>{prop.sqm}m²</span>
                     </div>
                   </div>
-                  <ChevronRight size={16} className="text-gray-300" />
+                  <ChevronRight size={18} className="text-gray-300 group-hover:text-vinotinto group-hover:translate-x-1 transition-all" />
                 </div>
               </div>
             </motion.div>
@@ -844,12 +851,15 @@ export default function Inventario() {
         )}
       </motion.div>
 
-      <button
+      <motion.button
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
         onClick={() => router.push('/inventario/registro')}
-        className="fixed bottom-[calc(70px+env(safe-area-inset-bottom)+1rem)] right-5 w-14 h-14 bg-vinotinto text-white rounded-full flex items-center justify-center shadow-lg shadow-vinotinto/30 active:scale-90 transition-transform z-20"
+        className="fixed bottom-[calc(70px+env(safe-area-inset-bottom)+1rem)] right-5 w-14 h-14 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-full flex items-center justify-center shadow-xl shadow-vinotinto/35 border border-white/20 active:scale-90 transition-all z-20"
+        title="Registrar nuevo inmueble"
       >
         <Plus size={28} />
-      </button>
+      </motion.button>
 
       {/* MODAL DE EXPORTACIÓN PERSONALIZADA */}
       <AnimatePresence>

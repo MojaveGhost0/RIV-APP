@@ -262,29 +262,38 @@ export default function Perfil() {
       initial="hidden"
       animate="visible"
       variants={containerVariants}
-      className="bg-gray-50 min-h-[100dvh] page-content"
+      className="bg-[#F3F4F6] min-h-[100dvh] page-content relative overflow-hidden"
     >
-      {/* HEADER */}
+      {/* Luces de fondo ambientales de lujo */}
+      <div className="absolute top-0 right-0 w-80 h-80 bg-vinotinto/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+      <div className="absolute top-1/2 left-0 w-72 h-72 bg-dorado/5 rounded-full blur-3xl pointer-events-none -ml-20" />
+
+      {/* HEADER CON GLASSMORPHISM */}
       <motion.header
         variants={itemVariants}
-        className="bg-white px-5 pt-8 pb-6 shadow-sm"
+        className="bg-white/85 backdrop-blur-md px-5 pt-8 pb-6 border-b border-gray-100 shadow-xs relative z-10 transition-all"
       >
-        <h1 className="text-2xl font-bold text-vinotinto mb-5">Mi Perfil</h1>
+        <div className="flex justify-between items-center mb-5">
+          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Mi Perfil</h1>
+          <BrandLogo size="xs" className="shrink-0 drop-shadow-xs" />
+        </div>
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-vinotinto flex items-center justify-center shrink-0 shadow-md">
-            <User size={32} className="text-white" />
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-vinotinto-dark via-vinotinto to-vinotinto-light flex items-center justify-center shrink-0 shadow-lg shadow-vinotinto/25 border border-white/20">
+            <User size={30} className="text-white drop-shadow-xs" />
           </div>
           <div>
-            <p className="font-bold text-xl text-gray-800">{user?.nombre}</p>
-            <p className="text-sm text-gray-500">{user?.email}</p>
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${
-                isAdmin ? 'bg-vinotinto/10 text-vinotinto' : 'bg-blue-50 text-blue-600'
+            <p className="font-extrabold text-xl text-gray-900 leading-tight">{user?.nombre}</p>
+            <p className="text-xs sm:text-sm text-gray-500 font-medium">{user?.email}</p>
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border shadow-xs ${
+                isAdmin
+                  ? 'bg-dorado/15 text-dorado-dark border-dorado/30'
+                  : 'bg-vinotinto/10 text-vinotinto border-vinotinto/20'
               }`}>
-                <Shield size={11} /> {user?.rol}
+                {isAdmin ? <Sparkles size={11} className="text-dorado" /> : <Shield size={11} />} {user?.rol}
               </span>
               {user?.telefono && (
-                <span className="inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="inline-flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
                   <Phone size={10} /> {user.telefono}
                 </span>
               )}
@@ -293,20 +302,20 @@ export default function Perfil() {
         </div>
       </motion.header>
 
-      <div className="p-4 space-y-4">
-        {/* STATS */}
+      <div className="p-4 space-y-4 relative z-10">
+        {/* STATS CON GLASSMORPHISM */}
         <motion.div variants={itemVariants} className="grid grid-cols-3 gap-3">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
-            <p className="text-3xl font-black text-vinotinto">{misCaptaciones.length}</p>
-            <p className="text-[11px] text-gray-500 font-medium mt-1 leading-tight">Captaciones</p>
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xs p-4 text-center hover:shadow-md hover:border-vinotinto/30 transition-all">
+            <p className="text-3xl font-black text-vinotinto tracking-tight">{misCaptaciones.length}</p>
+            <p className="text-[11px] text-gray-500 font-bold mt-1 leading-tight">Captaciones</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
-            <p className="text-3xl font-black text-blue-500">{misCitasPendientes.length}</p>
-            <p className="text-[11px] text-gray-500 font-medium mt-1 leading-tight">Citas Pend.</p>
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xs p-4 text-center hover:shadow-md hover:border-blue-200 transition-all">
+            <p className="text-3xl font-black text-blue-600 tracking-tight">{misCitasPendientes.length}</p>
+            <p className="text-[11px] text-gray-500 font-bold mt-1 leading-tight">Citas Pend.</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
-            <p className="text-3xl font-black text-green-600">{misVentas}</p>
-            <p className="text-[11px] text-gray-500 font-medium mt-1 leading-tight">Ventas</p>
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xs p-4 text-center hover:shadow-md hover:border-dorado/40 transition-all">
+            <p className="text-3xl font-black text-dorado-dark tracking-tight">{misVentas}</p>
+            <p className="text-[11px] text-gray-500 font-bold mt-1 leading-tight">Ventas</p>
           </div>
         </motion.div>
 
