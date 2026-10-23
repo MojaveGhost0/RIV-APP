@@ -287,7 +287,7 @@ export default function GestorCitas() {
               exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.18 } }}
               whileHover={{ y: -2 }}
               key={cita.id} 
-              className="bg-white/90 backdrop-blur-md p-4.5 rounded-2xl border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_10px_28px_rgba(128,0,32,0.06)] hover:border-dorado/30 relative overflow-hidden transition-all group"
+              className="bg-white/90 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_10px_28px_rgba(128,0,32,0.06)] hover:border-dorado/30 relative overflow-hidden transition-all group"
             >
               {/* Barra lateral indicadora de tipo con gradiente */}
               <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl bg-gradient-to-b ${gradiente}`}></div>

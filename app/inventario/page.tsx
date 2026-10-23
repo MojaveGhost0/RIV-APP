@@ -799,7 +799,7 @@ export default function Inventario() {
               </div>
 
               {/* INFO */}
-              <div className="p-4.5">
+              <div className="p-4 sm:p-5">
                 <div className="flex justify-between items-start mb-1.5">
                   <h3 className="font-bold text-base text-gray-900 leading-tight flex-1 pr-2 group-hover:text-vinotinto transition-colors">
                     {prop.title}

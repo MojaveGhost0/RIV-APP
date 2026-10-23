@@ -408,7 +408,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
         </motion.div>
 
         {/* Ubicación */}
-        <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-md rounded-2xl p-4.5 border border-gray-100 shadow-xs space-y-3">
+        <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-gray-100 shadow-xs space-y-3">
           <div className="flex items-center gap-2 text-gray-600">
             <MapPin size={17} className="text-vinotinto shrink-0" />
             <p className="text-sm font-medium">{property.location}</p>

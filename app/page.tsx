@@ -129,7 +129,7 @@ export default function Dashboard() {
           whileHover={{ y: -3, scale: 1.01 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => router.push('/citas')}
-          className="bg-white/85 backdrop-blur-md p-4.5 rounded-2xl border border-gray-200/70 shadow-xs hover:shadow-lg hover:border-vinotinto/40 transition-all cursor-pointer flex flex-col justify-between group"
+          className="bg-white/85 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-gray-200/70 shadow-xs hover:shadow-lg hover:border-vinotinto/40 transition-all cursor-pointer flex flex-col justify-between group"
         >
           <div className="flex items-center justify-between mb-3">
             <div className="bg-vinotinto/10 p-2.5 rounded-xl text-vinotinto group-hover:bg-vinotinto group-hover:text-white transition-colors duration-200">
@@ -150,7 +150,7 @@ export default function Dashboard() {
           whileHover={{ y: -3, scale: 1.01 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => router.push('/inventario')}
-          className="bg-white/85 backdrop-blur-md p-4.5 rounded-2xl border border-dorado/30 shadow-xs shadow-dorado/5 hover:shadow-lg hover:border-dorado/60 transition-all cursor-pointer flex flex-col justify-between group"
+          className="bg-white/85 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-dorado/30 shadow-xs shadow-dorado/5 hover:shadow-lg hover:border-dorado/60 transition-all cursor-pointer flex flex-col justify-between group"
         >
           <div className="flex items-center justify-between mb-3">
             <div className="bg-dorado/15 p-2.5 rounded-xl text-dorado-dark group-hover:bg-dorado group-hover:text-white transition-colors duration-200">

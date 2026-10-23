@@ -661,25 +661,25 @@ export default function CRMPage() {
                       onClick={() => setExpandedClient(expandedClient === client.name ? null : client.name)}
                       className="w-full flex items-center justify-between p-4 bg-white hover:bg-gray-50 transition-colors"
                     >
-                      <div className="flex items-center gap-3 text-left">
+                      <div className="flex items-center gap-3 text-left min-w-0 flex-1 pr-2">
                         <div className="w-10 h-10 rounded-full bg-vinotinto/10 flex items-center justify-center shrink-0">
                           <User size={20} className="text-vinotinto" />
                         </div>
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-bold text-gray-800 text-sm">{client.name}</h3>
+                            <h3 className="font-bold text-gray-800 text-sm truncate max-w-full">{client.name}</h3>
                             {clientProps.length > 0 && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-vinotinto/10 text-vinotinto flex items-center gap-1">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-vinotinto/10 text-vinotinto flex items-center gap-1 shrink-0">
                                 <Home size={10} /> {clientProps.length} inmueble{clientProps.length > 1 ? 's' : ''}
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-400 mt-0.5">
+                          <p className="text-xs text-gray-400 mt-0.5 truncate">
                             {client.history.length} interacción(es) · Última: {new Date(client.lastInteraction).toLocaleDateString('es-VE')}
                           </p>
                         </div>
                       </div>
-                      <div className="text-gray-400">
+                      <div className="text-gray-400 shrink-0 ml-2">
                         {expandedClient === client.name ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                       </div>
                     </button>
