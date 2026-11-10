@@ -1189,7 +1189,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
           </div>
         </div>
 
-        {/* ── Instagram – Plantilla A: Clean Dark 9:16 (Ultra-Minimalista) ──── */}
+        {/* ── Instagram – Plantilla A: Clean Dark 9:16 (Lujo & Botones Centrados) ──── */}
         <div
           ref={igARef}
           style={{
@@ -1202,7 +1202,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             boxSizing: 'border-box'
           }}
         >
-          {/* FOTO FULL BLEED — sin distorsión */}
+          {/* FOTO FULL BLEED */}
           <img
             src={base64Img || property.image}
             crossOrigin="anonymous"
@@ -1217,123 +1217,221 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             alt=""
           />
 
-          {/* DEGRADADO SUTIL SOLO EN LA BASE para contraste del texto */}
+          {/* DEGRADADO SUPERIOR para contraste del logo y precio */}
           <div style={{
             position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.35) 35%, transparent 60%)',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '360px',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)',
             pointerEvents: 'none'
           }} />
 
-          {/* BADGE SUPERIOR DERECHO — Precio o Estatus */}
-          <div style={{
-            position: 'absolute',
-            top: 56,
-            right: 56,
-            zIndex: 20,
-            background: '#8B0000',
-            padding: '18px 36px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0'
-          }}>
-            <span style={{
-              color: '#FFFFFF',
-              fontWeight: 900,
-              fontSize: '36px',
-              letterSpacing: '1px',
-              textTransform: 'uppercase',
-              lineHeight: 1
-            }}>
-              {property.status === 'Vendida'
-                ? 'VENDIDO'
-                : `$${fmt(property.price)} USD`}
-            </span>
-          </div>
-
-          {/* BLOQUE INFERIOR MINIMALISTA — directo sobre la foto */}
+          {/* DEGRADADO INFERIOR PROFUNDO para máxima legibilidad */}
           <div style={{
             position: 'absolute',
             bottom: 0,
             left: 0,
             right: 0,
-            padding: '60px 60px 72px',
-            zIndex: 10,
+            height: '1100px',
+            background: 'linear-gradient(to top, rgba(5,5,5,0.98) 0%, rgba(10,10,10,0.92) 40%, rgba(10,10,10,0.55) 75%, transparent 100%)',
+            pointerEvents: 'none'
+          }} />
+
+          {/* BARRA SUPERIOR: LOGO Y PRECIO */}
+          <div style={{
+            position: 'absolute',
+            top: 56,
+            left: 56,
+            right: 56,
+            zIndex: 20,
             display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'flex-end',
-            gap: '28px'
+            justifyContent: 'space-between',
+            alignItems: 'center'
           }}>
-            {/* Ícono izquierdo — Casa vectorial */}
-            <div style={{ flexShrink: 0, paddingBottom: '8px' }}>
-              <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
-                <path d="M9 21V12h6v9" />
-              </svg>
+            {/* BADGE DEL LOGO CORPORATIVO RIV */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              background: 'rgba(10, 10, 10, 0.85)',
+              border: '1.5px solid rgba(212, 175, 55, 0.6)',
+              borderRadius: '24px',
+              padding: '12px 26px',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
+            }}>
+              <img
+                src="/logo-riv.svg"
+                alt="RIV"
+                style={{ height: '46px', objectFit: 'contain' }}
+                crossOrigin="anonymous"
+              />
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <span style={{ color: '#D4AF37', fontWeight: 900, fontSize: '20px', letterSpacing: '2px', lineHeight: 1.1 }}>
+                  RIV MARGARITA
+                </span>
+                <span style={{ color: '#FFFFFF', fontWeight: 800, fontSize: '13px', letterSpacing: '3px', lineHeight: 1.2 }}>
+                  PREMIER
+                </span>
+              </div>
             </div>
 
-            {/* Textos centrales */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {/* Línea 1 — Título / Ubicación */}
-              <p style={{
+            {/* BADGE DE PRECIO O ESTATUS */}
+            <div style={{
+              background: '#800020',
+              border: '1.5px solid rgba(255, 255, 255, 0.25)',
+              borderRadius: '24px',
+              padding: '16px 36px',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <span style={{
                 color: '#FFFFFF',
-                fontSize: '32px',
-                fontWeight: 500,
-                letterSpacing: '2px',
+                fontWeight: 900,
+                fontSize: '36px',
+                letterSpacing: '1px',
                 textTransform: 'uppercase',
-                margin: '0 0 10px 0',
-                lineHeight: 1.2,
-                opacity: 0.9
+                lineHeight: 1
               }}>
-                {property.location.toUpperCase()}
-              </p>
+                {property.status === 'Vendida'
+                  ? 'VENDIDO'
+                  : `$${fmt(property.price)} USD`}
+              </span>
+            </div>
+          </div>
 
-              {/* Línea 2 — Tipo de inmueble + Atributos */}
-              <p style={{
-                color: '#FFFFFF',
-                fontSize: '46px',
+          {/* TARJETA INFERIOR CONTENEDORA */}
+          <div style={{
+            position: 'absolute',
+            bottom: 60,
+            left: 56,
+            right: 56,
+            zIndex: 10,
+            background: 'rgba(15, 15, 15, 0.88)',
+            border: '1.5px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: '36px',
+            padding: '44px 44px 36px',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.7)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
+            {/* Header de la tarjeta: Tag y Ubicación */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <span style={{
+                background: 'rgba(212, 175, 55, 0.18)',
+                color: '#D4AF37',
+                border: '1px solid #D4AF37',
+                borderRadius: '12px',
+                padding: '8px 20px',
+                fontSize: '18px',
                 fontWeight: 800,
-                textTransform: 'uppercase',
-                margin: '0 0 16px 0',
-                lineHeight: 1.1,
-                letterSpacing: '-0.5px'
+                letterSpacing: '2px',
+                textTransform: 'uppercase'
               }}>
-                {property.propertyType
-                  ? `${property.propertyType.toUpperCase()} ${property.status === 'Vendida' ? 'VENDIDA' : 'EN VENTA'}`
-                  : 'EN VENTA'}
-                {validSpecs.length > 0 && (
-                  <span style={{ fontSize: '34px', fontWeight: 700, opacity: 0.85 }}>
-                    {' · '}{validSpecs.map(s => s.v).join(' | ')}
-                  </span>
-                )}
-              </p>
-
-              {/* Línea 3 — RIF Corporativo */}
-              <p style={{
-                color: 'rgba(255,255,255,0.65)',
+                ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'PROPIEDAD EXCLUSIVA'}
+              </span>
+              <span style={{
+                color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '22px',
-                fontStyle: 'italic',
-                fontWeight: 400,
-                margin: 0,
-                letterSpacing: '0.5px'
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
               }}>
-                J-11055496-2
-              </p>
+                📍 {property.location.toUpperCase()}
+              </span>
             </div>
 
-            {/* Flecha derecha */}
-            <div style={{ flexShrink: 0, paddingBottom: '8px' }}>
-              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
+            {/* Título de la propiedad */}
+            <h1 style={{
+              color: '#FFFFFF',
+              fontSize: '44px',
+              fontWeight: 900,
+              margin: 0,
+              lineHeight: 1.15,
+              letterSpacing: '-0.5px'
+            }}>
+              {property.title}
+            </h1>
+
+            {/* BOTONES DE ATRIBUTOS (SPECS) CENTRADOS */}
+            {validSpecs.length > 0 && (
+              <div style={{
+                display: 'flex',
+                gap: '16px',
+                width: '100%'
+              }}>
+                {validSpecs.map(s => (
+                  <div
+                    key={s.label}
+                    style={{
+                      flex: 1,
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1.5px solid rgba(212, 175, 55, 0.35)',
+                      borderRadius: '20px',
+                      padding: '20px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span style={{ fontSize: '32px', lineHeight: 1, marginBottom: '8px' }}>{s.emoji}</span>
+                    <span style={{ color: '#FFFFFF', fontSize: '28px', fontWeight: 900, lineHeight: 1.1 }}>{s.v}</span>
+                    <span style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginTop: '6px' }}>{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Footer de la tarjeta: Asesor y RIF */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+              paddingTop: '20px',
+              marginTop: '4px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  background: '#800020',
+                  border: '1px solid #D4AF37',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#FFFFFF',
+                  fontSize: '18px',
+                  fontWeight: 900
+                }}>
+                  {property.captador ? property.captador.charAt(0).toUpperCase() : 'R'}
+                </div>
+                <div>
+                  <p style={{ color: 'rgba(255, 255, 255, 0.55)', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', margin: 0, letterSpacing: '1px' }}>ASESOR INMOBILIARIO</p>
+                  <p style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: 800, margin: '2px 0 0' }}>{property.captador || 'RIV Premier'}</p>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 800, letterSpacing: '1.5px', margin: 0, textTransform: 'uppercase' }}>RIV MARGARITA PREMIER</p>
+                <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', margin: '2px 0 0', letterSpacing: '0.5px' }}>RIF J-11055496-2</p>
+              </div>
             </div>
           </div>
         </div>
 
 
 
-        {/* ── Instagram – Plantilla B: Clean Gold 9:16 (Ultra-Minimalista) ───── */}
+        {/* ── Instagram – Plantilla B: Clean Gold 9:16 (Lujo & Botones Centrados) ───── */}
         <div
           ref={igBRef}
           style={{
@@ -1346,7 +1444,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             boxSizing: 'border-box'
           }}
         >
-          {/* FOTO FULL BLEED — sin distorsión */}
+          {/* FOTO FULL BLEED */}
           <img
             src={base64Img || property.image}
             crossOrigin="anonymous"
@@ -1361,122 +1459,220 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             alt=""
           />
 
-          {/* DEGRADADO SUTIL SOLO EN LA BASE */}
+          {/* DEGRADADO SUPERIOR */}
           <div style={{
             position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.35) 35%, transparent 60%)',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '360px',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)',
             pointerEvents: 'none'
           }} />
 
-          {/* BADGE SUPERIOR DERECHO — Dorado */}
-          <div style={{
-            position: 'absolute',
-            top: 56,
-            right: 56,
-            zIndex: 20,
-            background: '#D4AF37',
-            padding: '18px 36px',
-            display: 'flex',
-            alignItems: 'center'
-          }}>
-            <span style={{
-              color: '#000000',
-              fontWeight: 900,
-              fontSize: '36px',
-              letterSpacing: '1px',
-              textTransform: 'uppercase',
-              lineHeight: 1
-            }}>
-              {property.status === 'Vendida'
-                ? 'VENDIDO'
-                : `$${fmt(property.price)} USD`}
-            </span>
-          </div>
-
-          {/* BLOQUE INFERIOR MINIMALISTA */}
+          {/* DEGRADADO INFERIOR PROFUNDO */}
           <div style={{
             position: 'absolute',
             bottom: 0,
             left: 0,
             right: 0,
-            padding: '60px 60px 72px',
-            zIndex: 10,
+            height: '1100px',
+            background: 'linear-gradient(to top, rgba(12,3,6,0.98) 0%, rgba(20,5,10,0.92) 40%, rgba(10,5,8,0.55) 75%, transparent 100%)',
+            pointerEvents: 'none'
+          }} />
+
+          {/* BARRA SUPERIOR: LOGO Y PRECIO */}
+          <div style={{
+            position: 'absolute',
+            top: 56,
+            left: 56,
+            right: 56,
+            zIndex: 20,
             display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'flex-end',
-            gap: '28px'
+            justifyContent: 'space-between',
+            alignItems: 'center'
           }}>
-            {/* Ícono izquierdo */}
-            <div style={{ flexShrink: 0, paddingBottom: '8px' }}>
-              <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
-                <path d="M9 21V12h6v9" />
-              </svg>
+            {/* BADGE DEL LOGO CORPORATIVO RIV - Variante Vinotinto & Oro */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              background: '#800020',
+              border: '1.5px solid #D4AF37',
+              borderRadius: '24px',
+              padding: '12px 26px',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
+            }}>
+              <img
+                src="/logo-riv.svg"
+                alt="RIV"
+                style={{ height: '46px', objectFit: 'contain' }}
+                crossOrigin="anonymous"
+              />
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <span style={{ color: '#D4AF37', fontWeight: 900, fontSize: '20px', letterSpacing: '2px', lineHeight: 1.1 }}>
+                  RIV MARGARITA
+                </span>
+                <span style={{ color: '#FFFFFF', fontWeight: 800, fontSize: '13px', letterSpacing: '3px', lineHeight: 1.2 }}>
+                  PREMIER
+                </span>
+              </div>
             </div>
 
-            {/* Textos centrales */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {/* Línea 1 — Ubicación */}
-              <p style={{
-                color: '#FFFFFF',
-                fontSize: '32px',
-                fontWeight: 500,
+            {/* BADGE DE PRECIO DORADO */}
+            <div style={{
+              background: '#D4AF37',
+              border: '1.5px solid #FFFFFF',
+              borderRadius: '24px',
+              padding: '16px 36px',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <span style={{
+                color: '#000000',
+                fontWeight: 900,
+                fontSize: '36px',
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+                lineHeight: 1
+              }}>
+                {property.status === 'Vendida'
+                  ? 'VENDIDO'
+                  : `$${fmt(property.price)} USD`}
+              </span>
+            </div>
+          </div>
+
+          {/* TARJETA INFERIOR CONTENEDORA (Estilo Dorado & Vinotinto) */}
+          <div style={{
+            position: 'absolute',
+            bottom: 60,
+            left: 56,
+            right: 56,
+            zIndex: 10,
+            background: 'rgba(26, 6, 12, 0.90)',
+            border: '1.5px solid #D4AF37',
+            borderRadius: '36px',
+            padding: '44px 44px 36px',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.8)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
+            {/* Header: Tag y Ubicación */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <span style={{
+                background: '#D4AF37',
+                color: '#000000',
+                borderRadius: '12px',
+                padding: '8px 20px',
+                fontSize: '18px',
+                fontWeight: 900,
                 letterSpacing: '2px',
-                textTransform: 'uppercase',
-                margin: '0 0 10px 0',
-                lineHeight: 1.2,
-                opacity: 0.9
+                textTransform: 'uppercase'
               }}>
-                {property.location.toUpperCase()}
-              </p>
-
-              {/* Línea 2 — Tipo + Atributos en dorado */}
-              <p style={{
+                ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'PROPIEDAD EXCLUSIVA'}
+              </span>
+              <span style={{
                 color: '#D4AF37',
-                fontSize: '46px',
-                fontWeight: 800,
-                textTransform: 'uppercase',
-                margin: '0 0 16px 0',
-                lineHeight: 1.1,
-                letterSpacing: '-0.5px'
-              }}>
-                {property.propertyType
-                  ? `${property.propertyType.toUpperCase()} ${property.status === 'Vendida' ? 'VENDIDA' : 'EN VENTA'}`
-                  : 'EN VENTA'}
-                {validSpecs.length > 0 && (
-                  <span style={{ fontSize: '34px', fontWeight: 700, opacity: 0.85, color: '#FFFFFF' }}>
-                    {' · '}{validSpecs.map(s => s.v).join(' | ')}
-                  </span>
-                )}
-              </p>
-
-              {/* Línea 3 — RIF Corporativo */}
-              <p style={{
-                color: 'rgba(255,255,255,0.65)',
                 fontSize: '22px',
-                fontStyle: 'italic',
-                fontWeight: 400,
-                margin: 0,
-                letterSpacing: '0.5px'
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
               }}>
-                J-11055496-2
-              </p>
+                📍 {property.location.toUpperCase()}
+              </span>
             </div>
 
-            {/* Flecha derecha en dorado */}
-            <div style={{ flexShrink: 0, paddingBottom: '8px' }}>
-              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
+            {/* Título de la propiedad */}
+            <h1 style={{
+              color: '#FFFFFF',
+              fontSize: '44px',
+              fontWeight: 900,
+              margin: 0,
+              lineHeight: 1.15,
+              letterSpacing: '-0.5px'
+            }}>
+              {property.title}
+            </h1>
+
+            {/* BOTONES DE ATRIBUTOS (SPECS) CENTRADOS DORADOS */}
+            {validSpecs.length > 0 && (
+              <div style={{
+                display: 'flex',
+                gap: '16px',
+                width: '100%'
+              }}>
+                {validSpecs.map(s => (
+                  <div
+                    key={s.label}
+                    style={{
+                      flex: 1,
+                      background: 'rgba(212, 175, 55, 0.12)',
+                      border: '1.5px solid #D4AF37',
+                      borderRadius: '20px',
+                      padding: '20px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span style={{ fontSize: '32px', lineHeight: 1, marginBottom: '8px' }}>{s.emoji}</span>
+                    <span style={{ color: '#FFFFFF', fontSize: '28px', fontWeight: 900, lineHeight: 1.1 }}>{s.v}</span>
+                    <span style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginTop: '6px' }}>{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Footer de la tarjeta: Asesor y RIF */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderTop: '1px solid rgba(212, 175, 55, 0.3)',
+              paddingTop: '20px',
+              marginTop: '4px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  background: '#D4AF37',
+                  border: '1px solid #FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#000000',
+                  fontSize: '18px',
+                  fontWeight: 900
+                }}>
+                  {property.captador ? property.captador.charAt(0).toUpperCase() : 'R'}
+                </div>
+                <div>
+                  <p style={{ color: 'rgba(212, 175, 55, 0.7)', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', margin: 0, letterSpacing: '1px' }}>ASESOR INMOBILIARIO</p>
+                  <p style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: 800, margin: '2px 0 0' }}>{property.captador || 'RIV Premier'}</p>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 800, letterSpacing: '1.5px', margin: 0, textTransform: 'uppercase' }}>RIV MARGARITA PREMIER</p>
+                <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', margin: '2px 0 0', letterSpacing: '0.5px' }}>RIF J-11055496-2</p>
+              </div>
             </div>
           </div>
         </div>
 
 
 
-        {/* ── WhatsApp – Plantilla A: Clean Full Photo 1:1 (Ultra-Minimalista) ─ */}
+        {/* ── WhatsApp – Plantilla A: Clean Full Photo 1:1 (Lujo & Botones Centrados) ─ */}
         <div
           ref={waARef}
           style={{
@@ -1485,10 +1681,11 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             height: '1080px',
             background: '#0a0a0a',
             fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            boxSizing: 'border-box'
           }}
         >
-          {/* FOTO FULL BLEED sin distorsión */}
+          {/* FOTO FULL BLEED */}
           <img
             src={base64Img || property.image}
             crossOrigin="anonymous"
@@ -1503,111 +1700,193 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             alt=""
           />
 
-          {/* DEGRADADO SUTIL SOLO EN LA BASE */}
+          {/* DEGRADADO SUPERIOR */}
           <div style={{
             position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.32) 35%, transparent 60%)',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '240px',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%)',
             pointerEvents: 'none'
           }} />
 
-          {/* BADGE SUPERIOR DERECHO — Precio */}
-          <div style={{
-            position: 'absolute',
-            top: 48,
-            right: 48,
-            zIndex: 20,
-            background: '#8B0000',
-            padding: '16px 32px'
-          }}>
-            <span style={{
-              color: '#FFFFFF',
-              fontWeight: 900,
-              fontSize: '34px',
-              letterSpacing: '0.5px',
-              textTransform: 'uppercase',
-              lineHeight: 1
-            }}>
-              {property.status === 'Vendida'
-                ? 'VENDIDO'
-                : `$${fmt(property.price)} USD`}
-            </span>
-          </div>
-
-          {/* BLOQUE INFERIOR MINIMALISTA */}
+          {/* DEGRADADO INFERIOR PROFUNDO */}
           <div style={{
             position: 'absolute',
             bottom: 0,
             left: 0,
             right: 0,
-            padding: '52px 52px 60px',
-            zIndex: 10,
+            height: '680px',
+            background: 'linear-gradient(to top, rgba(5,5,5,0.98) 0%, rgba(10,10,10,0.90) 45%, rgba(10,10,10,0.4) 80%, transparent 100%)',
+            pointerEvents: 'none'
+          }} />
+
+          {/* BARRA SUPERIOR: LOGO Y PRECIO */}
+          <div style={{
+            position: 'absolute',
+            top: 40,
+            left: 40,
+            right: 40,
+            zIndex: 20,
             display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'flex-end',
-            gap: '24px'
+            justifyContent: 'space-between',
+            alignItems: 'center'
           }}>
-            {/* Ícono izquierdo */}
-            <div style={{ flexShrink: 0, paddingBottom: '6px' }}>
-              <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
-                <path d="M9 21V12h6v9" />
-              </svg>
+            {/* LOGO BADGE */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              background: 'rgba(10, 10, 10, 0.85)',
+              border: '1.5px solid rgba(212, 175, 55, 0.6)',
+              borderRadius: '20px',
+              padding: '10px 22px',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.5)'
+            }}>
+              <img
+                src="/logo-riv.svg"
+                alt="RIV"
+                style={{ height: '38px', objectFit: 'contain' }}
+                crossOrigin="anonymous"
+              />
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <span style={{ color: '#D4AF37', fontWeight: 900, fontSize: '17px', letterSpacing: '1.5px', lineHeight: 1.1 }}>
+                  RIV MARGARITA
+                </span>
+                <span style={{ color: '#FFFFFF', fontWeight: 800, fontSize: '11px', letterSpacing: '2.5px', lineHeight: 1.2 }}>
+                  PREMIER
+                </span>
+              </div>
             </div>
 
-            {/* Textos centrales */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{
+            {/* PRECIO BADGE */}
+            <div style={{
+              background: '#800020',
+              border: '1.5px solid rgba(255, 255, 255, 0.25)',
+              borderRadius: '20px',
+              padding: '12px 28px',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.5)'
+            }}>
+              <span style={{
                 color: '#FFFFFF',
+                fontWeight: 900,
                 fontSize: '28px',
-                fontWeight: 500,
-                letterSpacing: '2px',
+                letterSpacing: '0.5px',
                 textTransform: 'uppercase',
-                margin: '0 0 8px 0',
-                lineHeight: 1.2,
-                opacity: 0.9
+                lineHeight: 1
               }}>
-                {property.location.toUpperCase()}
-              </p>
-              <p style={{
-                color: '#FFFFFF',
-                fontSize: '42px',
+                {property.status === 'Vendida'
+                  ? 'VENDIDO'
+                  : `$${fmt(property.price)} USD`}
+              </span>
+            </div>
+          </div>
+
+          {/* TARJETA INFERIOR CONTENEDORA */}
+          <div style={{
+            position: 'absolute',
+            bottom: 40,
+            left: 40,
+            right: 40,
+            zIndex: 10,
+            background: 'rgba(14, 14, 14, 0.90)',
+            border: '1.5px solid rgba(255, 255, 255, 0.16)',
+            borderRadius: '28px',
+            padding: '30px 32px 24px',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.7)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '18px'
+          }}>
+            {/* Header: Tag & Ubicación */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{
+                background: 'rgba(212, 175, 55, 0.18)',
+                color: '#D4AF37',
+                border: '1px solid #D4AF37',
+                borderRadius: '10px',
+                padding: '6px 14px',
+                fontSize: '15px',
                 fontWeight: 800,
-                textTransform: 'uppercase',
-                margin: '0 0 12px 0',
-                lineHeight: 1.1
+                letterSpacing: '1.5px',
+                textTransform: 'uppercase'
               }}>
-                {property.propertyType
-                  ? `${property.propertyType.toUpperCase()} ${property.status === 'Vendida' ? 'VENDIDA' : 'EN VENTA'}`
-                  : 'EN VENTA'}
-                {validSpecs.length > 0 && (
-                  <span style={{ fontSize: '30px', fontWeight: 700, opacity: 0.85 }}>
-                    {' · '}{validSpecs.map(s => s.v).join(' | ')}
-                  </span>
-                )}
-              </p>
-              <p style={{
-                color: 'rgba(255,255,255,0.6)',
-                fontSize: '20px',
-                fontStyle: 'italic',
-                fontWeight: 400,
-                margin: 0
+                ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'EN VENTA'}
+              </span>
+              <span style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '18px',
+                fontWeight: 600
               }}>
-                J-11055496-2
-              </p>
+                📍 {property.location.toUpperCase()}
+              </span>
             </div>
 
-            {/* Flecha derecha */}
-            <div style={{ flexShrink: 0, paddingBottom: '6px' }}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
+            {/* Título de la propiedad */}
+            <h2 style={{
+              color: '#FFFFFF',
+              fontSize: '32px',
+              fontWeight: 900,
+              margin: 0,
+              lineHeight: 1.15
+            }}>
+              {property.title}
+            </h2>
+
+            {/* BOTONES DE ATRIBUTOS (SPECS) CENTRADOS */}
+            {validSpecs.length > 0 && (
+              <div style={{
+                display: 'flex',
+                gap: '14px',
+                width: '100%'
+              }}>
+                {validSpecs.map(s => (
+                  <div
+                    key={s.label}
+                    style={{
+                      flex: 1,
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1.5px solid rgba(212, 175, 55, 0.35)',
+                      borderRadius: '16px',
+                      padding: '14px 10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span style={{ fontSize: '26px', lineHeight: 1, marginBottom: '4px' }}>{s.emoji}</span>
+                    <span style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: 900, lineHeight: 1.1 }}>{s.v}</span>
+                    <span style={{ color: '#D4AF37', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px' }}>{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Footer de la tarjeta */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+              paddingTop: '14px'
+            }}>
+              <p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: 700, margin: 0 }}>
+                👤 Asesor: {property.captador || 'RIV Premier'}
+              </p>
+              <p style={{ color: 'rgba(255, 255, 255, 0.55)', fontSize: '12px', margin: 0, letterSpacing: '0.5px' }}>
+                RIV MARGARITA PREMIER · J-11055496-2
+              </p>
             </div>
           </div>
         </div>
 
-        {/* ── WhatsApp – Plantilla B: Clean Split 1:1 (Ultra-Minimalista) ──────── */}
+
+
+        {/* ── WhatsApp – Plantilla B: Clean Split 1:1 (Lujo & Botones Centrados) ──────── */}
         <div
           ref={waBRef}
           style={{
@@ -1617,11 +1896,12 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             overflow: 'hidden',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            boxSizing: 'border-box'
           }}
         >
-          {/* FOTO SUPERIOR — 58% del canvas, sin distorsión */}
-          <div style={{ position: 'relative', height: '626px', flexShrink: 0, overflow: 'hidden' }}>
+          {/* FOTO SUPERIOR — 580px */}
+          <div style={{ position: 'relative', height: '580px', flexShrink: 0, overflow: 'hidden' }}>
             <img
               src={base64Img || property.image}
               crossOrigin="anonymous"
@@ -1634,109 +1914,173 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               }}
               alt=""
             />
-            {/* Gradiente sutil sobre la foto */}
+            {/* Gradientes sobre la foto */}
             <div style={{
               position: 'absolute',
               inset: 0,
-              background: 'linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.12) 100%)'
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 40%, rgba(0,0,0,0.3) 100%)'
             }} />
-            {/* BADGE SUPERIOR DERECHO */}
+
+            {/* BARRA SUPERIOR SOBRE FOTO */}
             <div style={{
               position: 'absolute',
               top: 36,
+              left: 36,
               right: 36,
-              background: '#8B0000',
-              padding: '14px 28px',
-              zIndex: 10
+              zIndex: 10,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
-              <span style={{
-                color: '#FFFFFF',
-                fontWeight: 900,
-                fontSize: '28px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                lineHeight: 1
+              {/* LOGO BADGE */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                background: 'rgba(255, 255, 255, 0.95)',
+                border: '1.5px solid #800020',
+                borderRadius: '18px',
+                padding: '8px 18px',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
               }}>
-                {property.status === 'Vendida' ? 'VENDIDO' : 'EN VENTA'}
-              </span>
+                <img
+                  src="/logo-riv.svg"
+                  alt="RIV"
+                  style={{ height: '32px', objectFit: 'contain' }}
+                  crossOrigin="anonymous"
+                />
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <span style={{ color: '#800020', fontWeight: 900, fontSize: '15px', letterSpacing: '1px', lineHeight: 1.1 }}>
+                    RIV MARGARITA
+                  </span>
+                  <span style={{ color: '#D4AF37', fontWeight: 800, fontSize: '10px', letterSpacing: '2px', lineHeight: 1.2 }}>
+                    PREMIER
+                  </span>
+                </div>
+              </div>
+
+              {/* TAG ESTADO */}
+              <div style={{
+                background: '#800020',
+                border: '1.5px solid #FFFFFF',
+                borderRadius: '18px',
+                padding: '10px 22px',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
+              }}>
+                <span style={{
+                  color: '#FFFFFF',
+                  fontWeight: 900,
+                  fontSize: '20px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  lineHeight: 1
+                }}>
+                  {property.status === 'Vendida' ? 'VENDIDO' : 'EN VENTA'}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* PANEL INFERIOR BLANCO — Info limpia */}
+          {/* PANEL INFERIOR EDITORIAL BLANCO — 500px */}
           <div style={{
             flex: 1,
-            padding: '36px 52px 40px',
+            padding: '36px 48px 32px',
             display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'flex-end',
-            gap: '20px',
-            background: '#FFFFFF'
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            background: '#FFFFFF',
+            boxSizing: 'border-box'
           }}>
-            {/* Ícono casa */}
-            <div style={{ flexShrink: 0, paddingBottom: '4px' }}>
-              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
-                <path d="M9 21V12h6v9" />
-              </svg>
+            {/* Header: Ubicación + Título y Precio */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{
+                    color: '#800020',
+                    fontSize: '15px',
+                    fontWeight: 800,
+                    letterSpacing: '1.5px',
+                    textTransform: 'uppercase',
+                    margin: '0 0 6px 0'
+                  }}>
+                    📍 {property.location.toUpperCase()}
+                  </p>
+                  <h2 style={{
+                    color: '#111827',
+                    fontSize: '32px',
+                    fontWeight: 900,
+                    lineHeight: 1.15,
+                    margin: 0
+                  }}>
+                    {property.title}
+                  </h2>
+                </div>
+
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <p style={{
+                    fontSize: '40px',
+                    fontWeight: 900,
+                    color: '#800020',
+                    margin: 0,
+                    lineHeight: 1
+                  }}>
+                    ${fmt(property.price)}
+                  </p>
+                  <p style={{ fontSize: '15px', fontWeight: 700, color: '#6B7280', margin: '4px 0 0', letterSpacing: '1px' }}>
+                    USD
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* Textos */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{
-                color: '#555555',
-                fontSize: '22px',
-                fontWeight: 500,
-                letterSpacing: '2px',
-                textTransform: 'uppercase',
-                margin: '0 0 6px 0',
-                lineHeight: 1.2
+            {/* BOTONES DE ATRIBUTOS (SPECS) CENTRADOS EDITORIALES */}
+            {validSpecs.length > 0 && (
+              <div style={{
+                display: 'flex',
+                gap: '14px',
+                width: '100%',
+                margin: '12px 0'
               }}>
-                {property.location.toUpperCase()}
-              </p>
-              <p style={{
-                color: '#111111',
-                fontSize: '36px',
-                fontWeight: 800,
-                textTransform: 'uppercase',
-                margin: '0 0 10px 0',
-                lineHeight: 1.1
-              }}>
-                {property.propertyType
-                  ? `${property.propertyType.toUpperCase()} ${property.status === 'Vendida' ? 'VENDIDA' : 'EN VENTA'}`
-                  : 'EN VENTA'}
-                {validSpecs.length > 0 && (
-                  <span style={{ fontSize: '26px', fontWeight: 600, color: '#444444' }}>
-                    {' · '}{validSpecs.map(s => s.v).join(' | ')}
-                  </span>
-                )}
-              </p>
-              <p style={{
-                color: '#999999',
-                fontSize: '17px',
-                fontStyle: 'italic',
-                fontWeight: 400,
-                margin: 0
-              }}>
-                J-11055496-2
-              </p>
-            </div>
+                {validSpecs.map(s => (
+                  <div
+                    key={s.label}
+                    style={{
+                      flex: 1,
+                      background: '#F8FAFC',
+                      border: '1.5px solid #E2E8F0',
+                      borderRadius: '16px',
+                      padding: '14px 10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span style={{ fontSize: '26px', lineHeight: 1, marginBottom: '4px' }}>{s.emoji}</span>
+                    <span style={{ color: '#0F172A', fontSize: '22px', fontWeight: 900, lineHeight: 1.1 }}>{s.v}</span>
+                    <span style={{ color: '#800020', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px' }}>{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
-            {/* Precio y flecha */}
-            <div style={{ flexShrink: 0, textAlign: 'right', paddingBottom: '4px' }}>
-              <p style={{
-                fontSize: '38px',
-                fontWeight: 900,
-                color: '#8B0000',
-                margin: '0 0 6px 0',
-                lineHeight: 1
-              }}>
-                ${fmt(property.price)}
-                <span style={{ fontSize: '18px', fontWeight: 600, color: '#999999', display: 'block' }}>USD</span>
+            {/* Footer Editorial: Asesor y RIF */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderTop: '1.5px solid #F1F5F9',
+              paddingTop: '14px'
+            }}>
+              <p style={{ color: '#334155', fontSize: '15px', fontWeight: 700, margin: 0 }}>
+                👤 Asesor: {property.captador || 'RIV Premier'}
               </p>
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto' }}>
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
+              <p style={{ color: '#94A3B8', fontSize: '12px', margin: 0, fontWeight: 600, letterSpacing: '0.5px' }}>
+                RIV MARGARITA PREMIER · J-11055496-2
+              </p>
             </div>
           </div>
         </div>
