@@ -1217,7 +1217,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             alt=""
           />
 
-          {/* DEGRADADO SUPERIOR para contraste del logo y precio */}
+          {/* DEGRADADO SUPERIOR */}
           <div style={{
             position: 'absolute',
             top: 0,
@@ -1228,7 +1228,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             pointerEvents: 'none'
           }} />
 
-          {/* DEGRADADO INFERIOR PROFUNDO para máxima legibilidad */}
+          {/* DEGRADADO INFERIOR PROFUNDO */}
           <div style={{
             position: 'absolute',
             bottom: 0,
@@ -1250,51 +1250,81 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            {/* BADGE DEL LOGO CORPORATIVO RIV */}
+            {/* BADGE DEL LOGO CORPORATIVO RIV — Textos perfectamente centrados */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '14px',
+              height: '76px',
+              boxSizing: 'border-box',
               background: 'rgba(10, 10, 10, 0.85)',
               border: '1.5px solid rgba(212, 175, 55, 0.6)',
               borderRadius: '24px',
-              padding: '12px 26px',
+              padding: '0 26px',
               boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
             }}>
               <img
                 src="/logo-riv.svg"
                 alt="RIV"
-                style={{ height: '46px', objectFit: 'contain' }}
+                style={{ height: '44px', width: 'auto', objectFit: 'contain', borderRadius: '6px' }}
                 crossOrigin="anonymous"
               />
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <span style={{ color: '#D4AF37', fontWeight: 900, fontSize: '20px', letterSpacing: '2px', lineHeight: 1.1 }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center'
+              }}>
+                <span style={{
+                  color: '#D4AF37',
+                  fontWeight: 900,
+                  fontSize: '19px',
+                  letterSpacing: '2px',
+                  lineHeight: '1.2',
+                  textAlign: 'center'
+                }}>
                   RIV MARGARITA
                 </span>
-                <span style={{ color: '#FFFFFF', fontWeight: 800, fontSize: '13px', letterSpacing: '3px', lineHeight: 1.2 }}>
+                <span style={{
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '12px',
+                  letterSpacing: '3px',
+                  lineHeight: '1.2',
+                  textAlign: 'center'
+                }}>
                   PREMIER
                 </span>
               </div>
             </div>
 
-            {/* BADGE DE PRECIO O ESTATUS */}
+            {/* BADGE DE PRECIO O ESTATUS — Texto perfectamente centrado */}
             <div style={{
+              height: '76px',
+              boxSizing: 'border-box',
               background: '#800020',
               border: '1.5px solid rgba(255, 255, 255, 0.25)',
               borderRadius: '24px',
-              padding: '16px 36px',
+              padding: '0 36px',
               boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              textAlign: 'center'
             }}>
               <span style={{
                 color: '#FFFFFF',
                 fontWeight: 900,
-                fontSize: '36px',
+                fontSize: '34px',
                 letterSpacing: '1px',
                 textTransform: 'uppercase',
-                lineHeight: 1
+                lineHeight: '1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center'
               }}>
                 {property.status === 'Vendida'
                   ? 'VENDIDO'
@@ -1321,19 +1351,26 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
           }}>
             {/* Header de la tarjeta: Tag y Ubicación */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-              <span style={{
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                height: '42px',
+                boxSizing: 'border-box',
+                padding: '0 20px',
                 background: 'rgba(212, 175, 55, 0.18)',
                 color: '#D4AF37',
                 border: '1px solid #D4AF37',
                 borderRadius: '12px',
-                padding: '8px 20px',
-                fontSize: '18px',
+                fontSize: '17px',
                 fontWeight: 800,
                 letterSpacing: '2px',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                lineHeight: '1'
               }}>
                 ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'PROPIEDAD EXCLUSIVA'}
-              </span>
+              </div>
               <span style={{
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '22px',
@@ -1358,35 +1395,40 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               {property.title}
             </h1>
 
-            {/* BOTONES DE ATRIBUTOS (SPECS) CENTRADOS */}
+            {/* BOTONES DE ATRIBUTOS (SPECS) CENTRADOS CON ICONOS SVG */}
             {validSpecs.length > 0 && (
               <div style={{
                 display: 'flex',
                 gap: '16px',
                 width: '100%'
               }}>
-                {validSpecs.map(s => (
-                  <div
-                    key={s.label}
-                    style={{
-                      flex: 1,
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      border: '1.5px solid rgba(212, 175, 55, 0.35)',
-                      borderRadius: '20px',
-                      padding: '20px 14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      textAlign: 'center',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <span style={{ fontSize: '32px', lineHeight: 1, marginBottom: '8px' }}>{s.emoji}</span>
-                    <span style={{ color: '#FFFFFF', fontSize: '28px', fontWeight: 900, lineHeight: 1.1 }}>{s.v}</span>
-                    <span style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginTop: '6px' }}>{s.label}</span>
-                  </div>
-                ))}
+                {validSpecs.map(s => {
+                  const SpecIcon = s.icon;
+                  return (
+                    <div
+                      key={s.label}
+                      style={{
+                        flex: 1,
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1.5px solid rgba(212, 175, 55, 0.35)',
+                        borderRadius: '20px',
+                        padding: '18px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+                        <SpecIcon size={32} color="#D4AF37" strokeWidth={1.8} />
+                      </div>
+                      <span style={{ color: '#FFFFFF', fontSize: '28px', fontWeight: 900, lineHeight: 1.1, textAlign: 'center' }}>{s.v}</span>
+                      <span style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginTop: '6px', textAlign: 'center' }}>{s.label}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1492,51 +1534,81 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            {/* BADGE DEL LOGO CORPORATIVO RIV - Variante Vinotinto & Oro */}
+            {/* BADGE DEL LOGO CORPORATIVO RIV - Variante Vinotinto & Oro — Textos centrados */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '14px',
+              height: '76px',
+              boxSizing: 'border-box',
               background: '#800020',
               border: '1.5px solid #D4AF37',
               borderRadius: '24px',
-              padding: '12px 26px',
+              padding: '0 26px',
               boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
             }}>
               <img
                 src="/logo-riv.svg"
                 alt="RIV"
-                style={{ height: '46px', objectFit: 'contain' }}
+                style={{ height: '44px', width: 'auto', objectFit: 'contain', borderRadius: '6px' }}
                 crossOrigin="anonymous"
               />
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <span style={{ color: '#D4AF37', fontWeight: 900, fontSize: '20px', letterSpacing: '2px', lineHeight: 1.1 }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center'
+              }}>
+                <span style={{
+                  color: '#D4AF37',
+                  fontWeight: 900,
+                  fontSize: '19px',
+                  letterSpacing: '2px',
+                  lineHeight: '1.2',
+                  textAlign: 'center'
+                }}>
                   RIV MARGARITA
                 </span>
-                <span style={{ color: '#FFFFFF', fontWeight: 800, fontSize: '13px', letterSpacing: '3px', lineHeight: 1.2 }}>
+                <span style={{
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '12px',
+                  letterSpacing: '3px',
+                  lineHeight: '1.2',
+                  textAlign: 'center'
+                }}>
                   PREMIER
                 </span>
               </div>
             </div>
 
-            {/* BADGE DE PRECIO DORADO */}
+            {/* BADGE DE PRECIO DORADO — Texto centrado */}
             <div style={{
+              height: '76px',
+              boxSizing: 'border-box',
               background: '#D4AF37',
               border: '1.5px solid #FFFFFF',
               borderRadius: '24px',
-              padding: '16px 36px',
+              padding: '0 36px',
               boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              textAlign: 'center'
             }}>
               <span style={{
                 color: '#000000',
                 fontWeight: 900,
-                fontSize: '36px',
+                fontSize: '34px',
                 letterSpacing: '1px',
                 textTransform: 'uppercase',
-                lineHeight: 1
+                lineHeight: '1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center'
               }}>
                 {property.status === 'Vendida'
                   ? 'VENDIDO'
@@ -1563,18 +1635,25 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
           }}>
             {/* Header: Tag y Ubicación */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-              <span style={{
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                height: '42px',
+                boxSizing: 'border-box',
+                padding: '0 20px',
                 background: '#D4AF37',
                 color: '#000000',
                 borderRadius: '12px',
-                padding: '8px 20px',
-                fontSize: '18px',
+                fontSize: '17px',
                 fontWeight: 900,
                 letterSpacing: '2px',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                lineHeight: '1'
               }}>
                 ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'PROPIEDAD EXCLUSIVA'}
-              </span>
+              </div>
               <span style={{
                 color: '#D4AF37',
                 fontSize: '22px',
@@ -1606,28 +1685,33 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                 gap: '16px',
                 width: '100%'
               }}>
-                {validSpecs.map(s => (
-                  <div
-                    key={s.label}
-                    style={{
-                      flex: 1,
-                      background: 'rgba(212, 175, 55, 0.12)',
-                      border: '1.5px solid #D4AF37',
-                      borderRadius: '20px',
-                      padding: '20px 14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      textAlign: 'center',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <span style={{ fontSize: '32px', lineHeight: 1, marginBottom: '8px' }}>{s.emoji}</span>
-                    <span style={{ color: '#FFFFFF', fontSize: '28px', fontWeight: 900, lineHeight: 1.1 }}>{s.v}</span>
-                    <span style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginTop: '6px' }}>{s.label}</span>
-                  </div>
-                ))}
+                {validSpecs.map(s => {
+                  const SpecIcon = s.icon;
+                  return (
+                    <div
+                      key={s.label}
+                      style={{
+                        flex: 1,
+                        background: 'rgba(212, 175, 55, 0.12)',
+                        border: '1.5px solid #D4AF37',
+                        borderRadius: '20px',
+                        padding: '18px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+                        <SpecIcon size={32} color="#D4AF37" strokeWidth={1.8} />
+                      </div>
+                      <span style={{ color: '#FFFFFF', fontSize: '28px', fontWeight: 900, lineHeight: 1.1, textAlign: 'center' }}>{s.v}</span>
+                      <span style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginTop: '6px', textAlign: 'center' }}>{s.label}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1733,48 +1817,81 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            {/* LOGO BADGE */}
+            {/* LOGO BADGE — Textos centrados */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '12px',
+              height: '60px',
+              boxSizing: 'border-box',
               background: 'rgba(10, 10, 10, 0.85)',
               border: '1.5px solid rgba(212, 175, 55, 0.6)',
               borderRadius: '20px',
-              padding: '10px 22px',
+              padding: '0 22px',
               boxShadow: '0 6px 24px rgba(0,0,0,0.5)'
             }}>
               <img
                 src="/logo-riv.svg"
                 alt="RIV"
-                style={{ height: '38px', objectFit: 'contain' }}
+                style={{ height: '36px', width: 'auto', objectFit: 'contain', borderRadius: '4px' }}
                 crossOrigin="anonymous"
               />
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <span style={{ color: '#D4AF37', fontWeight: 900, fontSize: '17px', letterSpacing: '1.5px', lineHeight: 1.1 }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center'
+              }}>
+                <span style={{
+                  color: '#D4AF37',
+                  fontWeight: 900,
+                  fontSize: '16px',
+                  letterSpacing: '1.5px',
+                  lineHeight: '1.2',
+                  textAlign: 'center'
+                }}>
                   RIV MARGARITA
                 </span>
-                <span style={{ color: '#FFFFFF', fontWeight: 800, fontSize: '11px', letterSpacing: '2.5px', lineHeight: 1.2 }}>
+                <span style={{
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '11px',
+                  letterSpacing: '2.5px',
+                  lineHeight: '1.2',
+                  textAlign: 'center'
+                }}>
                   PREMIER
                 </span>
               </div>
             </div>
 
-            {/* PRECIO BADGE */}
+            {/* PRECIO BADGE — Texto centrado */}
             <div style={{
+              height: '60px',
+              boxSizing: 'border-box',
               background: '#800020',
               border: '1.5px solid rgba(255, 255, 255, 0.25)',
               borderRadius: '20px',
-              padding: '12px 28px',
-              boxShadow: '0 6px 24px rgba(0,0,0,0.5)'
+              padding: '0 28px',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center'
             }}>
               <span style={{
                 color: '#FFFFFF',
                 fontWeight: 900,
-                fontSize: '28px',
+                fontSize: '26px',
                 letterSpacing: '0.5px',
                 textTransform: 'uppercase',
-                lineHeight: 1
+                lineHeight: '1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center'
               }}>
                 {property.status === 'Vendida'
                   ? 'VENDIDO'
@@ -1801,19 +1918,26 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
           }}>
             {/* Header: Tag & Ubicación */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                height: '36px',
+                boxSizing: 'border-box',
+                padding: '0 16px',
                 background: 'rgba(212, 175, 55, 0.18)',
                 color: '#D4AF37',
                 border: '1px solid #D4AF37',
                 borderRadius: '10px',
-                padding: '6px 14px',
-                fontSize: '15px',
+                fontSize: '14px',
                 fontWeight: 800,
                 letterSpacing: '1.5px',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                lineHeight: '1'
               }}>
                 ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'EN VENTA'}
-              </span>
+              </div>
               <span style={{
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '18px',
@@ -1834,35 +1958,40 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               {property.title}
             </h2>
 
-            {/* BOTONES DE ATRIBUTOS (SPECS) CENTRADOS */}
+            {/* BOTONES DE ATRIBUTOS (SPECS) CENTRADOS CON ICONOS */}
             {validSpecs.length > 0 && (
               <div style={{
                 display: 'flex',
                 gap: '14px',
                 width: '100%'
               }}>
-                {validSpecs.map(s => (
-                  <div
-                    key={s.label}
-                    style={{
-                      flex: 1,
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      border: '1.5px solid rgba(212, 175, 55, 0.35)',
-                      borderRadius: '16px',
-                      padding: '14px 10px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      textAlign: 'center',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <span style={{ fontSize: '26px', lineHeight: 1, marginBottom: '4px' }}>{s.emoji}</span>
-                    <span style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: 900, lineHeight: 1.1 }}>{s.v}</span>
-                    <span style={{ color: '#D4AF37', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px' }}>{s.label}</span>
-                  </div>
-                ))}
+                {validSpecs.map(s => {
+                  const SpecIcon = s.icon;
+                  return (
+                    <div
+                      key={s.label}
+                      style={{
+                        flex: 1,
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1.5px solid rgba(212, 175, 55, 0.35)',
+                        borderRadius: '16px',
+                        padding: '14px 10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                        <SpecIcon size={26} color="#D4AF37" strokeWidth={1.8} />
+                      </div>
+                      <span style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: 900, lineHeight: 1.1, textAlign: 'center' }}>{s.v}</span>
+                      <span style={{ color: '#D4AF37', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px', textAlign: 'center' }}>{s.label}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1886,7 +2015,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
 
 
 
-        {/* ── WhatsApp – Plantilla B: Clean Split 1:1 (Lujo & Botones Centrados) ──────── */}
+        {/* ── WhatsApp – Plantilla B: Clean Split 1:1 (La Clara - Lujo & Botones Centrados) ──────── */}
         <div
           ref={waBRef}
           style={{
@@ -1921,7 +2050,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 40%, rgba(0,0,0,0.3) 100%)'
             }} />
 
-            {/* BARRA SUPERIOR SOBRE FOTO */}
+            {/* BARRA SUPERIOR SOBRE FOTO — Botones y textos perfectamente centrados */}
             <div style={{
               position: 'absolute',
               top: 36,
@@ -1936,36 +2065,65 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px',
+                justifyContent: 'center',
+                gap: '12px',
+                height: '56px',
+                boxSizing: 'border-box',
                 background: 'rgba(255, 255, 255, 0.95)',
                 border: '1.5px solid #800020',
-                borderRadius: '18px',
-                padding: '8px 18px',
+                borderRadius: '20px',
+                padding: '0 20px',
                 boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
               }}>
                 <img
                   src="/logo-riv.svg"
                   alt="RIV"
-                  style={{ height: '32px', objectFit: 'contain' }}
+                  style={{ height: '32px', width: 'auto', objectFit: 'contain', borderRadius: '4px' }}
                   crossOrigin="anonymous"
                 />
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <span style={{ color: '#800020', fontWeight: 900, fontSize: '15px', letterSpacing: '1px', lineHeight: 1.1 }}>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center'
+                }}>
+                  <span style={{
+                    color: '#800020',
+                    fontWeight: 900,
+                    fontSize: '15px',
+                    letterSpacing: '1.5px',
+                    lineHeight: '1.1',
+                    textAlign: 'center'
+                  }}>
                     RIV MARGARITA
                   </span>
-                  <span style={{ color: '#D4AF37', fontWeight: 800, fontSize: '10px', letterSpacing: '2px', lineHeight: 1.2 }}>
+                  <span style={{
+                    color: '#D4AF37',
+                    fontWeight: 800,
+                    fontSize: '10px',
+                    letterSpacing: '2px',
+                    lineHeight: '1.2',
+                    textAlign: 'center'
+                  }}>
                     PREMIER
                   </span>
                 </div>
               </div>
 
-              {/* TAG ESTADO */}
+              {/* TAG ESTADO — Texto centrado */}
               <div style={{
+                height: '56px',
+                boxSizing: 'border-box',
                 background: '#800020',
                 border: '1.5px solid #FFFFFF',
-                borderRadius: '18px',
-                padding: '10px 22px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
+                borderRadius: '20px',
+                padding: '0 24px',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center'
               }}>
                 <span style={{
                   color: '#FFFFFF',
@@ -1973,7 +2131,11 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                   fontSize: '20px',
                   textTransform: 'uppercase',
                   letterSpacing: '1px',
-                  lineHeight: 1
+                  lineHeight: '1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center'
                 }}>
                   {property.status === 'Vendida' ? 'VENDIDO' : 'EN VENTA'}
                 </span>
@@ -2041,29 +2203,34 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                 width: '100%',
                 margin: '12px 0'
               }}>
-                {validSpecs.map(s => (
-                  <div
-                    key={s.label}
-                    style={{
-                      flex: 1,
-                      background: '#F8FAFC',
-                      border: '1.5px solid #E2E8F0',
-                      borderRadius: '16px',
-                      padding: '14px 10px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      textAlign: 'center',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <span style={{ fontSize: '26px', lineHeight: 1, marginBottom: '4px' }}>{s.emoji}</span>
-                    <span style={{ color: '#0F172A', fontSize: '22px', fontWeight: 900, lineHeight: 1.1 }}>{s.v}</span>
-                    <span style={{ color: '#800020', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px' }}>{s.label}</span>
-                  </div>
-                ))}
+                {validSpecs.map(s => {
+                  const SpecIcon = s.icon;
+                  return (
+                    <div
+                      key={s.label}
+                      style={{
+                        flex: 1,
+                        background: '#F8FAFC',
+                        border: '1.5px solid #E2E8F0',
+                        borderRadius: '16px',
+                        padding: '14px 10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                        <SpecIcon size={26} color="#800020" strokeWidth={1.8} />
+                      </div>
+                      <span style={{ color: '#0F172A', fontSize: '22px', fontWeight: 900, lineHeight: 1.1, textAlign: 'center' }}>{s.v}</span>
+                      <span style={{ color: '#800020', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px', textAlign: 'center' }}>{s.label}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
