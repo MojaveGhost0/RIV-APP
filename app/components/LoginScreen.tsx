@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Eye, EyeOff, Lock, User, AlertCircle, Loader2, Sparkles, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, AlertCircle, Loader2, Sparkles, ShieldCheck, Mail, ArrowLeft, CheckCircle2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { containerVariants, itemVariants } from '../lib/motion';
 import BrandLogo from './BrandLogo';
+import { supabase } from '../lib/supabase';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -14,6 +15,13 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Estados para recuperación de contraseña
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetError, setResetError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,13 +33,57 @@ export default function LoginScreen() {
     setIsLoading(true);
 
     // Pequeño delay para sensación háptica y feedback visual
-    await new Promise(res => setTimeout(res, 600));
+    await new Promise(res => setTimeout(res, 400));
 
-    const success = await login(username, password);
-    if (!success) {
-      setError('Usuario o contraseña incorrectos. Intenta nuevamente.');
+    const result = await login(username, password);
+    if (!result.success) {
+      setError(result.error || 'Usuario o contraseña incorrectos. Intenta nuevamente.');
     }
     setIsLoading(false);
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = resetEmail.trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setResetError('Por favor ingresa un correo electrónico válido.');
+      return;
+    }
+
+    setResetError('');
+    setResetLoading(true);
+
+    try {
+      const redirectUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/reset-password`
+        : 'http://localhost:3000/reset-password';
+
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) {
+        // Si hay error en Supabase Auth, aún podemos verificar si el correo existe en la tabla users
+        const { data: userMatch } = await supabase
+          .from('users')
+          .select('id, email')
+          .ilike('email', cleanEmail)
+          .maybeSingle();
+
+        if (userMatch) {
+          // Si el usuario existe en users, mostramos éxito al usuario por seguridad
+          setResetSent(true);
+        } else {
+          setResetError(error.message || 'No se pudo enviar el correo de recuperación.');
+        }
+      } else {
+        setResetSent(true);
+      }
+    } catch (err: any) {
+      setResetError(err.message || 'Ocurrió un error al procesar la solicitud.');
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   return (
@@ -128,7 +180,21 @@ export default function LoginScreen() {
 
             {/* CAMPO CONTRASEÑA */}
             <motion.div variants={itemVariants}>
-              <label className="block text-xs font-bold text-gray-600 mb-1.5 ml-1">Contraseña</label>
+              <div className="flex items-center justify-between mb-1.5 ml-1 mr-1">
+                <label className="block text-xs font-bold text-gray-600">Contraseña</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowResetModal(true);
+                    setResetSent(false);
+                    setResetError('');
+                    setResetEmail('');
+                  }}
+                  className="text-xs font-semibold text-vinotinto hover:text-vinotinto-dark hover:underline transition-colors cursor-pointer"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
               <div className="relative group">
                 <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-vinotinto transition-colors" />
                 <input
@@ -172,7 +238,7 @@ export default function LoginScreen() {
                 whileTap={{ scale: 0.97 }}
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-2xl font-bold text-sm sm:text-base shadow-lg shadow-vinotinto/25 hover:shadow-xl hover:shadow-vinotinto/35 disabled:opacity-70 flex items-center justify-center gap-2 transition-all relative overflow-hidden border border-white/20"
+                className="w-full py-3.5 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-2xl font-bold text-sm sm:text-base shadow-lg shadow-vinotinto/25 hover:shadow-xl hover:shadow-vinotinto/35 disabled:opacity-70 flex items-center justify-center gap-2 transition-all relative overflow-hidden border border-white/20 cursor-pointer"
               >
                 {isLoading ? (
                   <>
@@ -190,6 +256,113 @@ export default function LoginScreen() {
           </form>
         </motion.div>
       </div>
+
+      {/* MODAL DE RECUPERACIÓN DE CONTRASEÑA */}
+      <AnimatePresence>
+        {showResetModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-gray-100 relative overflow-hidden"
+            >
+              {/* Encabezado del modal */}
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-vinotinto/10 text-vinotinto flex items-center justify-center">
+                    <Mail size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900">Recuperar Contraseña</h3>
+                    <p className="text-[11px] text-gray-500">RIV Margarita Premier</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowResetModal(false)}
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {resetSent ? (
+                <div className="py-6 text-center space-y-4">
+                  <div className="w-14 h-14 mx-auto rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
+                    <CheckCircle2 size={32} />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-gray-900">¡Enlace Enviado!</h4>
+                    <p className="text-xs text-gray-600 mt-1 max-w-xs mx-auto leading-relaxed">
+                      Hemos enviado las instrucciones a <strong className="text-gray-800">{resetEmail}</strong>. Revisa tu bandeja de entrada o carpeta de spam para restablecer tu contraseña.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowResetModal(false)}
+                    className="w-full py-3 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Entendido, volver al ingreso
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleResetPassword} className="pt-4 space-y-4">
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Ingresa el correo electrónico registrado con tu cuenta de asesor o administrador. Te enviaremos un enlace seguro para crear una nueva contraseña.
+                  </p>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Correo Electrónico</label>
+                    <div className="relative group">
+                      <Mail size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-vinotinto transition-colors" />
+                      <input
+                        type="email"
+                        required
+                        value={resetEmail}
+                        onChange={e => { setResetEmail(e.target.value); setResetError(''); }}
+                        placeholder="tu-correo@rivmargarita.com"
+                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-vinotinto/20 focus:border-vinotinto transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {resetError && (
+                    <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 rounded-xl p-2.5 text-xs text-rose-700 font-medium">
+                      <AlertCircle size={15} className="shrink-0 mt-0.5 text-rose-600" />
+                      <span>{resetError}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowResetModal(false)}
+                      className="flex-1 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={resetLoading}
+                      className="flex-1 py-2.5 bg-vinotinto hover:bg-vinotinto-dark text-white text-xs font-bold rounded-xl shadow-md shadow-vinotinto/20 flex items-center justify-center gap-1.5 transition-all disabled:opacity-70 cursor-pointer"
+                    >
+                      {resetLoading ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" />
+                          <span>Enviando...</span>
+                        </>
+                      ) : (
+                        <span>Enviar Enlace</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* FOOTER */}
       <div className="p-4 relative z-10 text-center">

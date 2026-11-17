@@ -129,6 +129,7 @@ export type PropertyType = typeof PROPERTY_TYPES[number];
 // =============================================================================
 export interface Property {
   id: string;
+  codigo?: string;
   title: string;
   price: number;
   location: string;
@@ -201,11 +202,33 @@ interface DataContextType {
 const localToday = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
 
 // =============================================================================
+// =============================================================================
+// HELPER — Generador de código correlativo único (ej: RIV-001)
+// =============================================================================
+export function generateNextCodigo(existingProperties: Property[]): string {
+  let maxNum = 0;
+  for (const p of existingProperties) {
+    if (p.codigo) {
+      const match = p.codigo.match(/RIV-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+  }
+  const nextNum = maxNum > 0 ? maxNum + 1 : existingProperties.length + 1;
+  return `RIV-${String(nextNum).padStart(3, '0')}`;
+}
+
+// =============================================================================
 // DEFAULT SEED DATA (DT-03: IDs con formato UUID estándar)
 // =============================================================================
 const DEFAULT_PROPERTIES: Property[] = [
   {
     id: '00000000-0000-0000-0000-000000000001',
+    codigo: 'RIV-001',
     title: "Apartamento Vista al Mar",
     price: 45000,
     location: "Pampatar, Margarita",
@@ -225,6 +248,7 @@ const DEFAULT_PROPERTIES: Property[] = [
   },
   {
     id: '00000000-0000-0000-0000-000000000002',
+    codigo: 'RIV-002',
     title: "Villa Exclusiva Costa Azul",
     price: 120000,
     location: "Costa Azul, Porlamar",
@@ -244,6 +268,7 @@ const DEFAULT_PROPERTIES: Property[] = [
   },
   {
     id: '00000000-0000-0000-0000-000000000003',
+    codigo: 'RIV-003',
     title: 'Exclusivo Apartamento Vista al Mar',
     price: 85000,
     location: 'Pampatar, Isla de Margarita',
@@ -264,6 +289,7 @@ const DEFAULT_PROPERTIES: Property[] = [
   },
   {
     id: '00000000-0000-0000-0000-000000000004',
+    codigo: 'RIV-004',
     title: 'Townhouse en Conjunto Residencial',
     price: 65000,
     location: 'Playa El Ángel, Margarita',
@@ -280,6 +306,7 @@ const DEFAULT_PROPERTIES: Property[] = [
   },
   {
     id: '00000000-0000-0000-0000-000000000005',
+    codigo: 'RIV-005',
     title: 'Penthouse de Lujo',
     price: 210000,
     location: 'Av. Aldonza Manrique',
@@ -296,6 +323,7 @@ const DEFAULT_PROPERTIES: Property[] = [
   },
   {
     id: '00000000-0000-0000-0000-000000000006',
+    codigo: 'RIV-006',
     title: 'Local Comercial Céntrico',
     price: 35000,
     location: 'Av. Santiago Mariño, Porlamar',
@@ -376,14 +404,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     fetchData();
   }, []);
 
-  // Add Property con soporte para campos de propietario y fallback preventivo
+  // Add Property con soporte para codigo único, campos de propietario y fallback preventivo
   const addProperty = useCallback(async (newProp: Omit<Property, 'id' | 'createdAt' | 'created_at'>): Promise<string> => {
     let dataId: string;
     let dataCreatedAt: string | undefined;
+    const finalCodigo = newProp.codigo?.trim() || generateNextCodigo(properties);
+    const propPayload = { ...newProp, codigo: finalCodigo };
+
     try {
       const { data, error } = await supabase
         .from('properties')
-        .insert([newProp])
+        .insert([propPayload])
         .select('id, created_at')
         .single();
 
@@ -391,11 +422,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dataId = data.id;
       dataCreatedAt = data.created_at;
     } catch (err: any) {
-      // Si las columnas de propietario aún no han sido migradas en la BD de Supabase, reintentar sin ellas
+      // Si las columnas personalizadas (codigo, propietarioNombre, etc.) aún no han sido migradas en la BD de Supabase, reintentar sin ellas
       const isColError = err?.message?.includes('does not exist') || err?.code === '42703';
       if (isColError) {
-        console.warn('Supabase: Columnas de propietario aún no creadas en BD. Guardando campos base...', err);
-        const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, ...baseProp } = newProp;
+        console.warn('Supabase: Columnas personalizadas aún no creadas en BD. Guardando campos base...', err);
+        const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, codigo, ...baseProp } = propPayload;
         const { data: retryData, error: retryError } = await supabase
           .from('properties')
           .insert([baseProp])
@@ -413,14 +444,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     const timestamp = dataCreatedAt || new Date().toISOString();
     const property: Property = {
-      ...newProp,
+      ...propPayload,
       id: dataId,
       createdAt: timestamp,
       created_at: timestamp,
     };
     setProperties(prev => [property, ...prev]);
     return dataId;
-  }, []);
+  }, [properties]);
 
   // Delete Property con Rollback (LOG-01)
   const deleteProperty = useCallback(async (id: string) => {
@@ -470,7 +501,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.from('properties').update(updates).eq('id', id);
       if (error) {
         // Fallback defensivo si alguna columna aún no existe en Supabase
-        const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, ...coreUpdates } = updates as any;
+        const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, codigo, ...coreUpdates } = updates as any;
         const { error: coreError } = await supabase.from('properties').update(coreUpdates).eq('id', id);
         if (coreError) throw coreError;
       }

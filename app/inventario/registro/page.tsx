@@ -17,9 +17,11 @@ import { normalize } from '../../lib/searchEngine';
 import {
   MARGARITA_LOCATIONS,
   PROPERTY_TYPES,
+  generateNextCodigo,
   type PropertyType,
 } from '../../context/DataContext';
 import BrandLogo from '../../components/BrandLogo';
+import { fmt, formatPrice } from '../../lib/currency';
 
 // ─── Icono por tipo ───────────────────────────────────────────────────────────
 const TYPE_ICONS: Record<PropertyType, React.ReactNode> = {
@@ -176,7 +178,7 @@ const METODOS_PAGO_PRESETS = [
 function formatPriceDisplay(val: string): string {
   const num = parseInt(val.replace(/\D/g, ''));
   if (isNaN(num)) return '';
-  return num.toLocaleString('es-VE');
+  return fmt(num);
 }
 
 // ─── Helpers de Propietarios Registrados ─────────────────────────────────────────
@@ -257,8 +259,11 @@ export default function RegistroPropiedad() {
   const [selectedType, setSelectedType] = useState<PropertyType>('Apartamento');
   const config = useMemo(() => TYPE_CONFIG[selectedType], [selectedType]);
 
+  const suggestedCodigo = useMemo(() => generateNextCodigo(properties), [properties]);
+
   const [formData, setFormData] = useState({
     // Inmueble
+    codigo: '',
     titulo: '',
     precio: '',
     habitaciones: '',
@@ -649,6 +654,7 @@ export default function RegistroPropiedad() {
 
       // Guardar propiedad en inventario
       const newId = await addProperty({
+        codigo: formData.codigo.trim() || suggestedCodigo,
         title: formData.titulo.trim(),
         price: Number(formData.precio.replace(/\D/g, '')),
         location: formData.ubicacion.trim(),
@@ -865,20 +871,36 @@ export default function RegistroPropiedad() {
                   </p>
                 </div>
 
-                {/* Título */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Título del Inmueble *
-                  </label>
-                  <input
-                    type="text" name="titulo" value={formData.titulo}
-                    onChange={handleInputChange}
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm"
-                    placeholder={`Ej: ${selectedType} en Pampatar con vista al mar`}
-                  />
-                  {formData.titulo.trim().length > 0 && formData.titulo.trim().length < 4 && (
-                    <p className="text-[10px] text-red-500 mt-1">El título debe tener al menos 4 caracteres.</p>
-                  )}
+                {/* Código y Título */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="sm:col-span-1">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Código Único
+                    </label>
+                    <input
+                      type="text"
+                      name="codigo"
+                      value={formData.codigo}
+                      onChange={e => setFormData(prev => ({ ...prev, codigo: e.target.value.toUpperCase() }))}
+                      placeholder={suggestedCodigo}
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-bold text-vinotinto"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Sugerido: <span className="font-semibold text-gray-600">{suggestedCodigo}</span></p>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Título del Inmueble *
+                    </label>
+                    <input
+                      type="text" name="titulo" value={formData.titulo}
+                      onChange={handleInputChange}
+                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm"
+                      placeholder={`Ej: ${selectedType} en Pampatar con vista al mar`}
+                    />
+                    {formData.titulo.trim().length > 0 && formData.titulo.trim().length < 4 && (
+                      <p className="text-[10px] text-red-500 mt-1">El título debe tener al menos 4 caracteres.</p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Ubicación — dropdown custom */}
@@ -1616,7 +1638,7 @@ export default function RegistroPropiedad() {
                   <div className="flex justify-between text-xs py-1 border-b border-gray-200/50">
                     <span className="text-gray-500">Precio:</span>
                     <span className="font-black text-vinotinto text-sm">
-                      ${parseInt(formData.precio).toLocaleString('es-VE')} USD
+                      {formatPrice(formData.precio, { suffix: ' USD' })}
                     </span>
                   </div>
                   <div className="flex justify-between text-xs py-1">

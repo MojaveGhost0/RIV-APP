@@ -23,10 +23,9 @@ import jsPDF from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
 import { normalize } from '../lib/searchEngine';
 import BrandLogo from '../components/BrandLogo';
+import { formatPrice, fmt } from '../lib/currency';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-const fmt = (n: number) =>
-  n.toLocaleString('es-VE', { maximumFractionDigits: 0 });
 
 /** Extrae el municipio del formato "Zona, Municipio, Isla…" o devuelve la ubicación cruda */
 function getMunicipio(location: string): string {

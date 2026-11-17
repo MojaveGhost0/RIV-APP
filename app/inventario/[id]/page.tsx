@@ -17,6 +17,7 @@ import { containerVariants, itemVariants } from '../../lib/motion';
 import { normalize } from '../../lib/searchEngine';
 import { uploadToCloudinary } from '../../lib/cloudinary';
 import BrandLogo from '../../components/BrandLogo';
+import { formatPrice } from '../../lib/currency';
 
 const STATUS_OPTIONS = ['Activa', 'Suspendida', 'Vendida'];
 
@@ -56,6 +57,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [editFormData, setEditFormData] = useState({
+    codigo: '',
     title: '',
     price: '',
     location: '',
@@ -114,6 +116,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
 
   const handleOpenEditModal = () => {
     setEditFormData({
+      codigo: property.codigo || '',
       title: property.title,
       price: String(property.price),
       location: property.location,
@@ -218,6 +221,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
       const oldTitle = property.title;
 
       await updateProperty(property.id, {
+        codigo: editFormData.codigo.trim() || undefined,
         title: newTitle,
         price: Number(editFormData.price.replace(/\D/g, '')) || property.price,
         location: editFormData.location.trim(),
@@ -260,7 +264,8 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
   };
 
   const handleShare = async () => {
-    const text = `🏠 ${property.title}\n📍 ${property.location}\n💰 $${property.price.toLocaleString()} USD\n🛏 ${property.beds} hab · 🚿 ${property.baths} baños · 📐 ${property.sqm}m²`;
+    const codePrefix = property.codigo ? `[${property.codigo}] ` : '';
+    const text = `🏠 ${codePrefix}${property.title}\n📍 ${property.location}\n💰 ${formatPrice(property.price, { suffix: ' USD' })}\n🛏 ${property.beds} hab · 🚿 ${property.baths} baños · 📐 ${property.sqm}m²`;
     try {
       if (navigator.share) {
         await navigator.share({ title: property.title, text });
@@ -298,7 +303,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
         {/* Overlay gradiente */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
 
-        {/* Botón atrás y Logo */}
+        {/* Botón atrás y Logo corporativo con contenedor estilizado de lujo (frosted glass) */}
         <div className="absolute top-4 left-4 flex items-center gap-2 z-10">
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -308,8 +313,8 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
           >
             <ArrowLeft size={20} />
           </motion.button>
-          <div className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 flex items-center">
-            <BrandLogo size="xs" variant="light" />
+          <div className="bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/60 shadow-md flex items-center justify-center">
+            <BrandLogo size="xs" variant="auto" />
           </div>
         </div>
 
@@ -394,16 +399,23 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
         className="px-4 sm:px-6 pt-5 pb-28 space-y-4 relative z-10"
       >
 
-        {/* Tarjeta de Título y precio */}
+        {/* Tarjeta de Título, Código y precio */}
         <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-gray-100 shadow-xs hover:border-dorado/30 transition-all">
           <div className="flex justify-between items-start gap-2 mb-2">
-            <h1 className="text-2xl font-extrabold text-gray-900 leading-tight flex-1 tracking-tight">{property.title}</h1>
+            <div className="flex-1">
+              {property.codigo && (
+                <span className="inline-block px-2.5 py-0.5 mb-1.5 text-[11px] font-bold tracking-wider text-vinotinto bg-vinotinto/10 border border-vinotinto/20 rounded-md">
+                  {property.codigo}
+                </span>
+              )}
+              <h1 className="text-2xl font-extrabold text-gray-900 leading-tight tracking-tight">{property.title}</h1>
+            </div>
             <span className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 mt-1 border shadow-xs ${STATUS_STYLE[property.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
               {property.status}
             </span>
           </div>
           <p className="text-3xl font-black text-vinotinto tracking-tight">
-            ${property.price.toLocaleString()} <span className="text-base font-bold text-gray-400">USD</span>
+            {formatPrice(property.price)} <span className="text-base font-bold text-gray-400">USD</span>
           </p>
         </motion.div>
 
@@ -748,15 +760,27 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                   </div>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">Título del Inmueble *</label>
-                  <input
-                    type="text"
-                    value={editFormData.title}
-                    onChange={e => setEditFormData({ ...editFormData, title: e.target.value })}
-                    required
-                    className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-1">
+                    <label className="block font-bold text-gray-700 mb-1">Código Único</label>
+                    <input
+                      type="text"
+                      placeholder="Ej: RIV-001"
+                      value={editFormData.codigo}
+                      onChange={e => setEditFormData({ ...editFormData, codigo: e.target.value.toUpperCase() })}
+                      className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-bold text-vinotinto"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block font-bold text-gray-700 mb-1">Título del Inmueble *</label>
+                    <input
+                      type="text"
+                      value={editFormData.title}
+                      onChange={e => setEditFormData({ ...editFormData, title: e.target.value })}
+                      required
+                      className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-medium"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

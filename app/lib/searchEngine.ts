@@ -205,6 +205,7 @@ function scoreProperty(
   }
 
   const fields: Array<{ text: string; weight: number }> = [
+    { text: normalize(property.codigo ?? ''),                           weight: 10 },
     { text: normalize(property.title),                                  weight: 5 },
     { text: normalize(property.location),                               weight: 4 },
     { text: normalize((property.amenities ?? []).join(' ')),            weight: 3 },
@@ -311,7 +312,7 @@ export function applyAIFilters(properties: Property[], filters: AIFilters): Prop
 
     // Texto de la propiedad para búsqueda
     const searchText = normalize(
-      `${p.title} ${p.location} ${p.description} ${p.captador} ${(p.amenities ?? []).join(' ')} ${p.propertyType ?? ''}`
+      `${p.codigo ?? ''} ${p.title} ${p.location} ${p.description} ${p.captador} ${(p.amenities ?? []).join(' ')} ${p.propertyType ?? ''}`
     );
 
     // Keywords — debe coincidir al menos una (OR)

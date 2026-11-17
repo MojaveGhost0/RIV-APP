@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import BrandLogo from './BrandLogo';
 import { DEFAULT_BRAND_LOGO } from '../lib/brandConfig';
+import { formatPrice, fmt } from '../lib/currency';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type FormatType = 'pdf' | 'instagram' | 'whatsapp' | 'video';
@@ -28,8 +29,6 @@ interface ExportModalProps {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const fmt = (n: number) => n.toLocaleString('es-VE', { maximumFractionDigits: 0 });
-
 async function urlToBase64(url: string): Promise<string> {
   if (!url) return '';
   if (url.startsWith('data:')) return url;

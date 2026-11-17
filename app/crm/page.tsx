@@ -15,6 +15,7 @@ import jsPDF from 'jspdf';
 import { normalize } from '../lib/searchEngine';
 import Combobox, { type ComboboxOption } from '../components/Combobox';
 import BrandLogo from '../components/BrandLogo';
+import { formatPrice, fmt } from '../lib/currency';
 
 // SEC-05: Sanitización preventiva de texto contra scripts o tags HTML maliciosos
 function sanitizeText(str: string): string {
@@ -285,7 +286,7 @@ function exportClientPDF(
       pdf.text(safePropTitle, marginX + 4, propBoxY + 5.5);
 
       pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      const priceStr = typeof prop.price === 'number' ? `$${prop.price.toLocaleString('es-VE')} USD` : String(prop.price || '');
+      const priceStr = typeof prop.price === 'number' ? formatPrice(prop.price, { suffix: ' USD' }) : String(prop.price || '');
       pdf.text(priceStr, pageWidth - marginX - 4, propBoxY + 5.5, { align: 'right' });
 
       // Ubicación y especificaciones
@@ -807,7 +808,7 @@ export default function CRMPage() {
                                       <div className="text-right shrink-0">
                                         {prop.price && (
                                           <span className="text-sm font-black text-vinotinto block">
-                                            {typeof prop.price === 'number' ? `$${prop.price.toLocaleString('es-VE')} USD` : prop.price}
+                                            {typeof prop.price === 'number' ? formatPrice(prop.price, { suffix: ' USD' }) : prop.price}
                                           </span>
                                         )}
                                         {prop.status && (

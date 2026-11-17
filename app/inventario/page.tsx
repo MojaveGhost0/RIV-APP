@@ -18,6 +18,7 @@ import { fuzzySearch, applyAIFilters, normalize, type AIFilters } from '../lib/s
 import { containerVariants, itemVariants } from '../lib/motion';
 import BrandLogo from '../components/BrandLogo';
 import { getActiveBrandLogo, BRAND_NAME, BRAND_RIF, BRAND_LOCATION } from '../lib/brandConfig';
+import { formatPrice, fmt } from '../lib/currency';
 
 // Icono pequeño por tipo (para el badge de las tarjetas)
 const TYPE_BADGE: Partial<Record<PropertyType, { icon: React.ReactNode; label: string }>> = {
@@ -110,13 +111,14 @@ async function exportToPDF(properties: Property[], filterDescription?: string) {
   const COLOR_BORDER: [number, number, number] = [229, 231, 235];
 
   const columns = [
-    { header: '#', width: 10, align: 'center' as const },
-    { header: 'Inmueble / Título', width: 68, align: 'left' as const },
-    { header: 'Tipo', width: 28, align: 'left' as const },
-    { header: 'Ubicación', width: 54, align: 'left' as const },
-    { header: 'Hab / Bñ / M²', width: 32, align: 'center' as const },
+    { header: '#', width: 8, align: 'center' as const },
+    { header: 'Código', width: 18, align: 'center' as const },
+    { header: 'Inmueble / Título', width: 62, align: 'left' as const },
+    { header: 'Tipo', width: 26, align: 'left' as const },
+    { header: 'Ubicación', width: 50, align: 'left' as const },
+    { header: 'Hab / Bñ / M²', width: 30, align: 'center' as const },
     { header: 'Precio (USD)', width: 28, align: 'right' as const },
-    { header: 'Estado', width: 24, align: 'center' as const },
+    { header: 'Estado', width: 22, align: 'center' as const },
     { header: 'Captador', width: 25, align: 'left' as const },
   ];
 
@@ -182,7 +184,7 @@ async function exportToPDF(properties: Property[], filterDescription?: string) {
       const activasVal = properties
         .filter(p => p.status === 'Activa')
         .reduce((sum, p) => sum + (p.price || 0), 0);
-      const summaryStr = `Activos: ${activasCount} | Catálogo: $${activasVal.toLocaleString('es-VE')} USD`;
+      const summaryStr = `Activos: ${activasCount} | Catálogo: ${formatPrice(activasVal, { suffix: ' USD' })}`;
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
@@ -284,51 +286,61 @@ async function exportToPDF(properties: Property[], filterDescription?: string) {
     let colX = marginX;
 
     // 1. #
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
     pdf.text(String(index + 1), colX + columns[0].width / 2, currentY + 4.8, { align: 'center' });
     colX += columns[0].width;
 
-    // 2. Inmueble
-    pdf.setFont('helvetica', 'bold');
-    const safeTitle = (prop.title || 'Sin título').length > 36
-      ? (prop.title || '').slice(0, 34) + '...'
-      : prop.title || 'Sin título';
-    pdf.text(safeTitle, colX + 2, currentY + 4.8);
-    colX += columns[1].width;
-
-    // 3. Tipo
-    pdf.setFont('helvetica', 'normal');
-    const safeType = (prop.propertyType || '-').length > 16
-      ? (prop.propertyType || '').slice(0, 14) + '...'
-      : prop.propertyType || '-';
-    pdf.text(safeType, colX + 2, currentY + 4.8);
-    colX += columns[2].width;
-
-    // 4. Ubicación
-    pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-    const safeLoc = (prop.location || '-').length > 30
-      ? (prop.location || '').slice(0, 28) + '...'
-      : prop.location || '-';
-    pdf.text(safeLoc, colX + 2, currentY + 4.8);
-    colX += columns[3].width;
-
-    // 5. Specs
-    pdf.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
-    const specs = `${prop.beds || 0}h · ${prop.baths || 0}b · ${prop.sqm || 0}m²`;
-    pdf.text(specs, colX + columns[4].width / 2, currentY + 4.8, { align: 'center' });
-    colX += columns[4].width;
-
-    // 6. Precio
+    // 2. Código
     pdf.setFont('helvetica', 'bold');
     pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-    const priceText = `$${(prop.price || 0).toLocaleString('es-VE')}`;
-    pdf.text(priceText, colX + columns[5].width - 2, currentY + 4.8, { align: 'right' });
+    pdf.text(prop.codigo || '-', colX + columns[1].width / 2, currentY + 4.8, { align: 'center' });
+    colX += columns[1].width;
+
+    // 3. Inmueble
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
+    const safeTitle = (prop.title || 'Sin título').length > 34
+      ? (prop.title || '').slice(0, 32) + '...'
+      : prop.title || 'Sin título';
+    pdf.text(safeTitle, colX + 2, currentY + 4.8);
+    colX += columns[2].width;
+
+    // 4. Tipo
+    pdf.setFont('helvetica', 'normal');
+    const safeType = (prop.propertyType || '-').length > 15
+      ? (prop.propertyType || '').slice(0, 13) + '...'
+      : prop.propertyType || '-';
+    pdf.text(safeType, colX + 2, currentY + 4.8);
+    colX += columns[3].width;
+
+    // 5. Ubicación
+    pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+    const safeLoc = (prop.location || '-').length > 28
+      ? (prop.location || '').slice(0, 26) + '...'
+      : prop.location || '-';
+    pdf.text(safeLoc, colX + 2, currentY + 4.8);
+    colX += columns[4].width;
+
+    // 6. Specs
+    pdf.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
+    const specs = `${prop.beds || 0}h · ${prop.baths || 0}b · ${prop.sqm || 0}m²`;
+    pdf.text(specs, colX + columns[5].width / 2, currentY + 4.8, { align: 'center' });
     colX += columns[5].width;
 
-    // 7. Estado
+    // 7. Precio
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+    const priceText = formatPrice(prop.price);
+    pdf.text(priceText, colX + columns[6].width - 2, currentY + 4.8, { align: 'right' });
+    colX += columns[6].width;
+
+    // 8. Estado
     const status = prop.status || 'Activa';
     const badgeW = 18;
     const badgeH = 4.5;
-    const badgeX = colX + (columns[6].width - badgeW) / 2;
+    const badgeX = colX + (columns[7].width - badgeW) / 2;
     const badgeY = currentY + (rowHeight - badgeH) / 2;
 
     if (status === 'Activa') {
@@ -346,10 +358,10 @@ async function exportToPDF(properties: Property[], filterDescription?: string) {
     }
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(6.5);
-    pdf.text(status, colX + columns[6].width / 2, currentY + 4.6, { align: 'center' });
-    colX += columns[6].width;
+    pdf.text(status, colX + columns[7].width / 2, currentY + 4.6, { align: 'center' });
+    colX += columns[7].width;
 
-    // 8. Captador
+    // 9. Captador
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7.5);
     pdf.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
@@ -632,11 +644,11 @@ export default function Inventario() {
 
     if (exportMinPrice || exportMaxPrice) {
       if (exportMinPrice && exportMaxPrice) {
-        parts.push(`$${Number(exportMinPrice).toLocaleString('es-VE')} - $${Number(exportMaxPrice).toLocaleString('es-VE')} USD`);
+        parts.push(`${formatPrice(Number(exportMinPrice))} - ${formatPrice(Number(exportMaxPrice), { suffix: ' USD' })}`);
       } else if (exportMinPrice) {
-        parts.push(`Desde $${Number(exportMinPrice).toLocaleString('es-VE')} USD`);
+        parts.push(`Desde ${formatPrice(Number(exportMinPrice), { suffix: ' USD' })}`);
       } else if (exportMaxPrice) {
-        parts.push(`Hasta $${Number(exportMaxPrice).toLocaleString('es-VE')} USD`);
+        parts.push(`Hasta ${formatPrice(Number(exportMaxPrice), { suffix: ' USD' })}`);
       }
     }
 
@@ -893,12 +905,19 @@ export default function Inventario() {
 
               {/* INFO */}
               <div className="p-4 sm:p-5">
+                {prop.codigo && (
+                  <div className="mb-1.5">
+                    <span className="inline-block px-2 py-0.5 text-[10px] font-bold tracking-wider text-vinotinto bg-vinotinto/10 border border-vinotinto/20 rounded-md">
+                      {prop.codigo}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between items-start mb-1.5">
                   <h3 className="font-bold text-base text-gray-900 leading-tight flex-1 pr-2 group-hover:text-vinotinto transition-colors">
                     {prop.title}
                   </h3>
                   <span className="font-black text-lg text-vinotinto tracking-tight whitespace-nowrap">
-                    ${prop.price.toLocaleString()}
+                    {formatPrice(prop.price)}
                   </span>
                 </div>
 

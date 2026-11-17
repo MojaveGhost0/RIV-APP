@@ -1,7 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { Calendar as CalendarIcon, Clock, Plus, X, User, ShieldAlert, Trash2, CheckCheck, AlertCircle, Edit2, Save, Sparkles } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import {
+  Calendar as CalendarIcon, Clock, Plus, X, User, ShieldAlert, Trash2,
+  CheckCheck, AlertCircle, Edit2, Save, Sparkles, ChevronLeft, ChevronRight,
+  Search, Filter, RotateCcw, ChevronDown, ChevronUp, CheckCircle2,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useAuth } from '../context/AuthContext';
@@ -37,6 +41,17 @@ export default function GestorCitas() {
     asesoresIds: user?.id ? [user.id] : [],
   });
 
+  // Estados para Calendario Interactivo (Requerimiento 4)
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
+  const [isCalendarOpen, setIsCalendarOpen] = useState(true);
+
+  // Estados para Filtros en Histórico General (Requerimiento 5)
+  const [historicoSearch, setHistoricoSearch] = useState('');
+  const [historicoDesde, setHistoricoDesde] = useState('');
+  const [historicoHasta, setHistoricoHasta] = useState('');
+  const [historicoEstado, setHistoricoEstado] = useState<'Todas' | 'Completada' | 'Vencida'>('Todas');
+
   // REGLA DE NEGOCIO (DT-04: normalize compartido desde searchEngine.ts):
   // - Asesor solo ve sus propias citas.
   // - Admin ve todas las citas de la agencia.
@@ -48,13 +63,99 @@ export default function GestorCitas() {
       const esMia = cita.asesores.some(a => normalize(a) === myNombre);
       if (!isAdmin && !esMia) return false;
       const pasada = isCitaPasada(cita, now);
-      if (activeTab === 'proximas')  return cita.estado === 'Pendiente' && !pasada;
-      if (activeTab === 'historico') return cita.estado !== 'Pendiente' || pasada;
+
+      // Filtro por Tab
+      if (activeTab === 'proximas') {
+        if (cita.estado !== 'Pendiente' || pasada) return false;
+      } else if (activeTab === 'historico') {
+        if (cita.estado === 'Pendiente' && !pasada) return false;
+
+        // Filtro de búsqueda en tiempo real (Requerimiento 5)
+        if (historicoSearch.trim()) {
+          const q = normalize(historicoSearch);
+          const matchCliente = normalize(cita.cliente || '').includes(q);
+          const matchTitulo = normalize(cita.titulo || '').includes(q);
+          if (!matchCliente && !matchTitulo) return false;
+        }
+
+        // Filtro de rango de fechas (Requerimiento 5)
+        if (historicoDesde && cita.fecha < historicoDesde) return false;
+        if (historicoHasta && cita.fecha > historicoHasta) return false;
+
+        // Filtro rápido de estado (Requerimiento 5)
+        if (historicoEstado === 'Completada' && cita.estado !== 'Completada') return false;
+        if (historicoEstado === 'Vencida') {
+          const esVencida = cita.estado === 'Vencida' || (cita.estado === 'Pendiente' && pasada);
+          if (!esVencida) return false;
+        }
+      }
+
+      // Filtro por fecha interactiva seleccionada en calendario (Requerimiento 4)
+      if (selectedCalendarDate && cita.fecha !== selectedCalendarDate) {
+        return false;
+      }
+
       return true;
     })
     .sort((a, b) => activeTab === 'proximas'
       ? getCitaTime(a) - getCitaTime(b)
       : getCitaTime(b) - getCitaTime(a));
+
+  // ─── LÓGICA DE CALENDARIO MENSUAL (Requerimiento 4) ──────────────────────
+  const MONTH_NAMES = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+  const calYear = calendarMonth.getFullYear();
+  const calMonth = calendarMonth.getMonth();
+
+  const daysInMonth = useMemo(() => new Date(calYear, calMonth + 1, 0).getDate(), [calYear, calMonth]);
+  const firstDayIndex = useMemo(() => {
+    // 0 = Domingo en JS -> convertimos a Lunes = 0, ..., Domingo = 6
+    const day = new Date(calYear, calMonth, 1).getDay();
+    return (day + 6) % 7;
+  }, [calYear, calMonth]);
+
+  const prevMonth = () => setCalendarMonth(new Date(calYear, calMonth - 1, 1));
+  const nextMonth = () => setCalendarMonth(new Date(calYear, calMonth + 1, 1));
+  const goToToday = () => {
+    const d = new Date();
+    setCalendarMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const todayStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    setSelectedCalendarDate(todayStr);
+  };
+
+  // Citas por fecha para los indicadores visuales del calendario
+  const calendarDayIndicators = useMemo(() => {
+    const map: Record<string, { hasPending: boolean; hasCompleted: boolean; hasExpired: boolean; count: number }> = {};
+    
+    appointments.forEach(cita => {
+      const esMia = cita.asesores.some(a => normalize(a) === myNombre);
+      if (!isAdmin && !esMia) return;
+
+      const f = cita.fecha;
+      if (!f) return;
+
+      if (!map[f]) {
+        map[f] = { hasPending: false, hasCompleted: false, hasExpired: false, count: 0 };
+      }
+
+      map[f].count++;
+      const pasada = isCitaPasada(cita, now);
+      if (cita.estado === 'Pendiente' && !pasada) {
+        map[f].hasPending = true;
+      } else if (cita.estado === 'Completada') {
+        map[f].hasCompleted = true;
+      } else {
+        map[f].hasExpired = true;
+      }
+    });
+
+    return map;
+  }, [appointments, isAdmin, myNombre, now]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -257,6 +358,280 @@ export default function GestorCitas() {
           )}
         </div>
       </div>
+
+      {/* SECCIÓN CALENDARIO INTERACTIVO (Requerimiento 4) */}
+      <div className="px-4 mb-4 relative z-10">
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xs overflow-hidden transition-all">
+          {/* Header del Calendario */}
+          <div className="p-3.5 sm:p-4 flex items-center justify-between border-b border-gray-100/80">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-vinotinto/10 text-vinotinto flex items-center justify-center">
+                <CalendarIcon size={16} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-900 leading-none">
+                  {MONTH_NAMES[calMonth]} {calYear}
+                </h3>
+                <p className="text-[10px] text-gray-400 mt-0.5">Calendario de Agenda</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={goToToday}
+                className="px-2.5 py-1 text-[11px] font-bold text-vinotinto bg-vinotinto/5 hover:bg-vinotinto/10 border border-vinotinto/20 rounded-lg transition-colors cursor-pointer"
+              >
+                Hoy
+              </button>
+              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
+                <button
+                  type="button"
+                  onClick={prevMonth}
+                  className="p-1.5 text-gray-600 hover:text-vinotinto hover:bg-gray-50 transition-colors cursor-pointer"
+                  title="Mes anterior"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <div className="w-[1px] h-4 bg-gray-200" />
+                <button
+                  type="button"
+                  onClick={nextMonth}
+                  className="p-1.5 text-gray-600 hover:text-vinotinto hover:bg-gray-50 transition-colors cursor-pointer"
+                  title="Mes siguiente"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCalendarOpen(v => !v)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer ml-1"
+                title={isCalendarOpen ? 'Ocultar calendario' : 'Mostrar calendario'}
+              >
+                {isCalendarOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Grilla Mensual Desplegable */}
+          <AnimatePresence initial={false}>
+            {isCalendarOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="p-3 sm:p-4">
+                  {/* Encabezado de Días de la Semana */}
+                  <div className="grid grid-cols-7 gap-1 text-center mb-1.5">
+                    {DAY_NAMES.map((d, idx) => (
+                      <span key={d} className={`text-[10px] font-bold uppercase tracking-wider ${idx >= 5 ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Celdas del Calendario */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {/* Días en blanco antes del inicio del mes */}
+                    {Array.from({ length: firstDayIndex }).map((_, i) => (
+                      <div key={`blank-${i}`} className="h-10 sm:h-12 rounded-xl bg-gray-50/40" />
+                    ))}
+
+                    {/* Días del mes */}
+                    {Array.from({ length: daysInMonth }).map((_, i) => {
+                      const dayNumber = i + 1;
+                      const padMonth = String(calMonth + 1).padStart(2, '0');
+                      const padDay = String(dayNumber).padStart(2, '0');
+                      const dateStr = `${calYear}-${padMonth}-${padDay}`;
+
+                      const isSelected = selectedCalendarDate === dateStr;
+                      const isToday = dateStr === todayISO(now);
+                      const indicator = calendarDayIndicators[dateStr];
+
+                      return (
+                        <button
+                          key={dateStr}
+                          type="button"
+                          onClick={() => setSelectedCalendarDate(isSelected ? null : dateStr)}
+                          className={`h-10 sm:h-12 rounded-xl flex flex-col items-center justify-between p-1 transition-all cursor-pointer relative group ${
+                            isSelected
+                              ? 'bg-vinotinto text-white shadow-md shadow-vinotinto/30 scale-102 z-10'
+                              : isToday
+                              ? 'bg-vinotinto/5 text-vinotinto font-extrabold border border-vinotinto/40 hover:bg-vinotinto/10'
+                              : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-100 hover:border-dorado/40'
+                          }`}
+                        >
+                          <span className={`text-xs font-semibold leading-none mt-0.5 ${isSelected ? 'text-white font-bold' : ''}`}>
+                            {dayNumber}
+                          </span>
+
+                          {/* Indicadores de citas por estado */}
+                          <div className="flex items-center justify-center gap-0.5 h-2 mb-0.5">
+                            {indicator ? (
+                              <>
+                                {indicator.hasPending && (
+                                  <span
+                                    title="Cita pendiente"
+                                    className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-amber-300 ring-1 ring-white' : 'bg-amber-500'}`}
+                                  />
+                                )}
+                                {indicator.hasCompleted && (
+                                  <span
+                                    title="Cita completada"
+                                    className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-emerald-300 ring-1 ring-white' : 'bg-emerald-500'}`}
+                                  />
+                                )}
+                                {indicator.hasExpired && (
+                                  <span
+                                    title="Cita vencida/cancelada"
+                                    className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-rose-300 ring-1 ring-white' : 'bg-rose-500'}`}
+                                  />
+                                )}
+                              </>
+                            ) : null}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Leyenda de Estados */}
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-3 mt-3 border-t border-gray-100 text-[10px] text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" /> Pendiente
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" /> Completada
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-rose-500" /> Vencida / Cancelada
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Banner de fecha seleccionada en calendario */}
+        {selectedCalendarDate && (
+          <div className="mt-2.5 flex items-center justify-between bg-vinotinto/10 border border-vinotinto/25 rounded-xl px-3.5 py-2 text-xs">
+            <div className="flex items-center gap-2">
+              <CalendarIcon size={14} className="text-vinotinto" />
+              <span className="text-gray-800 font-semibold">
+                Filtrando citas del día:{' '}
+                <strong className="text-vinotinto">{selectedCalendarDate}</strong>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedCalendarDate(null)}
+              className="px-2.5 py-1 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1"
+            >
+              <RotateCcw size={11} /> Ver todas
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* CONTROLES DE BÚSQUEDA Y FILTROS EN HISTÓRICO GENERAL (Requerimiento 5) */}
+      {activeTab === 'historico' && (
+        <div className="px-4 mb-4 relative z-10">
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-gray-100 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Filter size={15} className="text-vinotinto" />
+                <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
+                  Filtros del Histórico
+                </h3>
+              </div>
+              {(historicoSearch || historicoDesde || historicoHasta || historicoEstado !== 'Todas') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHistoricoSearch('');
+                    setHistoricoDesde('');
+                    setHistoricoHasta('');
+                    setHistoricoEstado('Todas');
+                  }}
+                  className="text-[11px] font-bold text-vinotinto hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCcw size={11} /> Limpiar filtros
+                </button>
+              )}
+            </div>
+
+            {/* Buscador en tiempo real por cliente o título */}
+            <div className="relative group">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-vinotinto transition-colors" />
+              <input
+                type="text"
+                value={historicoSearch}
+                onChange={e => setHistoricoSearch(e.target.value)}
+                placeholder="Buscar por nombre de cliente o título de propiedad..."
+                className="w-full pl-9 pr-8 py-2.5 bg-gray-50/80 border border-gray-200/80 rounded-xl text-xs focus:outline-none focus:bg-white focus:ring-2 focus:ring-vinotinto/20 focus:border-vinotinto transition-all"
+              />
+              {historicoSearch && (
+                <button
+                  type="button"
+                  onClick={() => setHistoricoSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Rango de fechas y filtro rápido por estado */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1">Fecha desde</label>
+                  <input
+                    type="date"
+                    value={historicoDesde}
+                    onChange={e => setHistoricoDesde(e.target.value)}
+                    className="w-full p-2 bg-gray-50/80 border border-gray-200/80 rounded-xl text-xs focus:outline-none focus:bg-white focus:ring-2 focus:ring-vinotinto/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1">Fecha hasta</label>
+                  <input
+                    type="date"
+                    value={historicoHasta}
+                    onChange={e => setHistoricoHasta(e.target.value)}
+                    className="w-full p-2 bg-gray-50/80 border border-gray-200/80 rounded-xl text-xs focus:outline-none focus:bg-white focus:ring-2 focus:ring-vinotinto/20"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 mb-1">Estado de la Cita</label>
+                <div className="flex bg-gray-100 p-0.5 rounded-xl">
+                  {(['Todas', 'Completada', 'Vencida'] as const).map(st => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setHistoricoEstado(st)}
+                      className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                        historicoEstado === st
+                          ? 'bg-white text-vinotinto shadow-xs'
+                          : 'text-gray-500 hover:text-gray-800'
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* LISTA DE CITAS */}
       <AnimatePresence mode="wait" initial={false}>

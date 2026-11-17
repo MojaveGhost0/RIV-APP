@@ -45,6 +45,7 @@ export default function Perfil() {
     email: '',
     password: '',
     rol: 'ASESOR' as UserRole,
+    is_active: true,
   });
 
   const handleOpenManageUser = (existingUser?: AuthUser) => {
@@ -58,6 +59,7 @@ export default function Perfil() {
         email: existingUser.email,
         password: '', // Leave blank, only update if typed
         rol: existingUser.rol,
+        is_active: existingUser.is_active !== false,
       });
     } else {
       setUserToEdit(null);
@@ -67,6 +69,7 @@ export default function Perfil() {
         email: '',
         password: '',
         rol: 'ASESOR',
+        is_active: true,
       });
     }
     setIsUserManageModalOpen(true);
@@ -84,6 +87,7 @@ export default function Perfil() {
           nombre: userForm.nombre,
           email: userForm.email,
           rol: userForm.rol,
+          is_active: userForm.is_active,
         };
         if (userForm.password) {
           dataToUpdate.password = userForm.password;
@@ -165,6 +169,13 @@ export default function Perfil() {
   };
 
   const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isAdmin) {
+      setLogoFeedback({
+        type: 'error',
+        message: 'Acceso denegado: Solo administradores pueden modificar el logotipo oficial de la franquicia.'
+      });
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -224,6 +235,13 @@ export default function Perfil() {
   };
 
   const handleResetLogo = async () => {
+    if (!isAdmin) {
+      setLogoFeedback({
+        type: 'error',
+        message: 'Acceso denegado: Solo administradores pueden modificar el logotipo oficial de la franquicia.'
+      });
+      return;
+    }
     setIsUploadingLogo(true);
     try {
       await updateAgencyLogo('');
@@ -432,36 +450,45 @@ export default function Perfil() {
             </div>
           )}
 
-          {/* BOTONES DE ACCIÓN */}
-          <div className="flex items-center gap-2 pt-1 flex-wrap">
-            <input
-              ref={logoFileInputRef}
-              type="file"
-              accept=".svg,.png,image/svg+xml,image/png"
-              className="hidden"
-              onChange={handleLogoFileSelect}
-            />
-            <button
-              onClick={() => logoFileInputRef.current?.click()}
-              disabled={isUploadingLogo}
-              className="flex-1 py-2.5 px-3 bg-vinotinto text-white rounded-xl text-xs font-bold hover:bg-[#a60029] active:scale-95 transition flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-60"
-            >
-              <Upload size={13} />
-              {isUploadingLogo ? 'Guardando...' : 'Cargar Logo Propio (PNG / SVG)'}
-            </button>
-
-            {user?.agencyLogo && (
+          {/* BOTONES DE ACCIÓN (SOLO ADMINISTRADORES) */}
+          {isAdmin ? (
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
+              <input
+                ref={logoFileInputRef}
+                type="file"
+                accept=".svg,.png,image/svg+xml,image/png"
+                className="hidden"
+                onChange={handleLogoFileSelect}
+              />
               <button
-                onClick={handleResetLogo}
+                onClick={() => logoFileInputRef.current?.click()}
                 disabled={isUploadingLogo}
-                className="py-2.5 px-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 active:scale-95 disabled:opacity-60"
-                title="Volver al logo oficial de RIV Margarita Premier"
+                className="flex-1 py-2.5 px-3 bg-vinotinto text-white rounded-xl text-xs font-bold hover:bg-[#a60029] active:scale-95 transition flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-60 cursor-pointer"
               >
-                <RotateCcw size={13} />
-                Restablecer RIV
+                <Upload size={13} />
+                {isUploadingLogo ? 'Guardando...' : 'Cargar Logo Propio (PNG / SVG)'}
               </button>
-            )}
-          </div>
+
+              {user?.agencyLogo && (
+                <button
+                  onClick={handleResetLogo}
+                  disabled={isUploadingLogo}
+                  className="py-2.5 px-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 active:scale-95 disabled:opacity-60 cursor-pointer"
+                  title="Volver al logo oficial de RIV Margarita Premier"
+                >
+                  <RotateCcw size={13} />
+                  Restablecer RIV
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-600">
+              <Shield size={16} className="text-vinotinto shrink-0" />
+              <span>
+                El logotipo corporativo solo puede ser configurado por usuarios con rol de <strong>Administrador</strong>.
+              </span>
+            </div>
+          )}
           <p className="text-[10px] text-gray-400 leading-normal">
             Acepta SVG vectorial oficial o PNG transparente (máx. 3MB). Este logo se reflejará automáticamente en la barra superior, fichas técnicas PDF, plantillas de Instagram Stories / Feed y marcas de agua de videos.
           </p>
@@ -495,11 +522,20 @@ export default function Perfil() {
               {getAllUsers().map(u => (
                 <div key={u.id} className="p-3 flex items-center justify-between hover:bg-gray-50 transition">
                   <div>
-                    <p className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-                      {u.nombre}
-                      {u.rol === 'ADMIN' && <Shield size={12} className="text-vinotinto" />}
-                    </p>
-                    <p className="text-xs text-gray-500">{u.username} • {u.email}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                        {u.nombre}
+                        {u.rol === 'ADMIN' && <Shield size={12} className="text-vinotinto" />}
+                      </p>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        u.is_active !== false
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                      }`}>
+                        {u.is_active !== false ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">{u.username} • {u.email}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -734,6 +770,44 @@ export default function Perfil() {
                       placeholder={userToEdit ? 'Dejar en blanco para no cambiar' : 'Requerida'}
                       className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-1 focus:ring-blue-500 outline-none text-sm"
                     />
+                  </div>
+                </div>
+
+                {/* Switch / Selector de Estado Activo / Inactivo (Requerimiento 6) */}
+                <div className="bg-gray-50 p-3 rounded-xl border border-gray-200/80">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-800">Estado del Asesor</label>
+                      <p className="text-[11px] text-gray-500">
+                        {userForm.is_active
+                          ? 'Cuenta activa con acceso regular al sistema.'
+                          : 'Cuenta suspendida (ej. vacaciones). Se impedirá el inicio de sesión.'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 shadow-xs shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setUserForm({ ...userForm, is_active: true })}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                          userForm.is_active
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-gray-500 hover:text-gray-800'
+                        }`}
+                      >
+                        Activo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUserForm({ ...userForm, is_active: false })}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                          !userForm.is_active
+                            ? 'bg-rose-600 text-white shadow-xs'
+                            : 'text-gray-500 hover:text-gray-800'
+                        }`}
+                      >
+                        Inactivo
+                      </button>
+                    </div>
                   </div>
                 </div>
 

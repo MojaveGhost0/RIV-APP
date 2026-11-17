@@ -18,6 +18,12 @@ export interface AuthUser {
   rol: UserRole;
   telefono?: string;
   agencyLogo?: string;
+  is_active?: boolean;
+}
+
+export interface LoginResult {
+  success: boolean;
+  error?: string;
 }
 
 interface AuthContextType {
@@ -25,7 +31,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isAsesor: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<LoginResult>;
   logout: () => void;
   getAllUsers: () => AuthUser[];
   updateUserPhone: (phone: string) => Promise<void>;
@@ -45,8 +51,12 @@ const DEFAULT_PHONES: Record<string, string> = {
   'usr-003': '0414-7903333',
 };
 
+interface DefaultUser extends AuthUser {
+  password?: string;
+}
+
 // Usuarios predeterminados del sistema con respaldo offline/local
-const DEFAULT_USERS: Array<AuthUser & { password?: string }> = [
+const DEFAULT_USERS: DefaultUser[] = [
   {
     id: 'usr-001',
     username: 'gerardo garcia',
@@ -55,6 +65,7 @@ const DEFAULT_USERS: Array<AuthUser & { password?: string }> = [
     email: 'admin@rivmargarita.com',
     rol: 'ADMIN',
     telefono: '0414-7901111',
+    is_active: true,
   },
   {
     id: 'usr-002',
@@ -64,6 +75,7 @@ const DEFAULT_USERS: Array<AuthUser & { password?: string }> = [
     email: 'juan.garcia@rivmargarita.com',
     rol: 'ASESOR',
     telefono: '0414-7902222',
+    is_active: true,
   },
   {
     id: 'usr-003',
@@ -73,6 +85,7 @@ const DEFAULT_USERS: Array<AuthUser & { password?: string }> = [
     email: 'amadolovera@rivmargarita.com',
     rol: 'ASESOR',
     telefono: '0414-7903333',
+    is_active: true,
   },
 ];
 
@@ -171,16 +184,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initAuth = async () => {
       try {
         let safeUsers: AuthUser[] = [];
+        let fetchedUsers: any[] = [];
 
-        // Consultar columnas estándar de la tabla 'users' en Supabase (evitando 'telefono' que causa error SQL si no existe en la BD)
+        // Consultar columnas estándar intentando incluir 'is_active'
         const { data: usersData, error: usersError } = await supabase
           .from('users')
-          .select('id, username, nombre, email, rol');
+          .select('id, username, nombre, email, rol, is_active');
+
+        if (!usersError && usersData && usersData.length > 0) {
+          fetchedUsers = usersData;
+        } else {
+          const { data: fallbackData } = await supabase
+            .from('users')
+            .select('id, username, nombre, email, rol');
+          if (fallbackData) fetchedUsers = fallbackData;
+        }
 
         const savedLogo = safeGetStorage('riv_custom_agency_logo') || undefined;
 
-        if (usersData && !usersError && usersData.length > 0) {
-          safeUsers = (usersData as any[]).map(u => ({
+        if (fetchedUsers.length > 0) {
+          safeUsers = fetchedUsers.map(u => ({
             id: u.id,
             username: u.username,
             nombre: u.nombre,
@@ -188,6 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             rol: u.rol,
             telefono: safeGetStorage(`riv_user_phone_${u.id}`) || DEFAULT_PHONES[u.id] || '',
             agencyLogo: savedLogo,
+            is_active: u.is_active !== false,
           }));
         } else {
           // Fallback a DEFAULT_USERS si la tabla o conexión no responden
@@ -195,6 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             ...u,
             telefono: safeGetStorage(`riv_user_phone_${u.id}`) || u.telefono || DEFAULT_PHONES[u.id] || '',
             agencyLogo: savedLogo,
+            is_active: (u as AuthUser).is_active !== false,
           }));
         }
 
@@ -208,7 +233,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (verification.valid && verification.userId) {
               const found = safeUsers.find((u: AuthUser) => u.id === verification.userId);
               if (found) {
-                setUser(found);
+                if (found.is_active === false) {
+                  console.warn('Usuario suspendido / inactivo. Sesión terminada.');
+                  safeRemoveStorage(SESSION_KEY);
+                  setUser(null);
+                } else {
+                  setUser(found);
+                }
               } else {
                 safeRemoveStorage(SESSION_KEY);
               }
@@ -222,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const safeUsers = DEFAULT_USERS.map(({ password: _, ...u }) => ({
           ...u,
           telefono: safeGetStorage(`riv_user_phone_${u.id}`) || u.telefono || DEFAULT_PHONES[u.id] || '',
+          is_active: (u as AuthUser).is_active !== false,
         }));
         setAllUsers(safeUsers);
       } finally {
@@ -232,7 +264,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (username: string, password: string): Promise<LoginResult> => {
     try {
       const trimmedUsername = username.trim();
       const cleanPassword = password.trim();
@@ -246,6 +278,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!rpcError && rpcData && rpcData.length > 0) {
           const raw = rpcData[0];
+          if (raw.is_active === false) {
+            return {
+              success: false,
+              error: 'Tu cuenta se encuentra inactiva. Contacta al administrador.',
+            };
+          }
           const authenticatedUser: AuthUser = {
             id: raw.id,
             username: raw.username,
@@ -253,10 +291,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: raw.email,
             rol: raw.rol,
             telefono: raw.telefono || safeGetStorage(`riv_user_phone_${raw.id}`) || DEFAULT_PHONES[raw.id] || '',
+            is_active: raw.is_active !== false,
           };
           setUser(authenticatedUser);
           safeSetStorage(SESSION_KEY, createSession(authenticatedUser));
-          return true;
+          return { success: true };
         }
       } catch (rpcErr) {
         // RPC no configurada en Supabase, continuar con la consulta directa
@@ -266,13 +305,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { data, error } = await supabase
           .from('users')
-          .select('id, username, password, nombre, email, rol')
+          .select('id, username, password, nombre, email, rol, is_active')
           .ilike('username', trimmedUsername)
           .maybeSingle();
 
         if (data && !error) {
           // Comparar contraseñas (soporta texto plano tal como está en Supabase)
           if (data.password === cleanPassword || data.password === password) {
+            if (data.is_active === false) {
+              return {
+                success: false,
+                error: 'Tu cuenta se encuentra inactiva. Contacta al administrador.',
+              };
+            }
             const authUser: AuthUser = {
               id: data.id,
               username: data.username,
@@ -280,10 +325,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               email: data.email,
               rol: data.rol,
               telefono: safeGetStorage(`riv_user_phone_${data.id}`) || DEFAULT_PHONES[data.id] || '',
+              is_active: data.is_active !== false,
             };
             setUser(authUser);
             safeSetStorage(SESSION_KEY, createSession(authUser));
-            return true;
+            return { success: true };
           }
         }
       } catch (dbErr) {
@@ -297,6 +343,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
 
       if (defaultMatch) {
+        const defaultIsActive = (defaultMatch as AuthUser).is_active !== false;
+        if (!defaultIsActive) {
+          return {
+            success: false,
+            error: 'Tu cuenta se encuentra inactiva. Contacta al administrador.',
+          };
+        }
         const authUser: AuthUser = {
           id: defaultMatch.id,
           username: defaultMatch.username,
@@ -304,15 +357,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: defaultMatch.email,
           rol: defaultMatch.rol,
           telefono: safeGetStorage(`riv_user_phone_${defaultMatch.id}`) || defaultMatch.telefono || DEFAULT_PHONES[defaultMatch.id] || '',
+          is_active: defaultIsActive,
         };
         setUser(authUser);
         safeSetStorage(SESSION_KEY, createSession(authUser));
-        return true;
+        return { success: true };
       }
     } catch (e) {
       console.error('Error en login:', e);
     }
-    return false;
+    return {
+      success: false,
+      error: 'Usuario o contraseña incorrectos. Intenta nuevamente.',
+    };
   };
 
   const logout = () => {
@@ -349,6 +406,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateAgencyLogo = async (logoUrl: string): Promise<void> => {
+    if (user?.rol !== 'ADMIN') {
+      throw new Error('Solo los administradores tienen permisos para modificar el logotipo global de la agencia.');
+    }
     const cleanLogo = logoUrl.trim();
     setCustomBrandLogo(cleanLogo);
     if (user) {
@@ -372,25 +432,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const addUser = async (userData: Omit<AuthUser, 'id'> & { password?: string }) => {
     try {
       const newId = `usr-${Date.now()}`;
-      const newUser = { id: newId, ...userData };
+      const is_active = userData.is_active !== false;
+      const newUser: AuthUser = { id: newId, ...userData, is_active };
       
-      const { error } = await supabase.from('users').insert([
-        {
-          id: newId,
-          username: userData.username,
-          password: userData.password || '123456',
-          nombre: userData.nombre,
-          email: userData.email,
-          rol: userData.rol,
-        }
-      ]);
+      const insertPayload: any = {
+        id: newId,
+        username: userData.username,
+        password: userData.password || '123456',
+        nombre: userData.nombre,
+        email: userData.email,
+        rol: userData.rol,
+        is_active,
+      };
+
+      let { error } = await supabase.from('users').insert([insertPayload]);
+      
+      // Fallback si la columna is_active aún no fue migrada en Supabase
+      if (error && error.message && error.message.toLowerCase().includes('is_active')) {
+        delete insertPayload.is_active;
+        const retry = await supabase.from('users').insert([insertPayload]);
+        error = retry.error;
+      }
       
       if (error) {
         throw new Error(error.message);
       }
       
       // Update local state if DB insert succeeds
-      setAllUsers(prev => [...prev, newUser as AuthUser]);
+      setAllUsers(prev => [...prev, newUser]);
     } catch (err: any) {
       console.error('Error adding user:', err);
       throw err;
@@ -404,10 +473,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       delete updatePayload.telefono; // Handle phone separately if needed
       delete updatePayload.agencyLogo;
 
-      const { error } = await supabase
+      let { error } = await supabase
         .from('users')
         .update(updatePayload)
         .eq('id', userId);
+
+      // Fallback si is_active aún no existe en Supabase
+      if (error && error.message && error.message.toLowerCase().includes('is_active')) {
+        delete updatePayload.is_active;
+        const retry = await supabase
+          .from('users')
+          .update(updatePayload)
+          .eq('id', userId);
+        error = retry.error;
+      }
 
       if (error) {
         throw new Error(error.message);
