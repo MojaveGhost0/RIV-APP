@@ -1052,7 +1052,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ background: '#800020', color: '#fff', padding: '6px 18px', borderRadius: '999px', fontSize: '11px', fontWeight: 800, letterSpacing: '2px' }}>FICHA TÉCNICA OFICIAL</span>
-              <p style={{ fontSize: '13px', color: '#6B7280', margin: '6px 0 0', fontWeight: 600 }}>Isla de Margarita, Venezuela</p>
+              <p style={{ fontSize: '12px', color: '#6B7280', margin: '6px 0 0', fontWeight: 600 }}>RIF: J-11055496-2 · Isla de Margarita, Venezuela</p>
             </div>
           </div>
 

@@ -17,6 +17,7 @@ import type { Property, PropertyType } from '../context/DataContext';
 import { fuzzySearch, applyAIFilters, normalize, type AIFilters } from '../lib/searchEngine';
 import { containerVariants, itemVariants } from '../lib/motion';
 import BrandLogo from '../components/BrandLogo';
+import { getActiveBrandLogo, BRAND_NAME, BRAND_RIF, BRAND_LOCATION } from '../lib/brandConfig';
 
 // Icono pequeño por tipo (para el badge de las tarjetas)
 const TYPE_BADGE: Partial<Record<PropertyType, { icon: React.ReactNode; label: string }>> = {
@@ -45,10 +46,50 @@ const MUNICIPIOS_MARGARITA = [
 ];
 
 // ─── Exportar Inventario a PDF ─────────────────────────────────────────────
-function exportToPDF(properties: Property[], filterDescription?: string) {
+/**
+ * Convierte una imagen a Base64 utilizando un canvas en memoria
+ * para garantizar compatibilidad total con jsPDF en el navegador sin dependencias externas.
+ */
+function loadLogoBase64(src: string): Promise<string | null> {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    const onDone = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+          return;
+        }
+      } catch (err) {
+        console.warn('No se pudo convertir el logo a canvas dataURL:', err);
+      }
+      resolve(null);
+    };
+
+    img.onload = onDone;
+    img.onerror = () => resolve(null);
+    img.src = src;
+
+    if (img.complete && img.naturalWidth > 0) {
+      onDone();
+    }
+  });
+}
+
+async function exportToPDF(properties: Property[], filterDescription?: string) {
   if (!properties || properties.length === 0) {
     return;
   }
+
+  // Pre-cargar el logotipo corporativo oficial en formato Base64 para jsPDF
+  const logoBase64 = await loadLogoBase64(getActiveBrandLogo());
 
   const pdf = new jsPDF({
     orientation: 'landscape',
@@ -82,68 +123,116 @@ function exportToPDF(properties: Property[], filterDescription?: string) {
   let currentY = 14;
 
   const drawHeader = (isFirstPage: boolean) => {
-    // Barra superior decorativa
+    // Barra superior decorativa vinotinto y detalle dorado
     pdf.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
     pdf.rect(marginX, 10, contentWidth, 2.5, 'F');
+    pdf.setFillColor(COLOR_GOLD[0], COLOR_GOLD[1], COLOR_GOLD[2]);
+    pdf.rect(marginX, 12.5, 36, 0.8, 'F');
 
     if (isFirstPage) {
+      // ─── PARTE SUPERIOR IZQUIERDA: LOGO, RIF Y LUGAR DE LA EMPRESA ──────────
+      const logoW = 24;
+      const logoH = 18.5;
+      const logoY = 15;
+
+      if (logoBase64) {
+        try {
+          pdf.addImage(logoBase64, 'PNG', marginX, logoY, logoW, logoH, undefined, 'FAST');
+        } catch (e) {
+          console.warn('Error al incrustar el logo en el PDF:', e);
+        }
+      }
+
+      const textX = logoBase64 ? marginX + 27 : marginX;
+
+      // Nombre de la Empresa
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(16);
+      pdf.setFontSize(13);
       pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text('RIV MARGARITA PREMIER', marginX, 19);
+      pdf.text(BRAND_NAME.toUpperCase(), textX, 19.5);
 
-      pdf.setFontSize(9);
+      // Título del Reporte
+      pdf.setFontSize(8.5);
+      pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(COLOR_GOLD[0], COLOR_GOLD[1], COLOR_GOLD[2]);
-      pdf.text('REPORTE GENERAL DE INVENTARIO INMOBILIARIO', marginX, 24);
+      pdf.text('REPORTE GENERAL DE INVENTARIO INMOBILIARIO', textX, 24);
 
+      // RIF y Lugar de la Empresa
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
+      pdf.text(`RIF: ${BRAND_RIF}  |  ${BRAND_LOCATION}`, textX, 28);
+
+      // Criterios de filtrado (si aplican)
       if (filterDescription) {
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(7.5);
         pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-        pdf.text('Criterios:', marginX, 28);
+        pdf.text('Filtros:', textX, 32);
         pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
-        const safeFilterDesc = filterDescription.length > 92 ? filterDescription.slice(0, 89) + '...' : filterDescription;
-        pdf.text(safeFilterDesc, marginX + 15, 28);
+        pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+        const safeFilterDesc = filterDescription.length > 76 ? filterDescription.slice(0, 73) + '...' : filterDescription;
+        pdf.text(safeFilterDesc, textX + 11, 32);
       }
 
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(8);
-      pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
-      
+      // ─── PARTE SUPERIOR DERECHA: METADATOS Y TOTALES ────────────────────────
       const dateStr = `Fecha: ${new Date().toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' })}`;
       const totalStr = `Total Inmuebles: ${properties.length}`;
       const activasCount = properties.filter(p => p.status === 'Activa').length;
       const activasVal = properties
         .filter(p => p.status === 'Activa')
         .reduce((sum, p) => sum + (p.price || 0), 0);
-      const summaryStr = `Activos: ${activasCount} | Catálogo Activo: $${activasVal.toLocaleString('es-VE')} USD`;
-
-      pdf.text(dateStr, pageWidth - marginX, 18, { align: 'right' });
-      pdf.text(totalStr, pageWidth - marginX, 22, { align: 'right' });
-      pdf.text(summaryStr, pageWidth - marginX, 26, { align: 'right' });
-
-      pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
-      pdf.setLineWidth(0.3);
-      pdf.line(marginX, 30, marginX + contentWidth, 30);
-
-      currentY = 33;
-    } else {
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
-      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text('RIV MARGARITA PREMIER · Reporte de Inventario', marginX, 18);
+      const summaryStr = `Activos: ${activasCount} | Catálogo: $${activasVal.toLocaleString('es-VE')} USD`;
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+      pdf.text(dateStr, pageWidth - marginX, 19.5, { align: 'right' });
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
+      pdf.text(totalStr, pageWidth - marginX, 24, { align: 'right' });
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+      pdf.text(summaryStr, pageWidth - marginX, 28, { align: 'right' });
+
+      // Línea divisoria inferior de cabecera
+      pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
+      pdf.setLineWidth(0.3);
+      pdf.line(marginX, 35, marginX + contentWidth, 35);
+
+      currentY = 38;
+    } else {
+      // Cabecera compacta para páginas siguientes con mini-logo
+      if (logoBase64) {
+        try {
+          pdf.addImage(logoBase64, 'PNG', marginX, 13, 11, 8.5, undefined, 'FAST');
+        } catch {
+          // ignore
+        }
+      }
+      const subTextX = logoBase64 ? marginX + 14 : marginX;
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+      pdf.text('RIV MARGARITA PREMIER · Reporte General de Inventario', subTextX, 18);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+      pdf.text(`RIF: ${BRAND_RIF} · ${BRAND_LOCATION}`, subTextX, 22);
+
       pdf.text(new Date().toLocaleDateString('es-VE'), pageWidth - marginX, 18, { align: 'right' });
 
       pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
       pdf.setLineWidth(0.3);
-      pdf.line(marginX, 21, marginX + contentWidth, 21);
+      pdf.line(marginX, 25, marginX + contentWidth, 25);
 
-      currentY = 24;
+      currentY = 28;
     }
 
     // Cabecera de la tabla
@@ -283,7 +372,11 @@ function exportToPDF(properties: Property[], filterDescription?: string) {
     pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
     pdf.setLineWidth(0.2);
     pdf.line(marginX, pageHeight - 10, marginX + contentWidth, pageHeight - 10);
-    pdf.text('RIV Margarita Premier · Documento confidencial para uso inmobiliario', marginX, pageHeight - 6);
+    pdf.text(
+      `RIV Margarita Premier · RIF: ${BRAND_RIF} · ${BRAND_LOCATION} · Documento confidencial para uso inmobiliario`,
+      marginX,
+      pageHeight - 6
+    );
     pdf.text(`Página ${i} de ${totalPages}`, pageWidth - marginX, pageHeight - 6, { align: 'right' });
   }
 
@@ -569,7 +662,7 @@ export default function Inventario() {
     exportStatus,
   ]);
 
-  const handleExecuteExport = () => {
+  const handleExecuteExport = async () => {
     if (exportTargetProperties.length === 0) {
       showToast('No hay inmuebles que coincidan con los filtros seleccionados.', 'info');
       return;
@@ -577,7 +670,7 @@ export default function Inventario() {
 
     setIsExporting(true);
     try {
-      exportToPDF(exportTargetProperties, exportFilterDescription);
+      await exportToPDF(exportTargetProperties, exportFilterDescription);
       setIsExportModalOpen(false);
       showToast('Inventario PDF generado correctamente.');
     } catch (err) {

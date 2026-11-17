@@ -17,6 +17,8 @@ export const BRAND_COLORS = {
 
 export const BRAND_NAME = 'RIV Margarita Premier';
 export const BRAND_TAGLINE = 'Sistema de Gestión Inmobiliaria';
+export const BRAND_RIF = 'J-11055496-2';
+export const BRAND_LOCATION = 'Isla de Margarita, Venezuela';
 
 export const appConfig = {
   brandLogoUrl: DEFAULT_BRAND_LOGO,
