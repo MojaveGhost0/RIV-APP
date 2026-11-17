@@ -55,42 +55,46 @@ export default function Dashboard() {
   };
 
   return (
-    <motion.div
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-      className="page-content p-4 sm:p-6 pb-28 bg-[#F3F4F6] min-h-[100dvh] relative overflow-hidden"
-    >
+    <div className="bg-[#F3F4F6] min-h-[100dvh] relative overflow-hidden">
       {/* Luces de fondo ambientales de lujo */}
       <div className="absolute top-0 right-0 w-80 h-80 bg-vinotinto/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
       <div className="absolute top-1/3 left-0 w-72 h-72 bg-dorado/5 rounded-full blur-3xl pointer-events-none -ml-20" />
 
-      {/* HEADER */}
-      <motion.header variants={itemVariants} className="flex justify-between items-center mb-6 pt-1 relative z-10">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-              Hola, {user?.nombre?.split(' ')[0] ?? 'Bienvenido'}
-            </h1>
-            <span className="text-xl">👋</span>
+      {/* HEADER PRINCIPAL BLANCO */}
+      <header className="bg-white/95 backdrop-blur-md px-4 sm:px-6 pt-safe pt-5 pb-4 border-b border-gray-100 shadow-xs sticky top-0 z-30 transition-all">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                Hola, {user?.nombre?.split(' ')[0] ?? 'Bienvenido'}
+              </h1>
+              <span className="text-xl">👋</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {isAdmin ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-dorado/15 text-dorado-dark border border-dorado/30 shadow-xs">
+                  <Sparkles size={12} className="text-dorado" /> Administrador
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-vinotinto/10 text-vinotinto border border-vinotinto/20">
+                  Asesor Inmobiliario
+                </span>
+              )}
+              <span className="text-xs text-gray-400">• RIV Premier</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {isAdmin ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-dorado/15 text-dorado-dark border border-dorado/30 shadow-xs">
-                <Sparkles size={12} className="text-dorado" /> Administrador
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-vinotinto/10 text-vinotinto border border-vinotinto/20">
-                Asesor Inmobiliario
-              </span>
-            )}
-            <span className="text-xs text-gray-400">• RIV Premier</span>
-          </div>
+          <BrandLogo size="sm" className="shrink-0 drop-shadow-xs" />
         </div>
-        <BrandLogo size="sm" className="shrink-0 drop-shadow-xs" />
-      </motion.header>
+      </header>
 
-      {/* BÚSQUEDA CON GLASSMORPHISM */}
+      {/* CONTENIDO PRINCIPAL */}
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+        className="page-content p-4 sm:p-6 pb-28 relative z-10 max-w-7xl mx-auto"
+      >
+        {/* BÚSQUEDA CON GLASSMORPHISM */}
       <motion.form variants={itemVariants} onSubmit={handleSearch} className="relative mb-7 z-10">
         <div className="relative flex items-center bg-white/85 backdrop-blur-md border border-gray-200/80 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] focus-within:border-vinotinto/60 focus-within:ring-2 focus-within:ring-vinotinto/15 transition-all group">
           <div className="pl-4 pr-2 flex items-center pointer-events-none text-gray-400 group-focus-within:text-vinotinto transition-colors">
@@ -301,6 +305,7 @@ export default function Dashboard() {
         </motion.button>
       </motion.div>
     </motion.div>
-  );
+  </div>
+);
 }
 
