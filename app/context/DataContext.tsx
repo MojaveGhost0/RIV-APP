@@ -423,19 +423,41 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dataCreatedAt = data.created_at;
     } catch (err: any) {
       // Si las columnas personalizadas (codigo, propietarioNombre, etc.) aún no han sido migradas en la BD de Supabase, reintentar sin ellas
-      const isColError = err?.message?.includes('does not exist') || err?.code === '42703';
+      const isColError =
+        err?.code === '42703' ||
+        err?.code === 'PGRST204' ||
+        err?.message?.toLowerCase().includes('does not exist') ||
+        err?.message?.toLowerCase().includes('schema cache') ||
+        err?.message?.toLowerCase().includes('column') ||
+        err?.message?.toLowerCase().includes('codigo');
+
       if (isColError) {
-        console.warn('Supabase: Columnas personalizadas aún no creadas en BD. Guardando campos base...', err);
-        const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, codigo, ...baseProp } = propPayload;
-        const { data: retryData, error: retryError } = await supabase
+        console.warn('Supabase: Columna codigo o campos adicionales no detectados en BD / cache. Reintentando...', err?.message);
+        
+        // 1. Intentar omitir solo 'codigo' si las demás existen
+        const { codigo: _, ...withoutCodigo } = propPayload;
+        const retry1 = await supabase
           .from('properties')
-          .insert([baseProp])
+          .insert([withoutCodigo])
           .select('id, created_at')
           .single();
 
-        if (retryError) throw retryError;
-        dataId = retryData.id;
-        dataCreatedAt = retryData.created_at;
+        if (!retry1.error && retry1.data) {
+          dataId = retry1.data.id;
+          dataCreatedAt = retry1.data.created_at;
+        } else {
+          // 2. Si falla de nuevo, omitir todas las columnas añadidas
+          const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, ...baseProp } = withoutCodigo;
+          const retry2 = await supabase
+            .from('properties')
+            .insert([baseProp])
+            .select('id, created_at')
+            .single();
+
+          if (retry2.error) throw retry2.error;
+          dataId = retry2.data.id;
+          dataCreatedAt = retry2.data.created_at;
+        }
       } else {
         console.error('Error adding property:', err);
         throw err;
@@ -500,10 +522,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase.from('properties').update(updates).eq('id', id);
       if (error) {
-        // Fallback defensivo si alguna columna aún no existe en Supabase
-        const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, codigo, ...coreUpdates } = updates as any;
-        const { error: coreError } = await supabase.from('properties').update(coreUpdates).eq('id', id);
-        if (coreError) throw coreError;
+        // Fallback defensivo si alguna columna aún no existe en Supabase (ej. schema cache o 42703)
+        const { codigo: _, ...withoutCodigo } = updates as any;
+        const retry1 = await supabase.from('properties').update(withoutCodigo).eq('id', id);
+        if (retry1.error) {
+          const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, ...coreUpdates } = withoutCodigo;
+          const retry2 = await supabase.from('properties').update(coreUpdates).eq('id', id);
+          if (retry2.error) throw retry2.error;
+        }
       }
     } catch (err) {
       console.error('Error al actualizar propiedad en Supabase. Revirtiendo estado local:', err);
