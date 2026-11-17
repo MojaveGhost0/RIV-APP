@@ -430,7 +430,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
 
       // Carga paralela de fotos y logo corporativo
       const [logoImg, ...loadedPhotos] = await Promise.all([
-        loadImg('/logo-riv.svg'),
+        loadImg('/logo-riv.png'),
         ...allImages.map(loadImg),
       ]);
 
@@ -560,8 +560,8 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             // 3. Top Header: Watermark Vector SVG & Counter
             // Watermark Logo
             if (logoImg) {
-              drawRoundRect(ctx, 48, 48, 280, 68, 20, 'rgba(0,0,0,0.45)', 'rgba(255,255,255,0.2)', 1);
-              ctx.drawImage(logoImg, 64, 56, 248, 52);
+              drawRoundRect(ctx, 48, 48, 220, 80, 20, 'rgba(255,255,255,0.95)', '#D4AF37', 1.5);
+              ctx.drawImage(logoImg, 58, 54, 200, 68);
             } else {
               // Fallback badge si falla el logo
               drawRoundRect(ctx, 48, 48, 290, 60, 20, '#800020', '#D4AF37', 1.5);
@@ -760,7 +760,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                   <div>
                     <h2 className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
                       <span>Módulo de Marketing</span>
-                      <BrandLogo size="xs" />
+                      <BrandLogo size="sm" />
                     </h2>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {step === 'format' && 'Selecciona el canal de exportación'}
@@ -1048,7 +1048,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
           {/* Header Corporativo con LOGO RIV MARGARITA PREMIER */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #800020', paddingBottom: '20px', marginBottom: '32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <img src="/logo-riv.svg" alt="RIV Margarita Premier" style={{ height: '64px', objectFit: 'contain' }} crossOrigin="anonymous" />
+              <img src="/logo-riv.png" alt="RIV Margarita Premier" style={{ height: '78px', width: 'auto', objectFit: 'contain' }} crossOrigin="anonymous" />
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ background: '#800020', color: '#fff', padding: '6px 18px', borderRadius: '999px', fontSize: '11px', fontWeight: 800, letterSpacing: '2px' }}>FICHA TÉCNICA OFICIAL</span>
@@ -1131,7 +1131,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.9) 100%)' }} />
             {/* Top Bar con Logo */}
             <div style={{ position: 'absolute', top: 40, left: 60, right: 60, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <img src="/logo-riv.svg" alt="RIV Margarita Premier" style={{ height: '54px', objectFit: 'contain' }} crossOrigin="anonymous" />
+              <img src="/logo-riv.png" alt="RIV Margarita Premier" style={{ height: '70px', width: 'auto', objectFit: 'contain' }} crossOrigin="anonymous" />
               <div style={{ background: '#D4AF37', color: '#000', padding: '6px 18px', borderRadius: '999px', fontSize: '11px', fontWeight: 900, letterSpacing: '2px' }}>PREMIUM COLLECTION</div>
             </div>
             {/* Title Bottom */}
@@ -1250,57 +1250,30 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            {/* BADGE DEL LOGO CORPORATIVO RIV — Textos perfectamente centrados vertical y horizontalmente */}
+            {/* BADGE DEL LOGO CORPORATIVO RIV — Logo oficial nítido y de gran presencia */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '14px',
               height: '76px',
               boxSizing: 'border-box',
-              background: 'rgba(10, 10, 10, 0.85)',
-              border: '1.5px solid rgba(212, 175, 55, 0.6)',
+              background: '#FFFFFF',
+              border: '1.5px solid #D4AF37',
               borderRadius: '24px',
-              padding: '0 26px',
+              padding: '0 28px',
               boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
             }}>
               <img
-                src="/logo-riv.svg"
-                alt="RIV"
-                style={{ height: '44px', width: 'auto', objectFit: 'contain', borderRadius: '6px' }}
+                src="/logo-riv.png"
+                alt="RIV Margarita Premier"
+                style={{
+                  height: '56px',
+                  width: 'auto',
+                  objectFit: 'contain',
+                  display: 'block'
+                }}
                 crossOrigin="anonymous"
               />
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                marginTop: '-4px'
-              }}>
-                <span style={{
-                  color: '#D4AF37',
-                  fontWeight: 900,
-                  fontSize: '19px',
-                  letterSpacing: '2px',
-                  lineHeight: '1.2',
-                  textAlign: 'center',
-                  display: 'block'
-                }}>
-                  RIV MARGARITA
-                </span>
-                <span style={{
-                  color: '#FFFFFF',
-                  fontWeight: 800,
-                  fontSize: '12px',
-                  letterSpacing: '3px',
-                  lineHeight: '1.2',
-                  textAlign: 'center',
-                  display: 'block'
-                }}>
-                  PREMIER
-                </span>
-              </div>
             </div>
 
             {/* BADGE DE PRECIO O ESTATUS — Texto ópticamente calibrado al centro vertical */}
@@ -1564,57 +1537,30 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            {/* BADGE DEL LOGO CORPORATIVO RIV - Variante Vinotinto & Oro — Textos centrados verticalmente */}
+            {/* BADGE DEL LOGO CORPORATIVO RIV - Variante Oro */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '14px',
               height: '76px',
               boxSizing: 'border-box',
-              background: '#800020',
-              border: '1.5px solid #D4AF37',
+              background: '#FFFFFF',
+              border: '2px solid #D4AF37',
               borderRadius: '24px',
-              padding: '0 26px',
+              padding: '0 28px',
               boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
             }}>
               <img
-                src="/logo-riv.svg"
-                alt="RIV"
-                style={{ height: '44px', width: 'auto', objectFit: 'contain', borderRadius: '6px' }}
+                src="/logo-riv.png"
+                alt="RIV Margarita Premier"
+                style={{
+                  height: '56px',
+                  width: 'auto',
+                  objectFit: 'contain',
+                  display: 'block'
+                }}
                 crossOrigin="anonymous"
               />
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                marginTop: '-4px'
-              }}>
-                <span style={{
-                  color: '#D4AF37',
-                  fontWeight: 900,
-                  fontSize: '19px',
-                  letterSpacing: '2px',
-                  lineHeight: '1.2',
-                  textAlign: 'center',
-                  display: 'block'
-                }}>
-                  RIV MARGARITA
-                </span>
-                <span style={{
-                  color: '#FFFFFF',
-                  fontWeight: 800,
-                  fontSize: '12px',
-                  letterSpacing: '3px',
-                  lineHeight: '1.2',
-                  textAlign: 'center',
-                  display: 'block'
-                }}>
-                  PREMIER
-                </span>
-              </div>
             </div>
 
             {/* BADGE DE PRECIO DORADO — Texto centrado verticalmente */}
@@ -1877,62 +1823,35 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            {/* LOGO BADGE — Textos centrados verticalmente */}
+            {/* LOGO BADGE — Logo oficial nítido y de gran presencia */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '12px',
-              height: '60px',
+              height: '62px',
               boxSizing: 'border-box',
-              background: 'rgba(10, 10, 10, 0.85)',
-              border: '1.5px solid rgba(212, 175, 55, 0.6)',
+              background: '#FFFFFF',
+              border: '1.5px solid #D4AF37',
               borderRadius: '20px',
-              padding: '0 22px',
+              padding: '0 24px',
               boxShadow: '0 6px 24px rgba(0,0,0,0.5)'
             }}>
               <img
-                src="/logo-riv.svg"
-                alt="RIV"
-                style={{ height: '36px', width: 'auto', objectFit: 'contain', borderRadius: '4px' }}
+                src="/logo-riv.png"
+                alt="RIV Margarita Premier"
+                style={{
+                  height: '46px',
+                  width: 'auto',
+                  objectFit: 'contain',
+                  display: 'block'
+                }}
                 crossOrigin="anonymous"
               />
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                marginTop: '-3px'
-              }}>
-                <span style={{
-                  color: '#D4AF37',
-                  fontWeight: 900,
-                  fontSize: '16px',
-                  letterSpacing: '1.5px',
-                  lineHeight: '1.2',
-                  textAlign: 'center',
-                  display: 'block'
-                }}>
-                  RIV MARGARITA
-                </span>
-                <span style={{
-                  color: '#FFFFFF',
-                  fontWeight: 800,
-                  fontSize: '11px',
-                  letterSpacing: '2.5px',
-                  lineHeight: '1.2',
-                  textAlign: 'center',
-                  display: 'block'
-                }}>
-                  PREMIER
-                </span>
-              </div>
             </div>
 
             {/* PRECIO BADGE — Texto centrado verticalmente */}
             <div style={{
-              height: '60px',
+              height: '62px',
               boxSizing: 'border-box',
               background: '#800020',
               border: '1.5px solid rgba(255, 255, 255, 0.25)',
@@ -2154,61 +2073,34 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '12px',
-                height: '56px',
+                height: '58px',
                 boxSizing: 'border-box',
-                background: 'rgba(255, 255, 255, 0.95)',
+                background: '#FFFFFF',
                 border: '1.5px solid #800020',
-                borderRadius: '20px',
-                padding: '0 20px',
+                borderRadius: '18px',
+                padding: '0 22px',
                 boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
               }}>
                 <img
-                  src="/logo-riv.svg"
-                  alt="RIV"
-                  style={{ height: '32px', width: 'auto', objectFit: 'contain', borderRadius: '4px' }}
+                  src="/logo-riv.png"
+                  alt="RIV Margarita Premier"
+                  style={{
+                    height: '42px',
+                    width: 'auto',
+                    objectFit: 'contain',
+                    display: 'block'
+                  }}
                   crossOrigin="anonymous"
                 />
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  textAlign: 'center',
-                  marginTop: '-3px'
-                }}>
-                  <span style={{
-                    color: '#800020',
-                    fontWeight: 900,
-                    fontSize: '15px',
-                    letterSpacing: '1.5px',
-                    lineHeight: '1.2',
-                    textAlign: 'center',
-                    display: 'block'
-                  }}>
-                    RIV MARGARITA
-                  </span>
-                  <span style={{
-                    color: '#D4AF37',
-                    fontWeight: 800,
-                    fontSize: '10px',
-                    letterSpacing: '2px',
-                    lineHeight: '1.2',
-                    textAlign: 'center',
-                    display: 'block'
-                  }}>
-                    PREMIER
-                  </span>
-                </div>
               </div>
 
               {/* TAG ESTADO — Texto centrado verticalmente */}
               <div style={{
-                height: '56px',
+                height: '58px',
                 boxSizing: 'border-box',
                 background: '#800020',
                 border: '1.5px solid #FFFFFF',
-                borderRadius: '20px',
+                borderRadius: '18px',
                 padding: '0 24px',
                 boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
                 display: 'flex',
@@ -2407,8 +2299,8 @@ function TemplateThumbnail({ format, template, property }: { format: FormatType;
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 45%, transparent 65%)' }} />
         {/* Header badges */}
         <div style={{ position: 'absolute', top: '7px', left: '7px', right: '7px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ background: '#800020', border: '0.5px solid #D4AF37', borderRadius: '4px', padding: '2px 5px', display: 'flex', alignItems: 'center', gap: '2px' }}>
-            <span style={{ fontSize: '6px', color: '#D4AF37', fontWeight: 900 }}>✦ RIV</span>
+          <div style={{ background: '#FFFFFF', border: '0.5px solid #D4AF37', borderRadius: '4px', padding: '1px 3px', display: 'flex', alignItems: 'center' }}>
+            <img src="/logo-riv.png" style={{ height: '7px', width: 'auto', display: 'block' }} alt="" />
           </div>
           <div style={{ background: '#D4AF37', borderRadius: '4px', padding: '2px 5px' }}>
             <span style={{ fontSize: '6px', color: '#000', fontWeight: 900 }}>${fmt(property.price)}</span>
@@ -2437,8 +2329,8 @@ function TemplateThumbnail({ format, template, property }: { format: FormatType;
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 45%, transparent 65%)' }} />
         {/* Header badges */}
         <div style={{ position: 'absolute', top: '7px', left: '7px', right: '7px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ background: 'rgba(0,0,0,0.8)', border: '0.5px solid #D4AF37', borderRadius: '4px', padding: '2px 5px', display: 'flex', alignItems: 'center', gap: '2px' }}>
-            <span style={{ fontSize: '6px', color: '#D4AF37', fontWeight: 900 }}>✦ RIV</span>
+          <div style={{ background: '#FFFFFF', border: '0.5px solid #D4AF37', borderRadius: '4px', padding: '1px 3px', display: 'flex', alignItems: 'center' }}>
+            <img src="/logo-riv.png" style={{ height: '7px', width: 'auto', display: 'block' }} alt="" />
           </div>
           <div style={{ background: '#800020', borderRadius: '4px', padding: '2px 5px' }}>
             <span style={{ fontSize: '6px', color: '#fff', fontWeight: 900 }}>${fmt(property.price)}</span>
@@ -2470,8 +2362,8 @@ function TemplateThumbnail({ format, template, property }: { format: FormatType;
         {/* Foto */}
         <div style={{ position: 'relative', height: '58%', overflow: 'hidden', flexShrink: 0 }}>
           <img src={property.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-          <div style={{ position: 'absolute', top: '5px', left: '5px', background: 'rgba(255,255,255,0.95)', border: '0.5px solid #800020', borderRadius: '3px', padding: '1px 4px' }}>
-            <span style={{ fontSize: '5px', color: '#800020', fontWeight: 900 }}>✦ RIV</span>
+          <div style={{ position: 'absolute', top: '5px', left: '5px', background: '#FFFFFF', border: '0.5px solid #800020', borderRadius: '3px', padding: '1px 3px', display: 'flex', alignItems: 'center' }}>
+            <img src="/logo-riv.png" style={{ height: '6px', width: 'auto', display: 'block' }} alt="" />
           </div>
           <div style={{ position: 'absolute', top: '5px', right: '5px', background: '#800020', borderRadius: '3px', padding: '1px 4px' }}>
             <span style={{ fontSize: '5px', color: '#fff', fontWeight: 900 }}>EN VENTA</span>
@@ -2503,8 +2395,8 @@ function TemplateThumbnail({ format, template, property }: { format: FormatType;
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 45%, transparent 65%)' }} />
         {/* Header badges */}
         <div style={{ position: 'absolute', top: '6px', left: '6px', right: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ background: 'rgba(0,0,0,0.8)', border: '0.5px solid #D4AF37', borderRadius: '4px', padding: '2px 4px' }}>
-            <span style={{ fontSize: '5px', color: '#D4AF37', fontWeight: 900 }}>✦ RIV</span>
+          <div style={{ background: '#FFFFFF', border: '0.5px solid #D4AF37', borderRadius: '4px', padding: '1px 3px', display: 'flex', alignItems: 'center' }}>
+            <img src="/logo-riv.png" style={{ height: '6px', width: 'auto', display: 'block' }} alt="" />
           </div>
           <div style={{ background: '#800020', borderRadius: '4px', padding: '2px 5px' }}>
             <span style={{ fontSize: '6px', color: '#fff', fontWeight: 900 }}>${fmt(property.price)}</span>

@@ -2,8 +2,8 @@
 // BRANDING CONFIGURATION - RIV MARGARITA PREMIER
 // =============================================================================
 
-export const DEFAULT_BRAND_LOGO = '/logo-riv.svg';
-export const ALT_BRAND_LOGO = '/LOGO RIV MARGARITA PREMIER.svg';
+export const DEFAULT_BRAND_LOGO = '/logo-riv.png';
+export const ALT_BRAND_LOGO = '/logo-riv.png';
 
 export const BRAND_COLORS = {
   primary: '#800020',       // Vinotinto RIV

@@ -60,9 +60,9 @@ export default function LoginScreen() {
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", stiffness: 220, damping: 20 }}
-          className="w-24 h-24 bg-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center p-3.5 mb-4 border border-dorado/40 shadow-2xl shadow-vinotinto/50 relative group"
+          className="w-28 h-28 bg-white/95 rounded-3xl flex items-center justify-center p-3 mb-4 border border-dorado/50 shadow-2xl shadow-vinotinto/50 relative group"
         >
-          <BrandLogo size="lg" variant="light" className="w-full h-full drop-shadow-md" />
+          <BrandLogo size="lg" className="w-full h-full drop-shadow-xs" />
         </motion.div>
 
         <motion.div

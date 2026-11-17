@@ -14,12 +14,12 @@ interface BrandLogoProps {
 }
 
 const SIZE_MAP = {
-  xs: 'h-6 max-w-[110px]',
-  sm: 'h-8 max-w-[140px]',
-  md: 'h-10 max-w-[170px]',
-  lg: 'h-14 max-w-[220px]',
-  xl: 'h-18 max-w-[260px]',
-  hero: 'h-24 max-w-[320px]',
+  xs: 'h-9 max-w-[150px]',
+  sm: 'h-11 max-w-[180px]',
+  md: 'h-14 max-w-[220px]',
+  lg: 'h-18 max-w-[280px]',
+  xl: 'h-24 max-w-[340px]',
+  hero: 'h-32 max-w-[420px]',
   custom: '',
 };
 
