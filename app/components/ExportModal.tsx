@@ -5,8 +5,9 @@ import {
   X, FileText, Instagram, MessageCircle, Video,
   MapPin, Bed, Bath, Maximize, Ruler, Smartphone, User, ArrowLeft,
   Download, ChevronRight, Star, Sparkles, Check,
-  Loader2, Copy, Share2, ExternalLink
+  Loader2, Copy, Share2, ExternalLink, Eye
 } from 'lucide-react';
+import { toCanvas } from 'html-to-image';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,6 +17,9 @@ import { useToast } from '../context/ToastContext';
 import BrandLogo from './BrandLogo';
 import { DEFAULT_BRAND_LOGO } from '../lib/brandConfig';
 import { formatPrice, fmt } from '../lib/currency';
+
+/** Fuente determinista cargada en app/layout.tsx para evitar variaciones entre Windows / iOS / Android */
+const EXPORT_FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type FormatType = 'pdf' | 'instagram' | 'whatsapp' | 'video';
@@ -234,7 +238,7 @@ async function triggerDownloadOrShare(file: File, blob: Blob, title: string): Pr
   return 'downloaded';
 }
 
-/** Filtro dinámico de atributos: garantiza siempre la tríada Habitaciones, Baños y Área para que nunca se vea vacío */
+/** Filtro dinámico de atributos: garantiza siempre 3 columnas simétricas (Habitaciones, Baños y Área) */
 function getValidSpecs(p: Property) {
   const specs: Array<{ label: string; v: string | number; emoji: string; icon: any }> = [];
   const typeLower = (p.propertyType || '').toLowerCase();
@@ -245,6 +249,8 @@ function getValidSpecs(p: Property) {
   if (isLand) {
     const sqmVal = p.sqm > 0 ? `${p.sqm} m²` : '— m²';
     specs.push({ label: 'Área Terreno', v: sqmVal, emoji: '📐', icon: Ruler });
+    specs.push({ label: 'Topografía', v: 'Plana', emoji: '📐', icon: Maximize });
+    specs.push({ label: 'Estatus Legal', v: 'Al Día', emoji: '✓', icon: Check });
     return specs;
   }
 
@@ -252,7 +258,7 @@ function getValidSpecs(p: Property) {
   const bedsVal = p.beds > 0 ? p.beds : 1;
   specs.push({ label: 'Habitaciones', v: bedsVal, emoji: '🛏', icon: Bed });
 
-  // 2. Baños: SIEMPRE mostrar para que nunca quede el espacio vacío (solicitado por usuario)
+  // 2. Baños: SIEMPRE mostrar para que nunca quede el espacio vacío
   const bathsVal = p.baths > 0 ? p.baths : 1;
   specs.push({ label: 'Baños', v: bathsVal, emoji: '🚿', icon: Bath });
 
@@ -261,6 +267,50 @@ function getValidSpecs(p: Property) {
   specs.push({ label: 'Área Total', v: sqmVal, emoji: '📐', icon: Ruler });
 
   return specs;
+}
+
+/** Calcula tamaño de fuente adaptativo para títulos largos sin romper la simetría de 2 líneas máx */
+function getAdaptiveTitleSize(title: string, basePx: number, minPx: number): number {
+  const len = (title || '').trim().length;
+  if (len <= 24) return basePx;
+  if (len >= 56) return minPx;
+  const ratio = (len - 24) / (56 - 24);
+  return Math.round(basePx - ratio * (basePx - minPx));
+}
+
+/** Normaliza y limita la descripción para que el PDF mantenga proporción A4 exacta sin vacíos ni desbordes */
+function getSafeDescription(p: Property): string {
+  const raw = (p.description || '').trim().replace(/\s+/g, ' ');
+  const fallback = `Exclusiva propiedad tipo ${(p.propertyType || 'inmueble').toLowerCase()} ubicada estratégicamente en ${p.location || 'Isla de Margarita'}. Cuenta con una excelente distribución arquitectónica de ${p.sqm > 0 ? `${p.sqm} m²` : 'amplios espacios'}, acabados de primera calidad, óptima iluminación natural y documentación lista para firma inmediata con el respaldo de RIV Margarita Premier.`;
+  const text = raw.length >= 70 ? raw : (raw ? `${raw} ${fallback}` : fallback);
+  if (text.length <= 420) return text;
+  const sliced = text.slice(0, 417);
+  const lastSpace = sliced.lastIndexOf(' ');
+  return `${sliced.slice(0, lastSpace > 320 ? lastSpace : 417)}…`;
+}
+
+/** Garantiza siempre entre 6 y 9 comodidades (grilla simétrica de 3 columnas) para que el PDF nunca se vea vacío */
+function getSafeAmenities(p: Property): string[] {
+  const defaults = [
+    'Ubicación Estratégica',
+    'Documentación al Día',
+    'Excelente Iluminación',
+    'Seguridad y Privacidad',
+    'Alta Revalorización',
+    'Asesoría Exclusiva RIV',
+  ];
+  const existing = (p.amenities || []).map(a => a.trim()).filter(Boolean);
+  const merged = [...existing];
+  for (const d of defaults) {
+    if (merged.length >= 6) break;
+    if (!merged.some(m => m.toLowerCase() === d.toLowerCase())) {
+      merged.push(d);
+    }
+  }
+  // Ajustar a múltiplo de 3 (6 o 9) para que la grilla de 3 columnas sea 100% simétrica
+  if (merged.length > 9) return merged.slice(0, 9);
+  if (merged.length > 6 && merged.length < 9) return merged.slice(0, 6);
+  return merged.slice(0, 6);
 }
 
 // ─── FORMAT CONFIG ─────────────────────────────────────────────────────────────
@@ -324,6 +374,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
   const [done, setDone] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
   const [base64Img, setBase64Img] = useState<string>('');
+  const [base64PdfImg, setBase64PdfImg] = useState<string>('');
   const [base64IgImg, setBase64IgImg] = useState<string>('');
   const [base64WaImg, setBase64WaImg] = useState<string>('');
   const [base64Logo, setBase64Logo] = useState<string>('');
@@ -332,12 +383,12 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
   const [generatedFile, setGeneratedFile] = useState<File | null>(null);
   const [generatedBlob, setGeneratedBlob] = useState<Blob | null>(null);
 
-  const advisorPhone = property.captador ? getAdvisorPhone(property.captador) : '';
+  const advisorPhone: string = (property.captador ? getAdvisorPhone(property.captador) : '') || '';
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : 'https://rivmargaritapremier.com';
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareUrl)}`;
 
-  // Preload logo and QR to base64 DataURL (evita fallos de red o CORS en html2canvas)
+  // Preload logo and QR to base64 DataURL (evita fallos de red o CORS en exportación)
   useEffect(() => {
     let isMounted = true;
     urlToBase64('/logo-riv.png', 'image/png').then(b64 => {
@@ -357,6 +408,9 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
     if (property.image) {
       urlToBase64(property.image).then(b64 => {
         if (isMounted && b64) setBase64Img(b64);
+      });
+      getCoverCroppedImage(property.image, 1380, 680).then(b64 => {
+        if (isMounted && b64) setBase64PdfImg(b64);
       });
       getCoverCroppedImage(property.image, 1080, 1920).then(b64 => {
         if (isMounted && b64) setBase64IgImg(b64);
@@ -479,6 +533,10 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
         activeImg = await urlToBase64(property.image);
         if (activeImg) setBase64Img(activeImg);
       }
+      if (selectedFormat === 'pdf' && !base64PdfImg && property.image) {
+        const croppedPdf = await getCoverCroppedImage(property.image, 1380, 680);
+        if (croppedPdf) setBase64PdfImg(croppedPdf);
+      }
       if (selectedFormat === 'instagram' && !base64IgImg && property.image) {
         const croppedIg = await getCoverCroppedImage(property.image, 1080, 1920);
         if (croppedIg) setBase64IgImg(croppedIg);
@@ -495,28 +553,63 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
         const qrB64 = await urlToBase64(qrUrl, 'image/png');
         if (qrB64) setBase64Qr(qrB64);
       }
-      await new Promise(r => setTimeout(r, 150));
+
+      // Cargar explícitamente los pesos de Inter antes de capturar para garantizar métricas idénticas
       if (typeof document !== 'undefined' && document.fonts) {
+        await Promise.allSettled([
+          document.fonts.load('600 16px Inter'),
+          document.fonts.load('700 18px Inter'),
+          document.fonts.load('800 24px Inter'),
+          document.fonts.load('900 44px Inter'),
+        ]);
         await document.fonts.ready;
       }
+      await new Promise(r => setTimeout(r, 120));
 
       // Determine background color so transparent canvas doesn't convert to solid black JPEG
       const isDark = (selectedFormat === 'pdf' && selectedTemplate === 'B') ||
-                     (selectedFormat === 'instagram' && selectedTemplate === 'A') ||
+                     (selectedFormat === 'instagram') ||
                      (selectedFormat === 'whatsapp' && selectedTemplate === 'A');
       const bgColor = isDark ? '#0F0F0F' : '#FFFFFF';
 
-      const canvas = await html2canvas(ref.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: bgColor,
-        logging: false,
-      });
+      const dims = selectedFormat === 'pdf'
+        ? { width: 794, height: 1123 }
+        : selectedFormat === 'instagram'
+          ? { width: 1080, height: 1920 }
+          : { width: 1080, height: 1080 };
+
+      let canvas: HTMLCanvasElement;
+      try {
+        const captureOptions = {
+          pixelRatio: 2,
+          width: dims.width,
+          height: dims.height,
+          backgroundColor: bgColor,
+          cacheBust: false,
+          style: {
+            transform: 'none',
+            transformOrigin: 'top left',
+            margin: '0',
+          },
+        };
+        // Primer pase warm-up para asegurar decodificación de imágenes data: en WebKit/Safari
+        await toCanvas(ref.current, { ...captureOptions, pixelRatio: 1 }).catch(() => null);
+        canvas = await toCanvas(ref.current, captureOptions);
+      } catch (err) {
+        console.warn('html-to-image fallback a html2canvas:', err);
+        canvas = await html2canvas(ref.current, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: bgColor,
+          logging: false,
+        });
+      }
 
       if (selectedFormat === 'pdf') {
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
-        // Clean standard A4 portrait (210mm x 297mm)
+        const imgData = canvas.toDataURL('image/jpeg', 0.96);
+        setGeneratedPreviewUrl(imgData);
+        // Clean standard A4 portrait (210mm x 297mm — exact 794x1123 aspect ratio 1:1.4143)
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
         const filename = `${property.title.replace(/\s+/g, '_')}_Ficha_RIV.pdf`;
@@ -962,7 +1055,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                     </motion.div>
                   )}
 
-                  {/* ─── STEP 2: PLANTILLA ─────────────────────────── */}
+                  {/* ─── STEP 2: PLANTILLA (CON VISTA PREVIA REAL EN VIVO) ─── */}
                   {step === 'template' && selectedFormat && selectedFormat !== 'video' && (
                     <motion.div key="template" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
                       <p className="text-sm font-semibold text-gray-600 mb-1">Selecciona una plantilla visual</p>
@@ -973,23 +1066,34 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                           return (
                             <motion.button
                               key={t}
-                              whileHover={{ scale: 1.03 }}
-                              whileTap={{ scale: 0.97 }}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
                               onClick={() => setSelectedTemplate(t)}
-                              className={`relative p-4 rounded-2xl border-2 transition-all text-left ${
+                              className={`relative p-3.5 rounded-2xl border-2 transition-all text-left ${
                                 selectedTemplate === t
-                                  ? `border-vinotinto bg-vinotinto/5 shadow-md`
+                                  ? 'border-vinotinto bg-vinotinto/5 shadow-md'
                                   : 'border-gray-200 bg-gray-50 hover:border-gray-300'
                               }`}
                             >
                               {selectedTemplate === t && (
-                                <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-vinotinto rounded-full flex items-center justify-center">
+                                <div className="absolute top-2.5 right-2.5 z-10 w-5 h-5 bg-vinotinto rounded-full flex items-center justify-center shadow">
                                   <Check size={11} className="text-white" strokeWidth={3} />
                                 </div>
                               )}
-                              <TemplateThumbnail format={selectedFormat} template={t} property={property} />
+                              <LiveTemplatePreview
+                                format={selectedFormat}
+                                template={t}
+                                property={property}
+                                advisorPhone={advisorPhone}
+                                base64Img={base64Img}
+                                base64PdfImg={base64PdfImg}
+                                base64IgImg={base64IgImg}
+                                base64WaImg={base64WaImg}
+                                base64Logo={base64Logo}
+                                base64Qr={base64Qr || qrUrl}
+                              />
                               <p className="text-sm font-bold text-gray-800 mt-3">{tData.name}</p>
-                              <p className="text-xs text-gray-400 mt-0.5">{tData.desc}</p>
+                              <p className="text-xs text-gray-400 mt-0.5 leading-snug">{tData.desc}</p>
                             </motion.button>
                           );
                         })}
@@ -1023,6 +1127,48 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                           </div>
                         </div>
                       </div>
+
+                      {/* VISTA PREVIA REAL EN VIVO ANTES DE EXPORTAR */}
+                      {selectedFormat !== 'video' && !done && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 space-y-2">
+                          <div className="flex items-center justify-between px-1">
+                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                              <Eye size={13} className="text-vinotinto" />
+                              Vista Previa Exacta (Plantilla {selectedTemplate})
+                            </span>
+                            <div className="flex gap-1">
+                              {(['A', 'B'] as TemplateType[]).map((t) => (
+                                <button
+                                  key={t}
+                                  type="button"
+                                  onClick={() => setSelectedTemplate(t)}
+                                  className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold transition ${
+                                    selectedTemplate === t
+                                      ? 'bg-vinotinto text-white shadow-sm'
+                                      : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  Plantilla {t}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="max-w-[240px] mx-auto">
+                            <LiveTemplatePreview
+                              format={selectedFormat}
+                              template={selectedTemplate}
+                              property={property}
+                              advisorPhone={advisorPhone}
+                              base64Img={base64Img}
+                              base64PdfImg={base64PdfImg}
+                              base64IgImg={base64IgImg}
+                              base64WaImg={base64WaImg}
+                              base64Logo={base64Logo}
+                              base64Qr={base64Qr || qrUrl}
+                            />
+                          </div>
+                        </div>
+                      )}
 
                       {/* SUBMÓDULO WHATSAPP: COPYWRITING & DEEP LINKING */}
                       {selectedFormat === 'whatsapp' && (
@@ -1104,39 +1250,41 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                               <img
                                 src={generatedPreviewUrl}
                                 alt="Plantilla Generada"
-                                className="max-h-60 rounded-xl object-contain shadow-md border border-gray-200 bg-white"
+                                className="max-h-64 rounded-xl object-contain shadow-md border border-gray-200 bg-white"
                               />
                             )}
                           </div>
 
-                          <div className="space-y-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (generatedFile && generatedBlob) {
-                                  await triggerDownloadOrShare(generatedFile, generatedBlob, `Plantilla RIV - ${property.title}`);
-                                }
-                              }}
-                              className="w-full py-3.5 bg-vinotinto hover:bg-[#a60029] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md shadow-vinotinto/25 active:scale-95 transition"
-                            >
-                              <Share2 size={18} />
-                              Guardar en Fotos / Compartir
-                            </button>
+                          {selectedFormat !== 'pdf' && (
+                            <div className="space-y-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (generatedFile && generatedBlob) {
+                                    await triggerDownloadOrShare(generatedFile, generatedBlob, `Plantilla RIV - ${property.title}`);
+                                  }
+                                }}
+                                className="w-full py-3.5 bg-vinotinto hover:bg-[#a60029] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md shadow-vinotinto/25 active:scale-95 transition"
+                              >
+                                <Share2 size={18} />
+                                Guardar en Fotos / Compartir
+                              </button>
 
-                            <a
-                              href={generatedPreviewUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="w-full py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition text-center"
-                            >
-                              <ExternalLink size={14} />
-                              Abrir archivo en pestaña nueva
-                            </a>
+                              <a
+                                href={generatedPreviewUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition text-center"
+                              >
+                                <ExternalLink size={14} />
+                                Abrir archivo en pestaña nueva
+                              </a>
 
-                            <p className="text-[11px] text-gray-500 text-center leading-relaxed">
-                              📱 <strong>En iPhone o Android:</strong> Toca <em>"Guardar en Fotos / Compartir"</em> o mantén presionada la imagen para guardarla en tu galería.
-                            </p>
-                          </div>
+                              <p className="text-[11px] text-gray-500 text-center leading-relaxed">
+                                📱 <strong>En iPhone o Android:</strong> Toca <em>"Guardar en Fotos / Compartir"</em> o mantén presionada la imagen para guardarla en tu galería.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1175,7 +1323,8 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
       </AnimatePresence>
 
       {/*
-        ─── HIDDEN TEMPLATES (OFF-SCREEN ACTIVO PARA HTML2CANVAS) ─────────────
+        ─── LIENZOS DE EXPORTACIÓN NATIVOS (PARA HTML-TO-IMAGE) ────────────────
+        Renderizados con la misma arquitectura compartida que la vista previa en vivo.
       */}
       <div
         aria-hidden="true"
@@ -1185,1776 +1334,2047 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
           left: '-9999px',
           zIndex: -9999,
           pointerEvents: 'none',
-          opacity: 0.99,
           overflow: 'visible',
         }}
       >
-        {/* ── PDF – Plantilla A: Clásica con Membrete Corporativo y QR ─────── */}
-        <div ref={pdfARef} style={{ width: '794px', minHeight: '1123px', background: '#FFFFFF', padding: '44px 52px', fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
-          {/* Header Corporativo con LOGO RIV MARGARITA PREMIER */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #800020', paddingBottom: '16px', marginBottom: '22px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <img src={base64Logo || '/logo-riv.png'} alt="RIV Margarita Premier" style={{ height: '76px', width: 'auto', objectFit: 'contain' }} crossOrigin="anonymous" />
-            </div>
-            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '32px',
-                background: '#800020',
-                borderRadius: '999px',
-                padding: '0 20px',
-                boxSizing: 'border-box'
-              }}>
-                <span style={{
-                  color: '#FFFFFF',
-                  fontSize: '11px',
-                  fontWeight: 800,
-                  letterSpacing: '2px',
-                  lineHeight: 1,
-                  position: 'relative',
-                  top: '-1px'
-                }}>
-                  FICHA TÉCNICA OFICIAL
-                </span>
-              </div>
-              <p style={{ fontSize: '11px', color: '#6B7280', margin: 0, fontWeight: 600 }}>RIF: J-11055496-2 · Isla de Margarita, Venezuela</p>
-            </div>
-          </div>
-
-          {/* Bloque Título, Ubicación y Precio Centrados con Máxima Elegancia */}
-          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            {/* Tag Badge Centrado */}
-            <div style={{ marginBottom: '8px' }}>
-              <span style={{
-                display: 'inline-block',
-                background: '#FFF1F4',
-                color: '#800020',
-                border: '1px solid #FECDD3',
-                borderRadius: '999px',
-                padding: '5px 22px',
-                fontSize: '12px',
-                fontWeight: 800,
-                letterSpacing: '1.5px',
-                textTransform: 'uppercase'
-              }}>
-                ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'INMUEBLE EN VENTA'}
-              </span>
-            </div>
-
-            {/* Título de la propiedad */}
-            <h1 style={{
-              fontSize: '34px',
-              fontWeight: 900,
-              color: '#111827',
-              margin: '0 0 6px 0',
-              lineHeight: 1.15
-            }}>
-              {property.title}
-            </h1>
-
-            {/* Ubicación */}
-            <p style={{
-              color: '#4B5563',
-              fontSize: '15px',
-              fontWeight: 600,
-              margin: '0 0 14px 0'
-            }}>
-              📍 {property.location}
-            </p>
-
-            {/* Banner de Precio de Inversión Centrado */}
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '14px',
-              background: 'linear-gradient(135deg, #800020 0%, #4A0012 100%)',
-              color: '#FFFFFF',
-              borderRadius: '16px',
-              padding: '10px 32px',
-              boxShadow: '0 4px 16px rgba(128, 0, 32, 0.2)'
-            }}>
-              <span style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#D4AF37' }}>
-                PRECIO DE INVERSIÓN:
-              </span>
-              <span style={{ fontSize: '32px', fontWeight: 900, color: '#FFFFFF', lineHeight: 1 }}>
-                ${fmt(property.price)} USD
-              </span>
-              {property.codigo && (
-                <span style={{
-                  background: 'rgba(212, 175, 55, 0.25)',
-                  color: '#D4AF37',
-                  border: '1px solid #D4AF37',
-                  padding: '3px 10px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  marginLeft: '4px'
-                }}>
-                  {property.codigo}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Foto Principal */}
-          <img src={base64Img || property.image} crossOrigin="anonymous" style={{ width: '100%', height: '340px', objectFit: 'cover', borderRadius: '18px', marginBottom: '22px' }} alt="" />
-
-          {/* Specs Dinámicos (Habitaciones, Baños y Área Total siempre presentes) */}
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${validSpecs.length}, 1fr)`, gap: '14px', marginBottom: '22px' }}>
-            {validSpecs.map(s => {
-              const Icon = s.icon;
-              return (
-              <div key={s.label} style={{ background: '#F9FAFB', border: '1.5px solid #E5E7EB', borderRadius: '16px', padding: '16px 12px', textAlign: 'center', boxSizing: 'border-box' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}><Icon size={26} color="#800020" /></div>
-                <p style={{ fontSize: '24px', fontWeight: 900, color: '#111827', margin: 0, lineHeight: 1 }}>{s.v}</p>
-                <p style={{ fontSize: '12px', color: '#6B7280', margin: '4px 0 0', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</p>
-              </div>
-            )})}
-          </div>
-
-          {/* Descripción y Comodidades estructuradas para eliminar vacíos */}
-          <div style={{ flex: 1, marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 800, color: '#800020', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Descripción de la Propiedad</h2>
-            <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '14px 18px' }}>
-              <p style={{ color: '#374151', fontSize: '13.5px', lineHeight: 1.6, margin: 0 }}>{property.description}</p>
-            </div>
-            {property.amenities && property.amenities.length > 0 && (
-              <div style={{ marginTop: '16px' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: 800, color: '#800020', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>Comodidades y Atributos Destacados</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                  {property.amenities.map(a => (
-                    <div key={a} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#FFF1F4', border: '1px solid #FECDD3', borderRadius: '10px', padding: '8px 12px', boxSizing: 'border-box' }}>
-                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#800020', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 900, flexShrink: 0 }}>✓</div>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#800020' }}>{a}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer Corporativo con Asesor (sin círculo de inicial) y Teléfono Grande Legible */}
-          <div style={{ borderTop: '2px solid #800020', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '18px', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '11px', color: '#800020', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.5px' }}>Asesor Inmobiliario Exclusivo</span>
-              <p style={{ fontSize: '20px', fontWeight: 900, color: '#111827', margin: '3px 0 0', lineHeight: 1.2 }}>{property.captador || 'RIV Margarita Premier'}</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                <Smartphone size={18} color="#800020" strokeWidth={2.2} />
-                <span style={{ fontSize: '18px', fontWeight: 900, color: '#800020', letterSpacing: '0.5px' }}>
-                  {advisorPhone || '0414-7901111'}
-                </span>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'right' }}>
-              <div>
-                <p style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: 800, margin: 0, letterSpacing: '1px' }}>ESCANEA PARA MÁS INFO</p>
-                <p style={{ fontSize: '13px', color: '#111827', fontWeight: 800, margin: '2px 0 0' }}>Ficha en Línea</p>
-                <p style={{ fontSize: '10px', color: '#6B7280', margin: '2px 0 0', fontWeight: 600 }}>RIV Margarita Premier</p>
-              </div>
-              <img src={base64Qr || qrUrl} alt="QR Ficha" style={{ width: '64px', height: '64px', borderRadius: '8px', border: '1px solid #D1D5DB', padding: '3px', background: '#FFFFFF' }} crossOrigin="anonymous" />
-            </div>
-          </div>
-        </div>
-
-        {/* ── PDF – Plantilla B: Lujosa Gold Edition con QR ───────────────── */}
-        <div ref={pdfBRef} style={{ width: '794px', minHeight: '1123px', background: '#0F0F0F', fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', overflow: 'hidden' }}>
-          {/* Hero con Membrete Dorado */}
-          <div style={{ position: 'relative', height: '440px', overflow: 'hidden' }}>
-            <img src={base64Img || property.image} crossOrigin="anonymous" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.65 }} alt="" />
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.92) 100%)' }} />
-            {/* Top Bar con Logo */}
-            <div style={{ position: 'absolute', top: 36, left: 52, right: 52, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <img src={base64Logo || '/logo-riv.png'} alt="RIV Margarita Premier" style={{ height: '68px', width: 'auto', objectFit: 'contain' }} crossOrigin="anonymous" />
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '32px',
-                background: '#D4AF37',
-                borderRadius: '999px',
-                padding: '0 20px',
-                boxSizing: 'border-box'
-              }}>
-                <span style={{
-                  color: '#000000',
-                  fontSize: '11px',
-                  fontWeight: 900,
-                  letterSpacing: '2px',
-                  lineHeight: 1,
-                  position: 'relative',
-                  top: '-1px'
-                }}>
-                  PREMIUM COLLECTION
-                </span>
-              </div>
-            </div>
-            {/* Title Bottom Centered */}
-            <div style={{ position: 'absolute', bottom: 32, left: 52, right: 52, textAlign: 'center' }}>
-              <div style={{ marginBottom: '8px' }}>
-                <span style={{
-                  display: 'inline-block',
-                  background: 'rgba(212, 175, 55, 0.18)',
-                  color: '#D4AF37',
-                  border: '1px solid #D4AF37',
-                  borderRadius: '999px',
-                  padding: '4px 18px',
-                  fontSize: '11px',
-                  fontWeight: 800,
-                  letterSpacing: '1.5px',
-                  textTransform: 'uppercase'
-                }}>
-                  ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'INMUEBLE EN VENTA'}
-                </span>
-              </div>
-              <h1 style={{ fontSize: '38px', fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.15 }}>{property.title}</h1>
-              <p style={{ color: 'rgba(255,255,255,0.75)', marginTop: '6px', fontSize: '15px' }}>📍 {property.location}</p>
-            </div>
-          </div>
-
-          {/* Body */}
-          <div style={{ padding: '32px 52px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(212,175,55,0.3)', paddingBottom: '20px' }}>
-              <div>
-                <p style={{ color: '#D4AF37', fontSize: '12px', fontWeight: 800, letterSpacing: '2px', margin: 0 }}>PRECIO DE INVERSIÓN</p>
-                <p style={{ color: '#fff', fontSize: '42px', fontWeight: 900, margin: '4px 0 0', lineHeight: 1 }}>${fmt(property.price)} <span style={{ fontSize: '18px', fontWeight: 700, color: '#D4AF37' }}>USD</span></p>
-              </div>
-              <div style={{ display: 'flex', gap: '16px' }}>
-                {validSpecs.map(s => (
-                  <div key={s.label} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '14px', padding: '12px 18px', textAlign: 'center' }}>
-                    <p style={{ color: '#D4AF37', fontSize: '24px', fontWeight: 900, margin: 0, lineHeight: 1 }}>{s.v}</p>
-                    <p style={{ color: '#9CA3AF', fontSize: '11px', fontWeight: 700, margin: '4px 0 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <h2 style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 800, letterSpacing: '2px', margin: '0 0 10px', textTransform: 'uppercase' }}>DESCRIPCIÓN DE LA PROPIEDAD</h2>
-            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '14px 18px' }}>
-              <p style={{ color: '#D1D5DB', fontSize: '13.5px', lineHeight: 1.7, margin: 0 }}>{property.description}</p>
-            </div>
-
-            {property.amenities && property.amenities.length > 0 && (
-              <div style={{ marginTop: '20px' }}>
-                <h2 style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 800, letterSpacing: '2px', margin: '0 0 12px', textTransform: 'uppercase' }}>COMODIDADES DESTACADAS</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                  {property.amenities.map(a => (
-                    <div key={a} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '10px', padding: '8px 12px', boxSizing: 'border-box' }}>
-                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#D4AF37', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 900, flexShrink: 0 }}>✓</div>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#D4AF37' }}>{a}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer Dorado con QR (sin círculo de letra) */}
-          <div style={{ background: '#D4AF37', padding: '20px 52px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(0,0,0,0.65)', margin: 0, letterSpacing: '1.5px', textTransform: 'uppercase' }}>ASESOR INMOBILIARIO EXCLUSIVO</span>
-              <p style={{ fontSize: '22px', fontWeight: 900, color: '#000000', margin: '2px 0 0', lineHeight: 1.2 }}>{property.captador || 'RIV Margarita Premier'}</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                <Smartphone size={18} color="#000000" strokeWidth={2.4} />
-                <span style={{ fontSize: '18px', fontWeight: 900, color: '#000000', letterSpacing: '0.5px' }}>
-                  {advisorPhone || '0414-7901111'}
-                </span>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'right' }}>
-              <div>
-                <p style={{ fontSize: '10px', color: 'rgba(0,0,0,0.6)', fontWeight: 800, margin: 0, letterSpacing: '1px' }}>ESCANEA PARA MÁS INFO</p>
-                <p style={{ fontSize: '13px', color: '#000000', fontWeight: 800, margin: '2px 0 0' }}>Ficha en Línea</p>
-                <p style={{ fontSize: '10px', color: 'rgba(0,0,0,0.7)', margin: '2px 0 0', fontWeight: 600 }}>RIV Margarita Premier</p>
-              </div>
-              <img src={base64Qr || qrUrl} alt="QR" style={{ width: '64px', height: '64px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.3)', padding: '3px', background: '#FFFFFF' }} crossOrigin="anonymous" />
-            </div>
-          </div>
-        </div>
-
-        {/* ── Instagram – Plantilla A: Clean Dark 9:16 (Lujo & Botones Centrados) ──── */}
-        <div
-          ref={igARef}
-          style={{
-            position: 'relative',
-            width: '1080px',
-            height: '1920px',
-            background: '#0a0a0a',
-            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            overflow: 'hidden',
-            boxSizing: 'border-box'
-          }}
-        >
-          {/* FOTO FULL BLEED PROPORCIONAL (SIN ESTIRAMIENTO) */}
-          <img
-            src={base64IgImg || base64Img || property.image}
-            crossOrigin="anonymous"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '1080px',
-              height: '1920px',
-              objectFit: 'cover',
-              objectPosition: 'center'
-            }}
-            alt=""
+        <div ref={pdfARef} style={{ width: '794px', height: '1123px' }}>
+          <RenderExportTemplate
+            format="pdf"
+            template="A"
+            property={property}
+            advisorPhone={advisorPhone}
+            base64Img={base64Img}
+            base64PdfImg={base64PdfImg}
+            base64IgImg={base64IgImg}
+            base64WaImg={base64WaImg}
+            base64Logo={base64Logo}
+            base64Qr={base64Qr || qrUrl}
           />
-
-          {/* DEGRADADO SUPERIOR */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '360px',
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)',
-            pointerEvents: 'none'
-          }} />
-
-          {/* DEGRADADO INFERIOR PROFUNDO */}
-          <div style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: '1100px',
-            background: 'linear-gradient(to top, rgba(5,5,5,0.98) 0%, rgba(10,10,10,0.92) 40%, rgba(10,10,10,0.55) 75%, transparent 100%)',
-            pointerEvents: 'none'
-          }} />
-
-          {/* BARRA SUPERIOR: LOGO Y PRECIO */}
-          <div style={{
-            position: 'absolute',
-            top: 56,
-            left: 56,
-            width: '968px',
-            boxSizing: 'border-box',
-            zIndex: 20,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            {/* BADGE DEL LOGO CORPORATIVO RIV — 84px de altura */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '84px',
-              boxSizing: 'border-box',
-              background: '#FFFFFF',
-              border: '1.5px solid #D4AF37',
-              borderRadius: '26px',
-              padding: '0 32px',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
-            }}>
-              <img
-                src={base64Logo || '/logo-riv.png'}
-                alt="RIV Margarita Premier"
-                style={{
-                  height: '62px',
-                  width: 'auto',
-                  objectFit: 'contain',
-                  display: 'block'
-                }}
-                crossOrigin="anonymous"
-              />
-            </div>
-
-            {/* BADGE DE PRECIO O ESTATUS — Texto grande y centrado matemáticamente */}
-            <div style={{
-              height: '84px',
-              boxSizing: 'border-box',
-              background: '#800020',
-              border: '1.5px solid rgba(255, 255, 255, 0.25)',
-              borderRadius: '26px',
-              padding: '0 40px',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center'
-            }}>
-              <span style={{
-                color: '#FFFFFF',
-                fontWeight: 900,
-                fontSize: '44px',
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase',
-                lineHeight: 1,
-                margin: 0,
-                padding: 0,
-                position: 'relative',
-                top: '-5px',
-                display: 'block',
-                textAlign: 'center'
-              }}>
-                {property.status === 'Vendida'
-                  ? 'VENDIDO'
-                  : `$${fmt(property.price)} USD`}
-              </span>
-            </div>
-          </div>
-
-          {/* TARJETA INFERIOR CONTENEDORA */}
-          <div style={{
-            position: 'absolute',
-            bottom: 60,
-            left: 56,
-            width: '968px',
-            boxSizing: 'border-box',
-            zIndex: 10,
-            background: 'rgba(15, 15, 15, 0.88)',
-            border: '1.5px solid rgba(255, 255, 255, 0.15)',
-            borderRadius: '36px',
-            padding: '38px 44px 34px',
-            boxShadow: '0 24px 60px rgba(0,0,0,0.7)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px'
-          }}>
-            {/* Header de la tarjeta: Tag y Ubicación en stack centrado simétrico */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              width: '100%',
-              textAlign: 'center'
-            }}>
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                height: '46px',
-                boxSizing: 'border-box',
-                padding: '0 24px',
-                background: 'rgba(212, 175, 55, 0.18)',
-                color: '#D4AF37',
-                border: '1px solid #D4AF37',
-                borderRadius: '14px'
-              }}>
-                <span style={{
-                  fontSize: '17px',
-                  fontWeight: 800,
-                  letterSpacing: '2px',
-                  textTransform: 'uppercase',
-                  lineHeight: 1,
-                  margin: 0,
-                  padding: 0,
-                  position: 'relative',
-                  top: '-3px',
-                  display: 'block',
-                  textAlign: 'center'
-                }}>
-                  ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'PROPIEDAD EXCLUSIVA'}
-                </span>
-              </div>
-              <div style={{
-                color: 'rgba(255, 255, 255, 0.9)',
-                fontSize: '22px',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                lineHeight: 1,
-                width: '100%',
-                textAlign: 'center'
-              }}>
-                <span>📍</span>
-                <span>{property.location.toUpperCase()}</span>
-              </div>
-            </div>
-
-            {/* Título de la propiedad centrado */}
-            <h1 style={{
-              color: '#FFFFFF',
-              fontSize: '48px',
-              fontWeight: 900,
-              margin: 0,
-              lineHeight: 1.2,
-              letterSpacing: '-0.5px',
-              textAlign: 'center',
-              width: '100%'
-            }}>
-              {property.title}
-            </h1>
-
-            {/* BOTONES DE ATRIBUTOS (SPECS) CENTRADOS CON ICONOS SVG */}
-            {validSpecs.length > 0 && (
-              <div style={{
-                display: 'flex',
-                gap: '16px',
-                width: '100%'
-              }}>
-                {validSpecs.map(s => {
-                  const SpecIcon = s.icon;
-                  return (
-                    <div
-                      key={s.label}
-                      style={{
-                        flex: 1,
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        border: '1.5px solid rgba(212, 175, 55, 0.35)',
-                        borderRadius: '20px',
-                        padding: '18px 12px 18px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        textAlign: 'center',
-                        boxSizing: 'border-box'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-                        <SpecIcon size={34} color="#D4AF37" strokeWidth={1.8} />
-                      </div>
-                      <div style={{
-                        color: '#FFFFFF',
-                        fontSize: '30px',
-                        fontWeight: 900,
-                        lineHeight: 1,
-                        textAlign: 'center',
-                        width: '100%',
-                        margin: '0 0 6px 0',
-                        position: 'relative',
-                        top: '-2px'
-                      }}>
-                        {s.v}
-                      </div>
-                      <div style={{
-                        color: '#D4AF37',
-                        fontSize: '13px',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '1px',
-                        textAlign: 'center',
-                        width: '100%',
-                        lineHeight: 1,
-                        margin: 0
-                      }}>
-                        {s.label}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Footer de la tarjeta: Asesor con Teléfono (sin la G) y RIF */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              borderTop: '1px solid rgba(255, 255, 255, 0.12)',
-              paddingTop: '18px',
-              marginTop: '2px'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <p style={{
-                  color: '#D4AF37',
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  margin: 0,
-                  letterSpacing: '1.5px',
-                  lineHeight: 1
-                }}>
-                  ASESOR INMOBILIARIO
-                </p>
-                <p style={{
-                  color: '#FFFFFF',
-                  fontSize: '22px',
-                  fontWeight: 900,
-                  margin: '4px 0 0',
-                  lineHeight: 1.15,
-                  letterSpacing: '-0.3px'
-                }}>
-                  {property.captador || 'RIV Premier'}
-                </p>
-                {(advisorPhone || '0414-7901111') && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginTop: '6px'
-                  }}>
-                    <Smartphone size={22} color="#D4AF37" strokeWidth={2.2} />
-                    <span style={{
-                      color: '#FFFFFF',
-                      fontSize: '22px',
-                      fontWeight: 900,
-                      letterSpacing: '0.5px',
-                      lineHeight: 1
-                    }}>
-                      {advisorPhone || '0414-7901111'}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <p style={{ color: '#D4AF37', fontSize: '15px', fontWeight: 800, letterSpacing: '1.5px', margin: 0, textTransform: 'uppercase', lineHeight: 1.2 }}>RIV MARGARITA PREMIER</p>
-                <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', margin: '3px 0 0', letterSpacing: '0.5px', lineHeight: 1.2 }}>RIF J-11055496-2</p>
-                {property.codigo && (
-                  <p style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 800, margin: '4px 0 0', letterSpacing: '1px', lineHeight: 1.2 }}>
-                    CÓD: {property.codigo}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
-
-
-
-        {/* ── Instagram – Plantilla B: Clean Gold 9:16 (Lujo & Botones Centrados) ───── */}
-        <div
-          ref={igBRef}
-          style={{
-            position: 'relative',
-            width: '1080px',
-            height: '1920px',
-            background: '#0a0a0a',
-            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            overflow: 'hidden',
-            boxSizing: 'border-box'
-          }}
-        >
-          {/* FOTO FULL BLEED PROPORCIONAL (SIN ESTIRAMIENTO) */}
-          <img
-            src={base64IgImg || base64Img || property.image}
-            crossOrigin="anonymous"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '1080px',
-              height: '1920px',
-              objectFit: 'cover',
-              objectPosition: 'center'
-            }}
-            alt=""
+        <div ref={pdfBRef} style={{ width: '794px', height: '1123px' }}>
+          <RenderExportTemplate
+            format="pdf"
+            template="B"
+            property={property}
+            advisorPhone={advisorPhone}
+            base64Img={base64Img}
+            base64PdfImg={base64PdfImg}
+            base64IgImg={base64IgImg}
+            base64WaImg={base64WaImg}
+            base64Logo={base64Logo}
+            base64Qr={base64Qr || qrUrl}
           />
-
-          {/* DEGRADADO SUPERIOR */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '360px',
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)',
-            pointerEvents: 'none'
-          }} />
-
-          {/* DEGRADADO INFERIOR PROFUNDO */}
-          <div style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: '1100px',
-            background: 'linear-gradient(to top, rgba(12,3,6,0.98) 0%, rgba(20,5,10,0.92) 40%, rgba(10,5,8,0.55) 75%, transparent 100%)',
-            pointerEvents: 'none'
-          }} />
-
-          {/* BARRA SUPERIOR: LOGO Y PRECIO */}
-          <div style={{
-            position: 'absolute',
-            top: 56,
-            left: 56,
-            width: '968px',
-            boxSizing: 'border-box',
-            zIndex: 20,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            {/* BADGE DEL LOGO CORPORATIVO RIV - Variante Oro 84px */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '84px',
-              boxSizing: 'border-box',
-              background: '#FFFFFF',
-              border: '2px solid #D4AF37',
-              borderRadius: '26px',
-              padding: '0 32px',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
-            }}>
-              <img
-                src={base64Logo || '/logo-riv.png'}
-                alt="RIV Margarita Premier"
-                style={{
-                  height: '62px',
-                  width: 'auto',
-                  objectFit: 'contain',
-                  display: 'block'
-                }}
-                crossOrigin="anonymous"
-              />
-            </div>
-
-            {/* BADGE DE PRECIO DORADO — Texto grande y centrado matemáticamente */}
-            <div style={{
-              height: '84px',
-              boxSizing: 'border-box',
-              background: '#D4AF37',
-              border: '1.5px solid #FFFFFF',
-              borderRadius: '26px',
-              padding: '0 40px',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center'
-            }}>
-              <span style={{
-                color: '#000000',
-                fontWeight: 900,
-                fontSize: '44px',
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase',
-                lineHeight: 1,
-                margin: 0,
-                padding: 0,
-                position: 'relative',
-                top: '-5px',
-                display: 'block',
-                textAlign: 'center'
-              }}>
-                {property.status === 'Vendida'
-                  ? 'VENDIDO'
-                  : `$${fmt(property.price)} USD`}
-              </span>
-            </div>
-          </div>
-
-          {/* TARJETA INFERIOR CONTENEDORA (Estilo Dorado & Vinotinto) */}
-          <div style={{
-            position: 'absolute',
-            bottom: 60,
-            left: 56,
-            width: '968px',
-            boxSizing: 'border-box',
-            zIndex: 10,
-            background: 'rgba(26, 6, 12, 0.90)',
-            border: '1.5px solid #D4AF37',
-            borderRadius: '36px',
-            padding: '38px 44px 34px',
-            boxShadow: '0 24px 60px rgba(0,0,0,0.8)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px'
-          }}>
-            {/* Header: Tag y Ubicación en stack centrado simétrico */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              width: '100%',
-              textAlign: 'center'
-            }}>
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                height: '46px',
-                boxSizing: 'border-box',
-                padding: '0 24px',
-                background: '#D4AF37',
-                color: '#000000',
-                borderRadius: '14px'
-              }}>
-                <span style={{
-                  fontSize: '17px',
-                  fontWeight: 900,
-                  letterSpacing: '2px',
-                  textTransform: 'uppercase',
-                  lineHeight: 1,
-                  margin: 0,
-                  padding: 0,
-                  position: 'relative',
-                  top: '-3px',
-                  display: 'block',
-                  textAlign: 'center'
-                }}>
-                  ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'PROPIEDAD EXCLUSIVA'}
-                </span>
-              </div>
-              <div style={{
-                color: '#D4AF37',
-                fontSize: '22px',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                lineHeight: 1,
-                width: '100%',
-                textAlign: 'center'
-              }}>
-                <span>📍</span>
-                <span>{property.location.toUpperCase()}</span>
-              </div>
-            </div>
-
-            {/* Título de la propiedad centrado */}
-            <h1 style={{
-              color: '#FFFFFF',
-              fontSize: '48px',
-              fontWeight: 900,
-              margin: 0,
-              lineHeight: 1.2,
-              letterSpacing: '-0.5px',
-              textAlign: 'center',
-              width: '100%'
-            }}>
-              {property.title}
-            </h1>
-
-            {/* BOTONES DE ATRIBUTOS (SPECS) CENTRADOS DORADOS */}
-            {validSpecs.length > 0 && (
-              <div style={{
-                display: 'flex',
-                gap: '16px',
-                width: '100%'
-              }}>
-                {validSpecs.map(s => {
-                  const SpecIcon = s.icon;
-                  return (
-                    <div
-                      key={s.label}
-                      style={{
-                        flex: 1,
-                        background: 'rgba(212, 175, 55, 0.12)',
-                        border: '1.5px solid #D4AF37',
-                        borderRadius: '20px',
-                        padding: '18px 12px 18px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        textAlign: 'center',
-                        boxSizing: 'border-box'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-                        <SpecIcon size={34} color="#D4AF37" strokeWidth={1.8} />
-                      </div>
-                      <div style={{
-                        color: '#FFFFFF',
-                        fontSize: '30px',
-                        fontWeight: 900,
-                        lineHeight: 1,
-                        textAlign: 'center',
-                        width: '100%',
-                        margin: '0 0 6px 0',
-                        position: 'relative',
-                        top: '-2px'
-                      }}>
-                        {s.v}
-                      </div>
-                      <div style={{
-                        color: '#D4AF37',
-                        fontSize: '13px',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '1px',
-                        textAlign: 'center',
-                        width: '100%',
-                        lineHeight: 1,
-                        margin: 0
-                      }}>
-                        {s.label}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Footer de la tarjeta: Asesor con Teléfono (sin la G) y RIF */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              borderTop: '1px solid rgba(212, 175, 55, 0.3)',
-              paddingTop: '18px',
-              marginTop: '2px'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <p style={{
-                  color: 'rgba(212, 175, 55, 0.85)',
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  margin: 0,
-                  letterSpacing: '1.5px',
-                  lineHeight: 1
-                }}>
-                  ASESOR INMOBILIARIO
-                </p>
-                <p style={{
-                  color: '#FFFFFF',
-                  fontSize: '22px',
-                  fontWeight: 900,
-                  margin: '4px 0 0',
-                  lineHeight: 1.15,
-                  letterSpacing: '-0.3px'
-                }}>
-                  {property.captador || 'RIV Premier'}
-                </p>
-                {(advisorPhone || '0414-7901111') && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginTop: '6px'
-                  }}>
-                    <Smartphone size={22} color="#D4AF37" strokeWidth={2.2} />
-                    <span style={{
-                      color: '#FFFFFF',
-                      fontSize: '22px',
-                      fontWeight: 900,
-                      letterSpacing: '0.5px',
-                      lineHeight: 1
-                    }}>
-                      {advisorPhone || '0414-7901111'}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <p style={{ color: '#D4AF37', fontSize: '15px', fontWeight: 800, letterSpacing: '1.5px', margin: 0, textTransform: 'uppercase', lineHeight: 1.2 }}>RIV MARGARITA PREMIER</p>
-                <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', margin: '3px 0 0', letterSpacing: '0.5px', lineHeight: 1.2 }}>RIF J-11055496-2</p>
-                {property.codigo && (
-                  <p style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 800, margin: '4px 0 0', letterSpacing: '1px', lineHeight: 1.2 }}>
-                    CÓD: {property.codigo}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
-
-
-
-        {/* ── WhatsApp – Plantilla A: Clean Full Photo 1:1 (Lujo & Botones Centrados) ─ */}
-        <div
-          ref={waARef}
-          style={{
-            position: 'relative',
-            width: '1080px',
-            height: '1080px',
-            background: '#0a0a0a',
-            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            overflow: 'hidden',
-            boxSizing: 'border-box'
-          }}
-        >
-          {/* FOTO FULL BLEED PROPORCIONAL */}
-          <img
-            src={base64WaImg || base64Img || property.image}
-            crossOrigin="anonymous"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '1080px',
-              height: '1080px',
-              objectFit: 'cover',
-              objectPosition: 'center'
-            }}
-            alt=""
+        <div ref={igARef} style={{ width: '1080px', height: '1920px' }}>
+          <RenderExportTemplate
+            format="instagram"
+            template="A"
+            property={property}
+            advisorPhone={advisorPhone}
+            base64Img={base64Img}
+            base64PdfImg={base64PdfImg}
+            base64IgImg={base64IgImg}
+            base64WaImg={base64WaImg}
+            base64Logo={base64Logo}
+            base64Qr={base64Qr || qrUrl}
           />
-
-          {/* DEGRADADO SUPERIOR */}
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '240px',
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%)',
-            pointerEvents: 'none'
-          }} />
-
-          {/* DEGRADADO INFERIOR PROFUNDO */}
-          <div style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: '680px',
-            background: 'linear-gradient(to top, rgba(5,5,5,0.98) 0%, rgba(10,10,10,0.90) 45%, rgba(10,10,10,0.4) 80%, transparent 100%)',
-            pointerEvents: 'none'
-          }} />
-
-          {/* BARRA SUPERIOR: LOGO Y PRECIO */}
-          <div style={{
-            position: 'absolute',
-            top: 40,
-            left: 40,
-            right: 40,
-            zIndex: 20,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            {/* LOGO BADGE */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '68px',
-              boxSizing: 'border-box',
-              background: '#FFFFFF',
-              border: '1.5px solid #D4AF37',
-              borderRadius: '20px',
-              padding: '0 28px',
-              boxShadow: '0 6px 24px rgba(0,0,0,0.5)'
-            }}>
-              <img
-                src={base64Logo || '/logo-riv.png'}
-                alt="RIV Margarita Premier"
-                style={{
-                  height: '50px',
-                  width: 'auto',
-                  objectFit: 'contain',
-                  display: 'block'
-                }}
-                crossOrigin="anonymous"
-              />
-            </div>
-
-            {/* PRECIO BADGE — Texto centrado verticalmente con compensación óptica */}
-            <div style={{
-              height: '68px',
-              boxSizing: 'border-box',
-              background: '#800020',
-              border: '1.5px solid rgba(255, 255, 255, 0.25)',
-              borderRadius: '20px',
-              padding: '0 32px',
-              boxShadow: '0 6px 24px rgba(0,0,0,0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center'
-            }}>
-              <span style={{
-                color: '#FFFFFF',
-                fontWeight: 900,
-                fontSize: '28px',
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase',
-                lineHeight: 1,
-                margin: 0,
-                padding: 0,
-                position: 'relative',
-                top: '-4px',
-                display: 'block',
-                textAlign: 'center'
-              }}>
-                {property.status === 'Vendida'
-                  ? 'VENDIDO'
-                  : `$${fmt(property.price)} USD`}
-              </span>
-            </div>
-          </div>
-
-          {/* TARJETA INFERIOR CONTENEDORA */}
-          <div style={{
-            position: 'absolute',
-            bottom: 40,
-            left: 40,
-            right: 40,
-            zIndex: 10,
-            background: 'rgba(14, 14, 14, 0.92)',
-            border: '1.5px solid rgba(255, 255, 255, 0.16)',
-            borderRadius: '30px',
-            padding: '28px 36px 24px',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.7)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px'
-          }}>
-            {/* Header: Tag & Ubicación en stack centrado simétrico */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              width: '100%',
-              textAlign: 'center'
-            }}>
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                height: '38px',
-                boxSizing: 'border-box',
-                padding: '0 22px',
-                background: 'rgba(212, 175, 55, 0.18)',
-                color: '#D4AF37',
-                border: '1px solid #D4AF37',
-                borderRadius: '12px'
-              }}>
-                <span style={{
-                  fontSize: '14px',
-                  fontWeight: 800,
-                  letterSpacing: '1.5px',
-                  textTransform: 'uppercase',
-                  lineHeight: 1,
-                  margin: 0,
-                  padding: 0,
-                  position: 'relative',
-                  top: '-2.5px',
-                  display: 'block',
-                  textAlign: 'center'
-                }}>
-                  ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'INMUEBLE EN VENTA'}
-                </span>
-              </div>
-              <div style={{
-                color: 'rgba(255, 255, 255, 0.9)',
-                fontSize: '17px',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                lineHeight: 1,
-                width: '100%',
-                textAlign: 'center'
-              }}>
-                <span>📍</span>
-                <span>{property.location.toUpperCase()}</span>
-              </div>
-            </div>
-
-            {/* Título de la propiedad centrado */}
-            <h2 style={{
-              color: '#FFFFFF',
-              fontSize: '34px',
-              fontWeight: 900,
-              margin: 0,
-              lineHeight: 1.15,
-              textAlign: 'center',
-              width: '100%'
-            }}>
-              {property.title}
-            </h2>
-
-            {/* BOTONES DE ATRIBUTOS (SPECS) CENTRADOS CON ICONOS */}
-            {validSpecs.length > 0 && (
-              <div style={{
-                display: 'flex',
-                gap: '14px',
-                width: '100%'
-              }}>
-                {validSpecs.map(s => {
-                  const SpecIcon = s.icon;
-                  return (
-                    <div
-                      key={s.label}
-                      style={{
-                        flex: 1,
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        border: '1.5px solid rgba(212, 175, 55, 0.35)',
-                        borderRadius: '18px',
-                        padding: '14px 10px 14px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        textAlign: 'center',
-                        boxSizing: 'border-box'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
-                        <SpecIcon size={28} color="#D4AF37" strokeWidth={1.8} />
-                      </div>
-                      <div style={{
-                        color: '#FFFFFF',
-                        fontSize: '24px',
-                        fontWeight: 900,
-                        lineHeight: 1,
-                        textAlign: 'center',
-                        width: '100%',
-                        margin: '0 0 4px 0',
-                        position: 'relative',
-                        top: '-2px'
-                      }}>
-                        {s.v}
-                      </div>
-                      <div style={{
-                        color: '#D4AF37',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.8px',
-                        textAlign: 'center',
-                        width: '100%',
-                        lineHeight: 1,
-                        margin: 0
-                      }}>
-                        {s.label}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Footer de la tarjeta: Asesor con Teléfono (sin la G) y RIF */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              borderTop: '1px solid rgba(255, 255, 255, 0.12)',
-              paddingTop: '14px',
-              marginTop: '2px'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <p style={{
-                  color: '#D4AF37',
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  margin: 0,
-                  letterSpacing: '1.5px',
-                  lineHeight: 1
-                }}>
-                  ASESOR INMOBILIARIO
-                </p>
-                <p style={{
-                  color: '#FFFFFF',
-                  fontSize: '20px',
-                  fontWeight: 900,
-                  margin: '4px 0 0',
-                  lineHeight: 1.15
-                }}>
-                  {property.captador || 'RIV Premier'}
-                </p>
-                {(advisorPhone || '0414-7901111') && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    marginTop: '5px'
-                  }}>
-                    <Smartphone size={20} color="#D4AF37" strokeWidth={2.2} />
-                    <span style={{
-                      color: '#FFFFFF',
-                      fontSize: '20px',
-                      fontWeight: 900,
-                      letterSpacing: '0.5px',
-                      lineHeight: 1
-                    }}>
-                      {advisorPhone || '0414-7901111'}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <p style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 800, letterSpacing: '1px', margin: 0, textTransform: 'uppercase' }}>
-                  RIV MARGARITA PREMIER
-                </p>
-                <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '11px', margin: '2px 0 0', letterSpacing: '0.5px' }}>
-                  RIF J-11055496-2
-                </p>
-                {property.codigo && (
-                  <p style={{ color: '#D4AF37', fontSize: '12px', fontWeight: 800, margin: '3px 0 0', letterSpacing: '1px' }}>
-                    CÓD: {property.codigo}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
-
-
-
-        {/* ── WhatsApp – Plantilla B: Clean Split 1:1 (La Clara - Lujo & Botones Centrados) ──────── */}
-        <div
-          ref={waBRef}
-          style={{
-            width: '1080px',
-            height: '1080px',
-            background: '#FFFFFF',
-            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            boxSizing: 'border-box'
-          }}
-        >
-          {/* FOTO SUPERIOR — 560px */}
-          <div style={{ position: 'relative', height: '560px', flexShrink: 0, overflow: 'hidden' }}>
-            <img
-              src={base64WaImg || base64Img || property.image}
-              crossOrigin="anonymous"
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                objectPosition: 'center',
-                display: 'block'
-              }}
-              alt=""
-            />
-            {/* Gradientes sobre la foto */}
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 40%, rgba(0,0,0,0.3) 100%)'
-            }} />
-
-            {/* BARRA SUPERIOR SOBRE FOTO — Botones y textos perfectamente centrados */}
-            <div style={{
-              position: 'absolute',
-              top: 36,
-              left: 36,
-              right: 36,
-              zIndex: 10,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              {/* LOGO BADGE */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '62px',
-                boxSizing: 'border-box',
-                background: '#FFFFFF',
-                border: '1.5px solid #800020',
-                borderRadius: '18px',
-                padding: '0 24px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
-              }}>
-                <img
-                  src={base64Logo || '/logo-riv.png'}
-                  alt="RIV Margarita Premier"
-                  style={{
-                    height: '46px',
-                    width: 'auto',
-                    objectFit: 'contain',
-                    display: 'block'
-                  }}
-                  crossOrigin="anonymous"
-                />
-              </div>
-
-              {/* TAG ESTADO — Texto centrado verticalmente */}
-              <div style={{
-                height: '62px',
-                boxSizing: 'border-box',
-                background: '#800020',
-                border: '1.5px solid #FFFFFF',
-                borderRadius: '18px',
-                padding: '0 28px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center'
-              }}>
-                <span style={{
-                  color: '#FFFFFF',
-                  fontWeight: 900,
-                  fontSize: '22px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  lineHeight: 1,
-                  margin: 0,
-                  padding: 0,
-                  position: 'relative',
-                  top: '-3px',
-                  display: 'block',
-                  textAlign: 'center'
-                }}>
-                  {property.status === 'Vendida' ? 'VENDIDO' : 'EN VENTA'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* PANEL INFERIOR EDITORIAL BLANCO — 520px */}
-          <div style={{
-            flex: 1,
-            padding: '28px 44px 28px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            background: '#FFFFFF',
-            boxSizing: 'border-box'
-          }}>
-            {/* Header: Ubicación + Título y Precio centrados */}
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                color: '#800020',
-                fontSize: '15px',
-                fontWeight: 800,
-                letterSpacing: '1.5px',
-                textTransform: 'uppercase',
-                marginBottom: '6px'
-              }}>
-                <span>📍</span>
-                <span>{property.location.toUpperCase()}</span>
-              </div>
-              <h2 style={{
-                color: '#111827',
-                fontSize: '34px',
-                fontWeight: 900,
-                lineHeight: 1.15,
-                margin: '0 0 10px 0',
-                textAlign: 'center'
-              }}>
-                {property.title}
-              </h2>
-              {/* Precio Centrado con estilo luxury */}
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'baseline',
-                gap: '8px',
-                background: '#FFF1F4',
-                border: '1.5px solid #FECDD3',
-                borderRadius: '16px',
-                padding: '8px 28px'
-              }}>
-                <span style={{
-                  fontSize: '36px',
-                  fontWeight: 900,
-                  color: '#800020',
-                  lineHeight: 1
-                }}>
-                  ${fmt(property.price)}
-                </span>
-                <span style={{
-                  fontSize: '16px',
-                  fontWeight: 800,
-                  color: '#800020',
-                  letterSpacing: '1px'
-                }}>
-                  USD
-                </span>
-              </div>
-            </div>
-
-            {/* BOTONES DE ATRIBUTOS (SPECS) CENTRADOS EDITORIALES */}
-            {validSpecs.length > 0 && (
-              <div style={{
-                display: 'flex',
-                gap: '14px',
-                width: '100%',
-                margin: '10px 0'
-              }}>
-                {validSpecs.map(s => {
-                  const SpecIcon = s.icon;
-                  return (
-                    <div
-                      key={s.label}
-                      style={{
-                        flex: 1,
-                        background: '#F8FAFC',
-                        border: '1.5px solid #E2E8F0',
-                        borderRadius: '16px',
-                        padding: '12px 10px 12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        textAlign: 'center',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                        boxSizing: 'border-box'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
-                        <SpecIcon size={26} color="#800020" strokeWidth={1.8} />
-                      </div>
-                      <div style={{
-                        color: '#0F172A',
-                        fontSize: '22px',
-                        fontWeight: 900,
-                        lineHeight: 1,
-                        textAlign: 'center',
-                        width: '100%',
-                        margin: '0 0 3px 0',
-                        position: 'relative',
-                        top: '-2px'
-                      }}>
-                        {s.v}
-                      </div>
-                      <div style={{
-                        color: '#800020',
-                        fontSize: '11px',
-                        fontWeight: 800,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        textAlign: 'center',
-                        width: '100%',
-                        lineHeight: 1,
-                        margin: 0
-                      }}>
-                        {s.label}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Footer Editorial: Asesor con Teléfono (sin la G) y RIF */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              borderTop: '1.5px solid #F1F5F9',
-              paddingTop: '12px'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <p style={{
-                  color: '#800020',
-                  fontSize: '11px',
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  margin: 0,
-                  letterSpacing: '1px'
-                }}>
-                  ASESOR INMOBILIARIO
-                </p>
-                <p style={{
-                  color: '#111827',
-                  fontSize: '18px',
-                  fontWeight: 800,
-                  margin: '2px 0 0',
-                  lineHeight: 1.15
-                }}>
-                  {property.captador || 'RIV Premier'}
-                </p>
-                {(advisorPhone || '0414-7901111') && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    marginTop: '4px'
-                  }}>
-                    <Smartphone size={18} color="#800020" strokeWidth={2.2} />
-                    <span style={{
-                      color: '#800020',
-                      fontSize: '18px',
-                      fontWeight: 900,
-                      letterSpacing: '0.5px',
-                      lineHeight: 1
-                    }}>
-                      {advisorPhone || '0414-7901111'}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ textAlign: 'right' }}>
-                <p style={{ color: '#111827', fontSize: '13px', fontWeight: 800, letterSpacing: '0.5px', margin: 0 }}>
-                  RIV MARGARITA PREMIER
-                </p>
-                <p style={{ color: '#94A3B8', fontSize: '11px', margin: '2px 0 0', fontWeight: 600, letterSpacing: '0.5px' }}>
-                  RIF: J-11055496-2
-                </p>
-                {property.codigo && (
-                  <p style={{ color: '#800020', fontSize: '12px', fontWeight: 800, margin: '2px 0 0', letterSpacing: '0.5px' }}>
-                    CÓD: {property.codigo}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
+        <div ref={igBRef} style={{ width: '1080px', height: '1920px' }}>
+          <RenderExportTemplate
+            format="instagram"
+            template="B"
+            property={property}
+            advisorPhone={advisorPhone}
+            base64Img={base64Img}
+            base64PdfImg={base64PdfImg}
+            base64IgImg={base64IgImg}
+            base64WaImg={base64WaImg}
+            base64Logo={base64Logo}
+            base64Qr={base64Qr || qrUrl}
+          />
+        </div>
+        <div ref={waARef} style={{ width: '1080px', height: '1080px' }}>
+          <RenderExportTemplate
+            format="whatsapp"
+            template="A"
+            property={property}
+            advisorPhone={advisorPhone}
+            base64Img={base64Img}
+            base64PdfImg={base64PdfImg}
+            base64IgImg={base64IgImg}
+            base64WaImg={base64WaImg}
+            base64Logo={base64Logo}
+            base64Qr={base64Qr || qrUrl}
+          />
+        </div>
+        <div ref={waBRef} style={{ width: '1080px', height: '1080px' }}>
+          <RenderExportTemplate
+            format="whatsapp"
+            template="B"
+            property={property}
+            advisorPhone={advisorPhone}
+            base64Img={base64Img}
+            base64PdfImg={base64PdfImg}
+            base64IgImg={base64IgImg}
+            base64WaImg={base64WaImg}
+            base64Logo={base64Logo}
+            base64Qr={base64Qr || qrUrl}
+          />
         </div>
       </div>
     </>
   );
 }
 
-// ─── Template Thumbnail Component ─────────────────────────────────────────────
-function TemplateThumbnail({ format, template, property }: { format: FormatType; template: TemplateType; property: Property }) {
-  const isB = template === 'B';
+// ─── COMPONENTES COMPARTIDOS SIMÉTRICOS PARA LAS 6 PLANTILLAS ─────────────────
+// Fuente fija Inter, íconos 100% Lucide SVG, compensación óptica de letterSpacing y cero offsets manuales.
 
+interface SharedTemplateProps {
+  format: Exclude<FormatType, 'video'>;
+  template: TemplateType;
+  property: Property;
+  advisorPhone: string;
+  base64Img: string;
+  base64PdfImg: string;
+  base64IgImg: string;
+  base64WaImg: string;
+  base64Logo: string;
+  base64Qr: string;
+}
+
+/** Píldora del logo oficial siempre centrada y pre-cargada en Base64 */
+function ExportLogoBadge({
+  logoSrc,
+  height,
+  imgHeight,
+  paddingX,
+  borderRadius,
+  borderColor = '#D4AF37',
+}: {
+  logoSrc: string;
+  height: number;
+  imgHeight: number;
+  paddingX: number;
+  borderRadius: number;
+  borderColor?: string;
+}) {
+  return (
+    <div
+      style={{
+        height: `${height}px`,
+        padding: `0 ${paddingX}px`,
+        background: '#FFFFFF',
+        border: `2px solid ${borderColor}`,
+        borderRadius: `${borderRadius}px`,
+        boxShadow: '0 8px 28px rgba(0, 0, 0, 0.38)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxSizing: 'border-box',
+        flexShrink: 0,
+      }}
+    >
+      <img
+        src={logoSrc}
+        alt="RIV Margarita Premier"
+        crossOrigin="anonymous"
+        style={{
+          height: `${imgHeight}px`,
+          width: 'auto',
+          objectFit: 'contain',
+          display: 'block',
+        }}
+      />
+    </div>
+  );
+}
+
+/** Píldora de Precio o Estado centrada matemáticamente */
+function ExportPriceBadge({
+  text,
+  height,
+  paddingX,
+  fontSize,
+  borderRadius,
+  bg,
+  color,
+  borderColor,
+}: {
+  text: string;
+  height: number;
+  paddingX: number;
+  fontSize: number;
+  borderRadius: number;
+  bg: string;
+  color: string;
+  borderColor: string;
+}) {
+  return (
+    <div
+      style={{
+        height: `${height}px`,
+        padding: `0 ${paddingX}px`,
+        background: bg,
+        border: `2px solid ${borderColor}`,
+        borderRadius: `${borderRadius}px`,
+        boxShadow: '0 8px 28px rgba(0, 0, 0, 0.38)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxSizing: 'border-box',
+        flexShrink: 0,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: EXPORT_FONT,
+          color,
+          fontWeight: 900,
+          fontSize: `${fontSize}px`,
+          letterSpacing: '0.5px',
+          paddingLeft: '0.5px',
+          textTransform: 'uppercase',
+          lineHeight: 1,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {text}
+      </span>
+    </div>
+  );
+}
+
+/** Píldora de Tipo de Propiedad con ícono Star SVG y compensación simétrica de letterSpacing */
+function ExportTypePill({
+  label,
+  height,
+  paddingX,
+  fontSize,
+  iconSize,
+  bg,
+  color,
+  borderColor,
+  borderRadius = 999,
+}: {
+  label: string;
+  height: number;
+  paddingX: number;
+  fontSize: number;
+  iconSize: number;
+  bg: string;
+  color: string;
+  borderColor: string;
+  borderRadius?: number;
+}) {
+  return (
+    <div
+      style={{
+        height: `${height}px`,
+        padding: `0 ${paddingX}px`,
+        background: bg,
+        color,
+        border: `1.5px solid ${borderColor}`,
+        borderRadius: `${borderRadius}px`,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px',
+        boxSizing: 'border-box',
+      }}
+    >
+      <Star size={iconSize} fill={color} color={color} strokeWidth={1.5} style={{ flexShrink: 0, display: 'block' }} />
+      <span
+        style={{
+          fontFamily: EXPORT_FONT,
+          fontSize: `${fontSize}px`,
+          fontWeight: 800,
+          letterSpacing: '2px',
+          paddingLeft: '2px',
+          textTransform: 'uppercase',
+          lineHeight: 1,
+          display: 'inline-flex',
+          alignItems: 'center',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/** Línea de Ubicación centrada con ícono MapPin SVG */
+function ExportLocationRow({
+  location,
+  fontSize,
+  iconSize,
+  color,
+  iconColor,
+  uppercase = true,
+}: {
+  location: string;
+  fontSize: number;
+  iconSize: number;
+  color: string;
+  iconColor: string;
+  uppercase?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px',
+        width: '100%',
+        textAlign: 'center',
+      }}
+    >
+      <MapPin size={iconSize} color={iconColor} strokeWidth={2.4} style={{ flexShrink: 0, display: 'block' }} />
+      <span
+        style={{
+          fontFamily: EXPORT_FONT,
+          color,
+          fontSize: `${fontSize}px`,
+          fontWeight: 700,
+          letterSpacing: uppercase ? '1px' : '0.2px',
+          paddingLeft: uppercase ? '1px' : '0',
+          textTransform: uppercase ? 'uppercase' : 'none',
+          lineHeight: 1.2,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          maxWidth: '92%',
+        }}
+      >
+        {location}
+      </span>
+    </div>
+  );
+}
+
+/** Grilla fija de 3 columnas iguales para Habitaciones, Baños y Área Total */
+function ExportSpecsGrid({
+  specs,
+  cardHeight,
+  borderRadius,
+  iconSize,
+  valueSize,
+  labelSize,
+  gap,
+  bg,
+  borderColor,
+  iconColor,
+  valueColor,
+  labelColor,
+}: {
+  specs: Array<{ label: string; v: string | number; icon: any }>;
+  cardHeight: number;
+  borderRadius: number;
+  iconSize: number;
+  valueSize: number;
+  labelSize: number;
+  gap: number;
+  bg: string;
+  borderColor: string;
+  iconColor: string;
+  valueColor: string;
+  labelColor: string;
+}) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${specs.length}, 1fr)`,
+        gap: `${gap}px`,
+        width: '100%',
+        boxSizing: 'border-box',
+      }}
+    >
+      {specs.map((s) => {
+        const SpecIcon = s.icon;
+        return (
+          <div
+            key={s.label}
+            style={{
+              height: `${cardHeight}px`,
+              background: bg,
+              border: `1.5px solid ${borderColor}`,
+              borderRadius: `${borderRadius}px`,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              padding: '0 12px',
+              boxSizing: 'border-box',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <SpecIcon size={iconSize} color={iconColor} strokeWidth={2} style={{ display: 'block' }} />
+            </div>
+            <div
+              style={{
+                fontFamily: EXPORT_FONT,
+                color: valueColor,
+                fontSize: `${valueSize}px`,
+                fontWeight: 900,
+                lineHeight: 1,
+                textAlign: 'center',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {s.v}
+            </div>
+            <div
+              style={{
+                fontFamily: EXPORT_FONT,
+                color: labelColor,
+                fontSize: `${labelSize}px`,
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                paddingLeft: '1px',
+                lineHeight: 1,
+                textAlign: 'center',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {s.label}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Footer simétrico de tarjeta (Instagram & WhatsApp) con pesos visuales balanceados y teléfono grande legible */
+function ExportSocialFooter({
+  advisorName,
+  advisorPhone,
+  codigo,
+  borderColor,
+  roleColor,
+  nameColor,
+  phoneBg,
+  phoneBorder,
+  phoneTextColor,
+  phoneIconColor,
+  brandColor,
+  rifColor,
+  scale = 'lg',
+}: {
+  advisorName: string;
+  advisorPhone: string;
+  codigo?: string;
+  borderColor: string;
+  roleColor: string;
+  nameColor: string;
+  phoneBg: string;
+  phoneBorder: string;
+  phoneTextColor: string;
+  phoneIconColor: string;
+  brandColor: string;
+  rifColor: string;
+  scale?: 'lg' | 'md';
+}) {
+  const isLg = scale === 'lg';
+  const phone = advisorPhone || '0414-7901111';
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr auto 1fr',
+        alignItems: 'center',
+        borderTop: `1.5px solid ${borderColor}`,
+        paddingTop: isLg ? '20px' : '14px',
+        width: '100%',
+        boxSizing: 'border-box',
+        gap: '16px',
+      }}
+    >
+      {/* Columna Izquierda: Asesor */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '4px', minWidth: 0 }}>
+        <span
+          style={{
+            fontFamily: EXPORT_FONT,
+            color: roleColor,
+            fontSize: isLg ? '12px' : '11px',
+            fontWeight: 800,
+            textTransform: 'uppercase',
+            letterSpacing: '1.5px',
+            lineHeight: 1,
+          }}
+        >
+          ASESOR INMOBILIARIO
+        </span>
+        <span
+          style={{
+            fontFamily: EXPORT_FONT,
+            color: nameColor,
+            fontSize: isLg ? '22px' : '19px',
+            fontWeight: 900,
+            lineHeight: 1.15,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
+          }}
+        >
+          {advisorName || 'RIV Margarita Premier'}
+        </span>
+      </div>
+
+      {/* Columna Central: Píldora de Teléfono Grande y Legible (Eje de Simetría) */}
+      <div
+        style={{
+          height: isLg ? '48px' : '42px',
+          padding: isLg ? '0 22px' : '0 18px',
+          background: phoneBg,
+          border: `1.5px solid ${phoneBorder}`,
+          borderRadius: '999px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          boxSizing: 'border-box',
+        }}
+      >
+        <Smartphone size={isLg ? 20 : 18} color={phoneIconColor} strokeWidth={2.4} style={{ flexShrink: 0, display: 'block' }} />
+        <span
+          style={{
+            fontFamily: EXPORT_FONT,
+            color: phoneTextColor,
+            fontSize: isLg ? '21px' : '18px',
+            fontWeight: 900,
+            letterSpacing: '0.5px',
+            lineHeight: 1,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {phone}
+        </span>
+      </div>
+
+      {/* Columna Derecha: Identidad Corporativa & Código */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', gap: '4px', textAlign: 'right' }}>
+        <span
+          style={{
+            fontFamily: EXPORT_FONT,
+            color: brandColor,
+            fontSize: isLg ? '14px' : '13px',
+            fontWeight: 800,
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+            lineHeight: 1,
+          }}
+        >
+          RIV MARGARITA PREMIER
+        </span>
+        <span
+          style={{
+            fontFamily: EXPORT_FONT,
+            color: rifColor,
+            fontSize: isLg ? '12px' : '11px',
+            fontWeight: 600,
+            letterSpacing: '0.5px',
+            lineHeight: 1.15,
+          }}
+        >
+          RIF: J-11055496-2{codigo ? ` · ${codigo}` : ''}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Renderizador Unificado de las 6 Plantillas (Usado tanto en la exportación como en la vista previa en vivo) */
+function RenderExportTemplate({
+  format,
+  template,
+  property,
+  advisorPhone,
+  base64Img,
+  base64PdfImg,
+  base64IgImg,
+  base64WaImg,
+  base64Logo,
+  base64Qr,
+}: SharedTemplateProps) {
+  const validSpecs = getValidSpecs(property);
+  const logoSrc = base64Logo || '/logo-riv.png';
+  const typeLabel = property.propertyType
+    ? `${property.propertyType.toUpperCase()} EN VENTA`
+    : 'PROPIEDAD EN VENTA';
+  const priceText = property.status === 'Vendida' ? 'VENDIDO' : `$${fmt(property.price)} USD`;
+  const phone = advisorPhone || '0414-7901111';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 1. FICHA COMERCIAL PDF (794 × 1123 px — Proporción A4 Exacta 1:1.414)
+  // ═══════════════════════════════════════════════════════════════════════════
   if (format === 'pdf') {
-    return isB ? (
-      <div style={{ width: '100%', aspectRatio: '0.77', background: '#0F0F0F', borderRadius: '10px', overflow: 'hidden', position: 'relative', fontSize: 0 }}>
-        <img src={property.image} style={{ width: '100%', height: '55%', objectFit: 'cover', opacity: 0.7 }} alt="" />
-        <div style={{ padding: '8px', background: '#0F0F0F' }}>
-          <div style={{ width: '60%', height: '6px', background: '#D4AF37', borderRadius: '3px', marginBottom: '5px' }} />
-          <div style={{ width: '90%', height: '4px', background: '#333', borderRadius: '3px', marginBottom: '3px' }} />
-          <div style={{ width: '75%', height: '4px', background: '#333', borderRadius: '3px', marginBottom: '8px' }} />
-          <div style={{ display: 'flex', gap: '3px' }}>
-            {[0,1,2].map(i => <div key={i} style={{ flex: 1, height: '16px', background: '#1A1A1A', borderRadius: '4px', border: '1px solid #D4AF37' }} />)}
+    const safeDesc = getSafeDescription(property);
+    const safeAmenities = getSafeAmenities(property);
+    const pdfPhoto = base64PdfImg || base64Img || property.image;
+    const pdfTitleSize = getAdaptiveTitleSize(property.title, 34, 24);
+
+    if (template === 'A') {
+      // ── PDF PLANTILLA A: CLÁSICA CORPORATIVA ──────────────────────────────
+      return (
+        <div
+          style={{
+            width: '794px',
+            height: '1123px',
+            background: '#FFFFFF',
+            padding: '40px 48px',
+            fontFamily: EXPORT_FONT,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            boxSizing: 'border-box',
+            overflow: 'hidden',
+          }}
+        >
+          {/* 1. Header Corporativo */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderBottom: '3px solid #800020',
+              paddingBottom: '16px',
+              flexShrink: 0,
+            }}
+          >
+            <img
+              src={logoSrc}
+              alt="RIV Margarita Premier"
+              crossOrigin="anonymous"
+              style={{ height: '72px', width: 'auto', objectFit: 'contain', display: 'block' }}
+            />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+              <div
+                style={{
+                  height: '32px',
+                  padding: '0 20px',
+                  background: '#800020',
+                  borderRadius: '999px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: EXPORT_FONT,
+                    color: '#FFFFFF',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    letterSpacing: '2px',
+                    paddingLeft: '2px',
+                    lineHeight: 1,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  FICHA TÉCNICA OFICIAL
+                </span>
+              </div>
+              <span style={{ fontFamily: EXPORT_FONT, fontSize: '11px', color: '#6B7280', fontWeight: 600, lineHeight: 1 }}>
+                RIF: J-11055496-2 · Isla de Margarita, Venezuela
+              </span>
+            </div>
+          </div>
+
+          {/* 2. Bloque Hero Centrado: Tipo, Título, Ubicación y Banner de Precio */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              gap: '8px',
+              flexShrink: 0,
+            }}
+          >
+            <ExportTypePill
+              label={typeLabel}
+              height={30}
+              paddingX={18}
+              fontSize={11}
+              iconSize={13}
+              bg="#FFF1F4"
+              color="#800020"
+              borderColor="#FECDD3"
+            />
+            <h1
+              style={{
+                fontFamily: EXPORT_FONT,
+                fontSize: `${pdfTitleSize}px`,
+                fontWeight: 900,
+                color: '#111827',
+                margin: 0,
+                lineHeight: 1.15,
+                textAlign: 'center',
+                maxWidth: '100%',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {property.title}
+            </h1>
+            <ExportLocationRow
+              location={property.location}
+              fontSize={14}
+              iconSize={16}
+              color="#4B5563"
+              iconColor="#800020"
+              uppercase={false}
+            />
+
+            {/* Banner de Precio Centrado */}
+            <div
+              style={{
+                height: '52px',
+                padding: '0 32px',
+                marginTop: '4px',
+                background: 'linear-gradient(135deg, #800020 0%, #590016 100%)',
+                borderRadius: '16px',
+                boxShadow: '0 6px 18px rgba(128, 0, 32, 0.2)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '14px',
+                boxSizing: 'border-box',
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: EXPORT_FONT,
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  letterSpacing: '2px',
+                  paddingLeft: '2px',
+                  textTransform: 'uppercase',
+                  color: '#D4AF37',
+                  lineHeight: 1,
+                }}
+              >
+                PRECIO DE INVERSIÓN
+              </span>
+              <span
+                style={{
+                  fontFamily: EXPORT_FONT,
+                  fontSize: '28px',
+                  fontWeight: 900,
+                  color: '#FFFFFF',
+                  lineHeight: 1,
+                }}
+              >
+                {priceText}
+              </span>
+              {property.codigo && (
+                <div
+                  style={{
+                    height: '26px',
+                    padding: '0 10px',
+                    background: 'rgba(212, 175, 55, 0.22)',
+                    border: '1px solid #D4AF37',
+                    borderRadius: '8px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <span style={{ fontFamily: EXPORT_FONT, color: '#D4AF37', fontSize: '11px', fontWeight: 800, lineHeight: 1 }}>
+                    {property.codigo}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 3. Fotografía Principal Proporcional */}
+          <div style={{ width: '100%', height: '300px', borderRadius: '18px', overflow: 'hidden', flexShrink: 0, border: '1px solid #E5E7EB' }}>
+            <img
+              src={pdfPhoto}
+              crossOrigin="anonymous"
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
+            />
+          </div>
+
+          {/* 4. Grilla Simétrica de 3 Especificaciones */}
+          <div style={{ flexShrink: 0 }}>
+            <ExportSpecsGrid
+              specs={validSpecs}
+              cardHeight={96}
+              borderRadius={16}
+              iconSize={24}
+              valueSize={24}
+              labelSize={11}
+              gap={14}
+              bg="#F9FAFB"
+              borderColor="#E5E7EB"
+              iconColor="#800020"
+              valueColor="#111827"
+              labelColor="#6B7280"
+            />
+          </div>
+
+          {/* 5. Descripción y Grilla de Comodidades 3×2 (Sin espacios vacíos) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexShrink: 0 }}>
+            <div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '8px',
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: EXPORT_FONT,
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    color: '#800020',
+                    textTransform: 'uppercase',
+                    letterSpacing: '2px',
+                    paddingLeft: '2px',
+                    lineHeight: 1,
+                  }}
+                >
+                  DESCRIPCIÓN DE LA PROPIEDAD
+                </span>
+              </div>
+              <div
+                style={{
+                  background: '#F9FAFB',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '14px',
+                  padding: '14px 20px',
+                  textAlign: 'center',
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: EXPORT_FONT,
+                    color: '#374151',
+                    fontSize: '13px',
+                    lineHeight: 1.55,
+                    margin: 0,
+                  }}
+                >
+                  {safeDesc}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '8px',
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: EXPORT_FONT,
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    color: '#800020',
+                    textTransform: 'uppercase',
+                    letterSpacing: '2px',
+                    paddingLeft: '2px',
+                    lineHeight: 1,
+                  }}
+                >
+                  COMODIDADES Y ATRIBUTOS DESTACADOS
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                {safeAmenities.map((a) => (
+                  <div
+                    key={a}
+                    style={{
+                      height: '38px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: '#FFF1F4',
+                      border: '1px solid #FECDD3',
+                      borderRadius: '10px',
+                      padding: '0 12px',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: '#800020',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Check size={11} color="#FFFFFF" strokeWidth={3} style={{ display: 'block' }} />
+                    </div>
+                    <span
+                      style={{
+                        fontFamily: EXPORT_FONT,
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color: '#800020',
+                        lineHeight: 1,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {a}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 6. Footer Corporativo Simétrico con Asesor, Teléfono Grande y QR */}
+          <div
+            style={{
+              borderTop: '2px solid #800020',
+              background: '#F9FAFB',
+              border: '1.5px solid #E5E7EB',
+              borderRadius: '18px',
+              padding: '16px 24px',
+              display: 'grid',
+              gridTemplateColumns: '1fr auto 1fr',
+              alignItems: 'center',
+              gap: '16px',
+              flexShrink: 0,
+              boxSizing: 'border-box',
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span
+                style={{
+                  fontFamily: EXPORT_FONT,
+                  fontSize: '10px',
+                  color: '#800020',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '1.5px',
+                  lineHeight: 1,
+                }}
+              >
+                ASESOR INMOBILIARIO EXCLUSIVO
+              </span>
+              <span
+                style={{
+                  fontFamily: EXPORT_FONT,
+                  fontSize: '19px',
+                  fontWeight: 900,
+                  color: '#111827',
+                  lineHeight: 1.15,
+                }}
+              >
+                {property.captador || 'RIV Margarita Premier'}
+              </span>
+            </div>
+
+            {/* Teléfono en píldora central destacada */}
+            <div
+              style={{
+                height: '44px',
+                padding: '0 20px',
+                background: '#800020',
+                borderRadius: '999px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+              }}
+            >
+              <Smartphone size={18} color="#D4AF37" strokeWidth={2.4} style={{ display: 'block', flexShrink: 0 }} />
+              <span
+                style={{
+                  fontFamily: EXPORT_FONT,
+                  fontSize: '18px',
+                  fontWeight: 900,
+                  color: '#FFFFFF',
+                  letterSpacing: '0.5px',
+                  lineHeight: 1,
+                }}
+              >
+                {phone}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px', textAlign: 'right' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <span style={{ fontFamily: EXPORT_FONT, fontSize: '9px', color: '#9CA3AF', fontWeight: 800, letterSpacing: '1px', lineHeight: 1 }}>
+                  ESCANEA PARA MÁS INFO
+                </span>
+                <span style={{ fontFamily: EXPORT_FONT, fontSize: '12px', color: '#111827', fontWeight: 800, lineHeight: 1.1 }}>
+                  Ficha en Línea
+                </span>
+                <span style={{ fontFamily: EXPORT_FONT, fontSize: '10px', color: '#6B7280', fontWeight: 600, lineHeight: 1 }}>
+                  RIV Margarita Premier
+                </span>
+              </div>
+              <img
+                src={base64Qr}
+                alt="QR Ficha"
+                crossOrigin="anonymous"
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '10px',
+                  border: '1px solid #D1D5DB',
+                  padding: '3px',
+                  background: '#FFFFFF',
+                  display: 'block',
+                  flexShrink: 0,
+                }}
+              />
+            </div>
           </div>
         </div>
-      </div>
-    ) : (
-      <div style={{ width: '100%', aspectRatio: '0.77', background: '#fff', borderRadius: '10px', overflow: 'hidden', border: '1px solid #F3F4F6', fontSize: 0 }}>
-        <img src={property.image} style={{ width: '100%', height: '48%', objectFit: 'cover' }} alt="" />
-        <div style={{ padding: '8px' }}>
-          <div style={{ width: '50%', height: '5px', background: '#800020', borderRadius: '3px', marginBottom: '4px' }} />
-          <div style={{ width: '85%', height: '4px', background: '#EEE', borderRadius: '3px', marginBottom: '3px' }} />
-          <div style={{ width: '65%', height: '4px', background: '#EEE', borderRadius: '3px', marginBottom: '7px' }} />
-          <div style={{ display: 'flex', gap: '3px' }}>
-            {[0,1,2].map(i => <div key={i} style={{ flex: 1, height: '16px', background: '#F9FAFB', borderRadius: '4px', border: '1px solid #EEE' }} />)}
+      );
+    }
+
+    // ── PDF PLANTILLA B: LUJOSA GOLD EDITION ────────────────────────────────
+    return (
+      <div
+        style={{
+          width: '794px',
+          height: '1123px',
+          background: '#0F0F0F',
+          fontFamily: EXPORT_FONT,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+        }}
+      >
+        {/* 1. Hero Superior con Foto y Membrete Dorado */}
+        <div style={{ position: 'relative', height: '390px', flexShrink: 0, overflow: 'hidden' }}>
+          <img
+            src={pdfPhoto}
+            crossOrigin="anonymous"
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', opacity: 0.72, display: 'block' }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, rgba(15,15,15,0.25) 40%, rgba(15,15,15,0.98) 100%)',
+            }}
+          />
+
+          {/* Top Bar */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 32,
+              left: 48,
+              right: 48,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <ExportLogoBadge logoSrc={logoSrc} height={60} imgHeight={44} paddingX={22} borderRadius={16} borderColor="#D4AF37" />
+            <ExportTypePill
+              label="PREMIUM COLLECTION"
+              height={36}
+              paddingX={18}
+              fontSize={11}
+              iconSize={13}
+              bg="#D4AF37"
+              color="#000000"
+              borderColor="#FFFFFF"
+            />
+          </div>
+
+          {/* Título y Ubicación Centrados sobre el Hero */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 20,
+              left: 48,
+              right: 48,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+              gap: '8px',
+            }}
+          >
+            <ExportTypePill
+              label={typeLabel}
+              height={30}
+              paddingX={18}
+              fontSize={11}
+              iconSize={13}
+              bg="rgba(212, 175, 55, 0.2)"
+              color="#D4AF37"
+              borderColor="#D4AF37"
+            />
+            <h1
+              style={{
+                fontFamily: EXPORT_FONT,
+                fontSize: `${pdfTitleSize}px`,
+                fontWeight: 900,
+                color: '#FFFFFF',
+                margin: 0,
+                lineHeight: 1.15,
+                textAlign: 'center',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {property.title}
+            </h1>
+            <ExportLocationRow
+              location={property.location}
+              fontSize={14}
+              iconSize={16}
+              color="rgba(255,255,255,0.85)"
+              iconColor="#D4AF37"
+              uppercase={false}
+            />
+          </div>
+        </div>
+
+        {/* 2. Cuerpo Central */}
+        <div
+          style={{
+            padding: '20px 48px 24px',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            boxSizing: 'border-box',
+          }}
+        >
+          {/* Banner de Precio Centrado */}
+          <div
+            style={{
+              height: '58px',
+              background: 'rgba(212, 175, 55, 0.12)',
+              border: '1.5px solid #D4AF37',
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '16px',
+              padding: '0 28px',
+              boxSizing: 'border-box',
+            }}
+          >
+            <span
+              style={{
+                fontFamily: EXPORT_FONT,
+                color: '#D4AF37',
+                fontSize: '12px',
+                fontWeight: 800,
+                letterSpacing: '2px',
+                paddingLeft: '2px',
+                textTransform: 'uppercase',
+                lineHeight: 1,
+              }}
+            >
+              PRECIO DE INVERSIÓN
+            </span>
+            <span style={{ fontFamily: EXPORT_FONT, color: '#FFFFFF', fontSize: '32px', fontWeight: 900, lineHeight: 1 }}>
+              {priceText}
+            </span>
+            {property.codigo && (
+              <div
+                style={{
+                  height: '26px',
+                  padding: '0 10px',
+                  background: '#D4AF37',
+                  borderRadius: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <span style={{ fontFamily: EXPORT_FONT, color: '#000000', fontSize: '11px', fontWeight: 900, lineHeight: 1 }}>
+                  {property.codigo}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Grilla de 3 Especificaciones */}
+          <ExportSpecsGrid
+            specs={validSpecs}
+            cardHeight={96}
+            borderRadius={16}
+            iconSize={24}
+            valueSize={24}
+            labelSize={11}
+            gap={14}
+            bg="rgba(255, 255, 255, 0.05)"
+            borderColor="rgba(212, 175, 55, 0.4)"
+            iconColor="#D4AF37"
+            valueColor="#FFFFFF"
+            labelColor="#D4AF37"
+          />
+
+          {/* Descripción */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+              <span
+                style={{
+                  fontFamily: EXPORT_FONT,
+                  color: '#D4AF37',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  letterSpacing: '2px',
+                  paddingLeft: '2px',
+                  textTransform: 'uppercase',
+                  lineHeight: 1,
+                }}
+              >
+                DESCRIPCIÓN DE LA PROPIEDAD
+              </span>
+            </div>
+            <div
+              style={{
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '14px',
+                padding: '14px 20px',
+                textAlign: 'center',
+              }}
+            >
+              <p style={{ fontFamily: EXPORT_FONT, color: '#D1D5DB', fontSize: '13px', lineHeight: 1.55, margin: 0 }}>
+                {safeDesc}
+              </p>
+            </div>
+          </div>
+
+          {/* Comodidades 3×2 */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+              <span
+                style={{
+                  fontFamily: EXPORT_FONT,
+                  color: '#D4AF37',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  letterSpacing: '2px',
+                  paddingLeft: '2px',
+                  textTransform: 'uppercase',
+                  lineHeight: 1,
+                }}
+              >
+                COMODIDADES Y ATRIBUTOS DESTACADOS
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+              {safeAmenities.map((a) => (
+                <div
+                  key={a}
+                  style={{
+                    height: '38px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: 'rgba(212, 175, 55, 0.08)',
+                    border: '1px solid rgba(212, 175, 55, 0.35)',
+                    borderRadius: '10px',
+                    padding: '0 12px',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      background: '#D4AF37',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Check size={11} color="#000000" strokeWidth={3} style={{ display: 'block' }} />
+                  </div>
+                  <span
+                    style={{
+                      fontFamily: EXPORT_FONT,
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#D4AF37',
+                      lineHeight: 1,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {a}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Footer Dorado Simétrico */}
+        <div
+          style={{
+            background: '#D4AF37',
+            padding: '18px 48px',
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
+            alignItems: 'center',
+            gap: '16px',
+            flexShrink: 0,
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span
+              style={{
+                fontFamily: EXPORT_FONT,
+                fontSize: '10px',
+                fontWeight: 800,
+                color: 'rgba(0,0,0,0.65)',
+                letterSpacing: '1.5px',
+                textTransform: 'uppercase',
+                lineHeight: 1,
+              }}
+            >
+              ASESOR INMOBILIARIO EXCLUSIVO
+            </span>
+            <span style={{ fontFamily: EXPORT_FONT, fontSize: '20px', fontWeight: 900, color: '#000000', lineHeight: 1.15 }}>
+              {property.captador || 'RIV Margarita Premier'}
+            </span>
+          </div>
+
+          <div
+            style={{
+              height: '44px',
+              padding: '0 20px',
+              background: '#0F0F0F',
+              borderRadius: '999px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+            }}
+          >
+            <Smartphone size={18} color="#D4AF37" strokeWidth={2.4} style={{ display: 'block', flexShrink: 0 }} />
+            <span style={{ fontFamily: EXPORT_FONT, fontSize: '18px', fontWeight: 900, color: '#D4AF37', letterSpacing: '0.5px', lineHeight: 1 }}>
+              {phone}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px', textAlign: 'right' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+              <span style={{ fontFamily: EXPORT_FONT, fontSize: '9px', color: 'rgba(0,0,0,0.65)', fontWeight: 800, letterSpacing: '1px', lineHeight: 1 }}>
+                ESCANEA PARA MÁS INFO
+              </span>
+              <span style={{ fontFamily: EXPORT_FONT, fontSize: '12px', color: '#000000', fontWeight: 800, lineHeight: 1.1 }}>
+                Ficha en Línea
+              </span>
+              <span style={{ fontFamily: EXPORT_FONT, fontSize: '10px', color: 'rgba(0,0,0,0.75)', fontWeight: 700, lineHeight: 1 }}>
+                RIF: J-11055496-2
+              </span>
+            </div>
+            <img
+              src={base64Qr}
+              alt="QR"
+              crossOrigin="anonymous"
+              style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '10px',
+                border: '1px solid rgba(0,0,0,0.3)',
+                padding: '3px',
+                background: '#FFFFFF',
+                display: 'block',
+                flexShrink: 0,
+              }}
+            />
           </div>
         </div>
       </div>
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 2. HISTORIA INSTAGRAM 9:16 (1080 × 1920 px — Simetría Total)
+  // ═══════════════════════════════════════════════════════════════════════════
   if (format === 'instagram') {
-    return isB ? (
-      // IG-B: Clean Gold thumbnail
-      <div style={{ width: '100%', aspectRatio: '0.56', background: '#0a0a0a', borderRadius: '10px', overflow: 'hidden', position: 'relative', fontSize: 0 }}>
-        <img src={property.image} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="" />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 45%, transparent 65%)' }} />
-        {/* Header badges */}
-        <div style={{ position: 'absolute', top: '7px', left: '7px', right: '7px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ background: '#FFFFFF', border: '0.5px solid #D4AF37', borderRadius: '4px', padding: '1px 3px', display: 'flex', alignItems: 'center' }}>
-            <img src="/logo-riv.png" style={{ height: '7px', width: 'auto', display: 'block' }} alt="" />
-          </div>
-          <div style={{ background: '#D4AF37', borderRadius: '4px', padding: '2px 5px' }}>
-            <span style={{ fontSize: '6px', color: '#000', fontWeight: 900 }}>${fmt(property.price)}</span>
-          </div>
+    const isGold = template === 'B';
+    const igPhoto = base64IgImg || base64Img || property.image;
+    const igTitleSize = getAdaptiveTitleSize(property.title, 46, 32);
+
+    return (
+      <div
+        style={{
+          position: 'relative',
+          width: '1080px',
+          height: '1920px',
+          background: '#0A0A0A',
+          fontFamily: EXPORT_FONT,
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        {/* Foto Full-Bleed Pre-Recortada 9:16 */}
+        <img
+          src={igPhoto}
+          crossOrigin="anonymous"
+          alt=""
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '1080px',
+            height: '1920px',
+            objectFit: 'cover',
+            objectPosition: 'center',
+            display: 'block',
+          }}
+        />
+
+        {/* Degradado Superior */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '340px',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.35) 60%, transparent 100%)',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Degradado Inferior Profundo */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '1080px',
+            background: isGold
+              ? 'linear-gradient(to top, rgba(16,4,8,0.98) 0%, rgba(22,6,11,0.9) 42%, rgba(10,5,8,0.45) 78%, transparent 100%)'
+              : 'linear-gradient(to top, rgba(6,6,6,0.98) 0%, rgba(12,12,12,0.9) 42%, rgba(10,10,10,0.45) 78%, transparent 100%)',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Barra Superior Simétrica (56px de margen a cada lado) */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 56,
+            left: 56,
+            width: '968px',
+            zIndex: 20,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxSizing: 'border-box',
+          }}
+        >
+          <ExportLogoBadge
+            logoSrc={logoSrc}
+            height={84}
+            imgHeight={60}
+            paddingX={32}
+            borderRadius={24}
+            borderColor="#D4AF37"
+          />
+          <ExportPriceBadge
+            text={priceText}
+            height={84}
+            paddingX={38}
+            fontSize={42}
+            borderRadius={24}
+            bg={isGold ? '#D4AF37' : '#800020'}
+            color={isGold ? '#000000' : '#FFFFFF'}
+            borderColor={isGold ? '#FFFFFF' : '#D4AF37'}
+          />
         </div>
-        {/* Bottom card */}
-        <div style={{ position: 'absolute', bottom: '8px', left: '7px', right: '7px', background: 'rgba(26,6,12,0.92)', borderRadius: '6px', padding: '6px', border: '0.5px solid #D4AF37' }}>
-          <p style={{ fontSize: '7px', fontWeight: 800, color: '#fff', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{property.title}</p>
-          <div style={{ display: 'flex', gap: '3px' }}>
-            <div style={{ flex: 1, background: 'rgba(212,175,55,0.15)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.beds || 1} Hab</span>
-            </div>
-            <div style={{ flex: 1, background: 'rgba(212,175,55,0.15)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.baths || 1} Bñ</span>
-            </div>
-            <div style={{ flex: 1, background: 'rgba(212,175,55,0.15)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.sqm} m²</span>
-            </div>
+
+        {/* Tarjeta Inferior Simétrica */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 56,
+            left: 56,
+            width: '968px',
+            zIndex: 10,
+            background: isGold ? 'rgba(26, 6, 12, 0.92)' : 'rgba(14, 14, 14, 0.92)',
+            border: isGold ? '2px solid #D4AF37' : '1.5px solid rgba(212, 175, 55, 0.45)',
+            borderRadius: '36px',
+            padding: '36px 44px 32px',
+            boxShadow: '0 24px 60px rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '22px',
+            boxSizing: 'border-box',
+          }}
+        >
+          {/* Stack Superior Centrado: Píldora Tipo + Ubicación + Título */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              width: '100%',
+              textAlign: 'center',
+            }}
+          >
+            <ExportTypePill
+              label={typeLabel}
+              height={46}
+              paddingX={26}
+              fontSize={16}
+              iconSize={18}
+              bg={isGold ? '#D4AF37' : 'rgba(212, 175, 55, 0.18)'}
+              color={isGold ? '#000000' : '#D4AF37'}
+              borderColor="#D4AF37"
+              borderRadius={14}
+            />
+            <ExportLocationRow
+              location={property.location}
+              fontSize={20}
+              iconSize={22}
+              color={isGold ? '#D4AF37' : 'rgba(255, 255, 255, 0.92)'}
+              iconColor="#D4AF37"
+              uppercase={true}
+            />
+            <h1
+              style={{
+                fontFamily: EXPORT_FONT,
+                color: '#FFFFFF',
+                fontSize: `${igTitleSize}px`,
+                fontWeight: 900,
+                margin: '2px 0 0',
+                lineHeight: 1.15,
+                textAlign: 'center',
+                width: '100%',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {property.title}
+            </h1>
           </div>
-        </div>
-      </div>
-    ) : (
-      // IG-A: Clean Dark thumbnail
-      <div style={{ width: '100%', aspectRatio: '0.56', background: '#0a0a0a', borderRadius: '10px', overflow: 'hidden', position: 'relative', fontSize: 0 }}>
-        <img src={property.image} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="" />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 45%, transparent 65%)' }} />
-        {/* Header badges */}
-        <div style={{ position: 'absolute', top: '7px', left: '7px', right: '7px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ background: '#FFFFFF', border: '0.5px solid #D4AF37', borderRadius: '4px', padding: '1px 3px', display: 'flex', alignItems: 'center' }}>
-            <img src="/logo-riv.png" style={{ height: '7px', width: 'auto', display: 'block' }} alt="" />
-          </div>
-          <div style={{ background: '#800020', borderRadius: '4px', padding: '2px 5px' }}>
-            <span style={{ fontSize: '6px', color: '#fff', fontWeight: 900 }}>${fmt(property.price)}</span>
-          </div>
-        </div>
-        {/* Bottom card */}
-        <div style={{ position: 'absolute', bottom: '8px', left: '7px', right: '7px', background: 'rgba(15,15,15,0.88)', borderRadius: '6px', padding: '6px', border: '0.5px solid rgba(255,255,255,0.2)' }}>
-          <p style={{ fontSize: '7px', fontWeight: 800, color: '#fff', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{property.title}</p>
-          <div style={{ display: 'flex', gap: '3px' }}>
-            <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.beds || 1} Hab</span>
-            </div>
-            <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.baths || 1} Bñ</span>
-            </div>
-            <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.sqm} m²</span>
-            </div>
-          </div>
+
+          {/* Grilla de 3 Especificaciones Iguales */}
+          <ExportSpecsGrid
+            specs={validSpecs}
+            cardHeight={132}
+            borderRadius={22}
+            iconSize={32}
+            valueSize={30}
+            labelSize={13}
+            gap={16}
+            bg={isGold ? 'rgba(212, 175, 55, 0.12)' : 'rgba(255, 255, 255, 0.07)'}
+            borderColor={isGold ? '#D4AF37' : 'rgba(212, 175, 55, 0.4)'}
+            iconColor="#D4AF37"
+            valueColor="#FFFFFF"
+            labelColor="#D4AF37"
+          />
+
+          {/* Footer Simétrico de 3 Columnas */}
+          <ExportSocialFooter
+            advisorName={property.captador || 'RIV Margarita Premier'}
+            advisorPhone={phone}
+            codigo={property.codigo}
+            borderColor={isGold ? 'rgba(212, 175, 55, 0.3)' : 'rgba(255, 255, 255, 0.14)'}
+            roleColor="#D4AF37"
+            nameColor="#FFFFFF"
+            phoneBg={isGold ? '#D4AF37' : '#800020'}
+            phoneBorder="#D4AF37"
+            phoneTextColor={isGold ? '#000000' : '#FFFFFF'}
+            phoneIconColor={isGold ? '#000000' : '#D4AF37'}
+            brandColor="#D4AF37"
+            rifColor="rgba(255, 255, 255, 0.65)"
+            scale="lg"
+          />
         </div>
       </div>
     );
   }
 
-  if (format === 'whatsapp') {
-    return isB ? (
-      // WA-B: Clean Split thumbnail (La Clara)
-      <div style={{ width: '100%', aspectRatio: '1', background: '#fff', borderRadius: '10px', overflow: 'hidden', fontSize: 0, display: 'flex', flexDirection: 'column', border: '1px solid #E5E7EB' }}>
-        {/* Foto */}
-        <div style={{ position: 'relative', height: '58%', overflow: 'hidden', flexShrink: 0 }}>
-          <img src={property.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-          <div style={{ position: 'absolute', top: '5px', left: '5px', background: '#FFFFFF', border: '0.5px solid #800020', borderRadius: '3px', padding: '1px 3px', display: 'flex', alignItems: 'center' }}>
-            <img src="/logo-riv.png" style={{ height: '6px', width: 'auto', display: 'block' }} alt="" />
-          </div>
-          <div style={{ position: 'absolute', top: '5px', right: '5px', background: '#800020', borderRadius: '3px', padding: '1px 4px' }}>
-            <span style={{ fontSize: '5px', color: '#fff', fontWeight: 900 }}>EN VENTA</span>
-          </div>
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 3. WHATSAPP MARKETING 1:1 (1080 × 1080 px — Simetría Total)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const waPhoto = base64WaImg || base64Img || property.image;
+  const waTitleSize = getAdaptiveTitleSize(property.title, 34, 24);
+
+  if (template === 'A') {
+    // ── WHATSAPP PLANTILLA A: CLEAN FULL PHOTO 1:1 ────────────────────────
+    return (
+      <div
+        style={{
+          position: 'relative',
+          width: '1080px',
+          height: '1080px',
+          background: '#0A0A0A',
+          fontFamily: EXPORT_FONT,
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        <img
+          src={waPhoto}
+          crossOrigin="anonymous"
+          alt=""
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '1080px',
+            height: '1080px',
+            objectFit: 'cover',
+            objectPosition: 'center',
+            display: 'block',
+          }}
+        />
+
+        {/* Degradado Superior */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '220px',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%)',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Degradado Inferior */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '660px',
+            background: 'linear-gradient(to top, rgba(5,5,5,0.98) 0%, rgba(10,10,10,0.88) 45%, rgba(10,10,10,0.35) 80%, transparent 100%)',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Barra Superior Simétrica (40px de margen) */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 40,
+            left: 40,
+            width: '1000px',
+            zIndex: 20,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxSizing: 'border-box',
+          }}
+        >
+          <ExportLogoBadge
+            logoSrc={logoSrc}
+            height={68}
+            imgHeight={48}
+            paddingX={26}
+            borderRadius={20}
+            borderColor="#D4AF37"
+          />
+          <ExportPriceBadge
+            text={priceText}
+            height={68}
+            paddingX={30}
+            fontSize={30}
+            borderRadius={20}
+            bg="#800020"
+            color="#FFFFFF"
+            borderColor="#D4AF37"
+          />
         </div>
-        {/* Panel blanco con botones de specs */}
-        <div style={{ flex: 1, padding: '5px 7px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: '#FFFFFF' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <p style={{ fontSize: '6px', fontWeight: 800, color: '#111', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '65%' }}>{property.title}</p>
-            <span style={{ fontSize: '7px', fontWeight: 900, color: '#800020' }}>${fmt(property.price)}</span>
+
+        {/* Tarjeta Inferior Contenedora Simétrica */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 40,
+            left: 40,
+            width: '1000px',
+            zIndex: 10,
+            background: 'rgba(14, 14, 14, 0.93)',
+            border: '1.5px solid rgba(212, 175, 55, 0.45)',
+            borderRadius: '30px',
+            padding: '26px 36px 22px',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '16px',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              width: '100%',
+              textAlign: 'center',
+            }}
+          >
+            <ExportTypePill
+              label={typeLabel}
+              height={38}
+              paddingX={22}
+              fontSize={14}
+              iconSize={15}
+              bg="rgba(212, 175, 55, 0.18)"
+              color="#D4AF37"
+              borderColor="#D4AF37"
+              borderRadius={12}
+            />
+            <ExportLocationRow
+              location={property.location}
+              fontSize={16}
+              iconSize={18}
+              color="rgba(255, 255, 255, 0.9)"
+              iconColor="#D4AF37"
+              uppercase={true}
+            />
+            <h2
+              style={{
+                fontFamily: EXPORT_FONT,
+                color: '#FFFFFF',
+                fontSize: `${waTitleSize}px`,
+                fontWeight: 900,
+                margin: '2px 0 0',
+                lineHeight: 1.15,
+                textAlign: 'center',
+                width: '100%',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {property.title}
+            </h2>
           </div>
-          <div style={{ display: 'flex', gap: '3px', marginTop: '2px' }}>
-            <div style={{ flex: 1, background: '#F8FAFC', border: '0.5px solid #E2E8F0', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '5px', color: '#111', fontWeight: 800 }}>{property.beds || 1} Hab</span>
-            </div>
-            <div style={{ flex: 1, background: '#F8FAFC', border: '0.5px solid #E2E8F0', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '5px', color: '#111', fontWeight: 800 }}>{property.baths || 1} Bñ</span>
-            </div>
-            <div style={{ flex: 1, background: '#F8FAFC', border: '0.5px solid #E2E8F0', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '5px', color: '#111', fontWeight: 800 }}>{property.sqm} m²</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    ) : (
-      // WA-A: Clean Full Photo thumbnail
-      <div style={{ width: '100%', aspectRatio: '1', background: '#0a0a0a', borderRadius: '10px', overflow: 'hidden', position: 'relative', fontSize: 0 }}>
-        <img src={property.image} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="" />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 45%, transparent 65%)' }} />
-        {/* Header badges */}
-        <div style={{ position: 'absolute', top: '6px', left: '6px', right: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ background: '#FFFFFF', border: '0.5px solid #D4AF37', borderRadius: '4px', padding: '1px 3px', display: 'flex', alignItems: 'center' }}>
-            <img src="/logo-riv.png" style={{ height: '6px', width: 'auto', display: 'block' }} alt="" />
-          </div>
-          <div style={{ background: '#800020', borderRadius: '4px', padding: '2px 5px' }}>
-            <span style={{ fontSize: '6px', color: '#fff', fontWeight: 900 }}>${fmt(property.price)}</span>
-          </div>
-        </div>
-        {/* Bottom card */}
-        <div style={{ position: 'absolute', bottom: '6px', left: '6px', right: '6px', background: 'rgba(14,14,14,0.9)', borderRadius: '6px', padding: '5px', border: '0.5px solid rgba(255,255,255,0.2)' }}>
-          <p style={{ fontSize: '6px', fontWeight: 800, color: '#fff', margin: '0 0 3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{property.title}</p>
-          <div style={{ display: 'flex', gap: '2px' }}>
-            <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '2px', padding: '1px', textAlign: 'center' }}>
-              <span style={{ fontSize: '5px', color: '#fff', fontWeight: 800 }}>{property.beds || 1} Hab</span>
-            </div>
-            <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '2px', padding: '1px', textAlign: 'center' }}>
-              <span style={{ fontSize: '5px', color: '#fff', fontWeight: 800 }}>{property.baths || 1} Bñ</span>
-            </div>
-            <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '2px', padding: '1px', textAlign: 'center' }}>
-              <span style={{ fontSize: '5px', color: '#fff', fontWeight: 800 }}>{property.sqm} m²</span>
-            </div>
-          </div>
+
+          <ExportSpecsGrid
+            specs={validSpecs}
+            cardHeight={106}
+            borderRadius={18}
+            iconSize={26}
+            valueSize={24}
+            labelSize={11}
+            gap={14}
+            bg="rgba(255, 255, 255, 0.07)"
+            borderColor="rgba(212, 175, 55, 0.4)"
+            iconColor="#D4AF37"
+            valueColor="#FFFFFF"
+            labelColor="#D4AF37"
+          />
+
+          <ExportSocialFooter
+            advisorName={property.captador || 'RIV Margarita Premier'}
+            advisorPhone={phone}
+            codigo={property.codigo}
+            borderColor="rgba(255, 255, 255, 0.14)"
+            roleColor="#D4AF37"
+            nameColor="#FFFFFF"
+            phoneBg="#800020"
+            phoneBorder="#D4AF37"
+            phoneTextColor="#FFFFFF"
+            phoneIconColor="#D4AF37"
+            brandColor="#D4AF37"
+            rifColor="rgba(255, 255, 255, 0.65)"
+            scale="md"
+          />
         </div>
       </div>
     );
   }
 
-  return <div style={{ width: '100%', aspectRatio: '1', background: '#EEE', borderRadius: '10px' }} />;
+  // ── WHATSAPP PLANTILLA B: CLEAN SPLIT 1:1 (LA CLARA EDITORIAL) ───────────
+  return (
+    <div
+      style={{
+        width: '1080px',
+        height: '1080px',
+        background: '#FFFFFF',
+        fontFamily: EXPORT_FONT,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        boxSizing: 'border-box',
+      }}
+    >
+      {/* Mitad Superior: Fotografía 540px */}
+      <div style={{ position: 'relative', height: '540px', flexShrink: 0, overflow: 'hidden' }}>
+        <img
+          src={waPhoto}
+          crossOrigin="anonymous"
+          alt=""
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center',
+            display: 'block',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 45%, rgba(0,0,0,0.35) 100%)',
+          }}
+        />
+
+        {/* Barra Superior Sobre Foto */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 36,
+            left: 40,
+            right: 40,
+            zIndex: 10,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <ExportLogoBadge
+            logoSrc={logoSrc}
+            height={64}
+            imgHeight={46}
+            paddingX={24}
+            borderRadius={18}
+            borderColor="#800020"
+          />
+          <ExportTypePill
+            label={typeLabel}
+            height={48}
+            paddingX={22}
+            fontSize={14}
+            iconSize={16}
+            bg="#800020"
+            color="#FFFFFF"
+            borderColor="#D4AF37"
+            borderRadius={16}
+          />
+        </div>
+      </div>
+
+      {/* Mitad Inferior: Panel Blanco Editorial Simétrico (540px) */}
+      <div
+        style={{
+          flex: 1,
+          padding: '26px 44px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: '#FFFFFF',
+          boxSizing: 'border-box',
+        }}
+      >
+        {/* Bloque Superior Centrado: Ubicación + Título + Píldora de Precio */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            width: '100%',
+            textAlign: 'center',
+          }}
+        >
+          <ExportLocationRow
+            location={property.location}
+            fontSize={15}
+            iconSize={17}
+            color="#800020"
+            iconColor="#800020"
+            uppercase={true}
+          />
+          <h2
+            style={{
+              fontFamily: EXPORT_FONT,
+              color: '#111827',
+              fontSize: `${waTitleSize}px`,
+              fontWeight: 900,
+              lineHeight: 1.15,
+              margin: 0,
+              textAlign: 'center',
+              width: '100%',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {property.title}
+          </h2>
+          <div
+            style={{
+              height: '52px',
+              padding: '0 28px',
+              marginTop: '2px',
+              background: '#FFF1F4',
+              border: '1.5px solid #FECDD3',
+              borderRadius: '16px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxSizing: 'border-box',
+            }}
+          >
+            <span
+              style={{
+                fontFamily: EXPORT_FONT,
+                fontSize: '32px',
+                fontWeight: 900,
+                color: '#800020',
+                lineHeight: 1,
+              }}
+            >
+              {priceText}
+            </span>
+          </div>
+        </div>
+
+        {/* Grilla de 3 Especificaciones */}
+        <ExportSpecsGrid
+          specs={validSpecs}
+          cardHeight={104}
+          borderRadius={18}
+          iconSize={26}
+          valueSize={23}
+          labelSize={11}
+          gap={14}
+          bg="#F8FAFC"
+          borderColor="#E2E8F0"
+          iconColor="#800020"
+          valueColor="#0F172A"
+          labelColor="#800020"
+        />
+
+        {/* Footer Simétrico de 3 Columnas */}
+        <ExportSocialFooter
+          advisorName={property.captador || 'RIV Margarita Premier'}
+          advisorPhone={phone}
+          codigo={property.codigo}
+          borderColor="#E2E8F0"
+          roleColor="#800020"
+          nameColor="#111827"
+          phoneBg="#800020"
+          phoneBorder="#800020"
+          phoneTextColor="#FFFFFF"
+          phoneIconColor="#D4AF37"
+          brandColor="#111827"
+          rifColor="#64748B"
+          scale="md"
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── VISTA PREVIA REAL EN VIVO ESCALADA (WYSIWYG) ─────────────────────────────
+function LiveTemplatePreview(props: SharedTemplateProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.18);
+
+  const dims =
+    props.format === 'pdf'
+      ? { w: 794, h: 1123 }
+      : props.format === 'instagram'
+        ? { w: 1080, h: 1920 }
+        : { w: 1080, h: 1080 };
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const updateScale = () => {
+      const w = el.clientWidth;
+      if (w > 0) setScale(w / dims.w);
+    };
+    updateScale();
+    const ro = new ResizeObserver(updateScale);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [dims.w]);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        width: '100%',
+        aspectRatio: `${dims.w} / ${dims.h}`,
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: '12px',
+        background: '#0F0F0F',
+        border: '1px solid #E5E7EB',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+      }}
+    >
+      <div
+        style={{
+          width: `${dims.w}px`,
+          height: `${dims.h}px`,
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+          pointerEvents: 'none',
+          userSelect: 'none',
+        }}
+      >
+        <RenderExportTemplate {...props} />
+      </div>
+    </div>
+  );
 }
 
 // ─── Canvas Helper ─────────────────────────────────────────────────────────────
