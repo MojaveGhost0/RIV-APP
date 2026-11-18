@@ -645,9 +645,20 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
       const WIDTH = 1080;
       const HEIGHT = 1920; // Formato 9:16 nativo para Reels/Stories
       const FPS = 30;
-      const SLIDE_FRAMES = FPS * 3;       // 3 segundos por imagen
-      const FADE_FRAMES  = Math.floor(FPS * 0.6); // 0.6s de transición suave
-      const OUTRO_FRAMES = FPS * 2.8;     // 2.8s para la tarjeta final de cierre
+      const SLIDE_FRAMES = FPS * 3;              // 3.0s por imagen
+      const FADE_FRAMES  = Math.floor(FPS * 0.55); // 0.55s de transición suave
+      const OUTRO_FRAMES = Math.floor(FPS * 3.2);  // 3.2s para la tarjeta final de cierre
+
+      // Asegurar que la fuente Inter esté lista en el motor Canvas 2D
+      if (typeof document !== 'undefined' && document.fonts) {
+        await Promise.allSettled([
+          document.fonts.load('600 22px Inter'),
+          document.fonts.load('700 24px Inter'),
+          document.fonts.load('800 28px Inter'),
+          document.fonts.load('900 52px Inter'),
+        ]);
+        await document.fonts.ready;
+      }
 
       const canvas = document.createElement('canvas');
       canvas.width = WIDTH;
@@ -655,25 +666,24 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('No se pudo inicializar el lienzo 2D.');
 
-      // Función de carga con respaldo y CORS
-      const loadImg = (src: string): Promise<HTMLImageElement | null> =>
-        new Promise((res) => {
+      // Función de carga con conversión a Base64 previa para evitar tainting en Canvas
+      const loadImg = async (src: string, isPng = false): Promise<HTMLImageElement | null> => {
+        if (!src) return null;
+        const safeSrc = src.startsWith('data:') ? src : await urlToBase64(src, isPng ? 'image/png' : 'image/jpeg');
+        return new Promise((res) => {
           const img = new Image();
           img.crossOrigin = 'anonymous';
           img.onload = () => res(img);
-          img.onerror = () => {
-            const fallback = new Image();
-            fallback.onload = () => res(fallback);
-            fallback.onerror = () => res(null);
-            fallback.src = src;
-          };
-          img.src = src;
+          img.onerror = () => res(null);
+          img.src = safeSrc || src;
         });
+      };
 
-      // Carga paralela de fotos y logo corporativo
-      const [logoImg, ...loadedPhotos] = await Promise.all([
-        loadImg('/logo-riv.png'),
-        ...allImages.map(loadImg),
+      // Carga paralela de logo corporativo, QR y todas las fotos de la propiedad
+      const [logoImg, qrImg, ...loadedPhotos] = await Promise.all([
+        loadImg(base64Logo || '/logo-riv.png', true),
+        loadImg(base64Qr || qrUrl, true),
+        ...allImages.map((u) => loadImg(u, false)),
       ]);
 
       const imgs = loadedPhotos.filter((img): img is HTMLImageElement => img !== null);
@@ -686,7 +696,19 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
       const photoFrames = imgs.length * SLIDE_FRAMES;
       const totalFrames = photoFrames + OUTRO_FRAMES;
 
-      // Detección de códec de video compatible (mp4 en Safari, webm en Chrome/Edge)
+      // Datos normalizados y simétricos
+      const pTypeLabel = `${(property.propertyType || 'PROPIEDAD').toUpperCase()} EN VENTA`;
+      const priceLabel = property.status === 'Vendida' ? 'VENDIDO' : `$${fmt(property.price)} USD`;
+      const phoneLabel = advisorPhone || '0414-7901111';
+      const advisorLabel = property.captador || 'RIV Margarita Premier';
+      const locationLabel = (property.location || 'Isla de Margarita').toUpperCase();
+      const specsForVideo = [
+        { kind: 'bed' as const, value: `${property.beds > 0 ? property.beds : 1}`, label: 'HABITACIONES' },
+        { kind: 'bath' as const, value: `${property.baths > 0 ? property.baths : 1}`, label: 'BAÑOS' },
+        { kind: 'area' as const, value: property.sqm > 0 ? `${property.sqm} m²` : '— m²', label: 'ÁREA TOTAL' },
+      ];
+
+      // Detección de códec de video compatible (mp4 en Safari/iOS, webm en Chrome/Edge)
       let mimeType = 'video/webm';
       if (typeof MediaRecorder !== 'undefined') {
         const testTypes = [
@@ -704,20 +726,21 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
         }
       }
 
-      // Configurar grabación multimedia
       const stream = canvas.captureStream(FPS);
       let recorder: MediaRecorder;
       try {
         recorder = new MediaRecorder(stream, {
           mimeType,
-          videoBitsPerSecond: 8_000_000,
+          videoBitsPerSecond: 10_000_000,
         });
       } catch {
         recorder = new MediaRecorder(stream);
       }
 
       const chunks: BlobPart[] = [];
-      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
 
       await new Promise<void>((resolve) => {
         recorder.onstop = async () => {
@@ -739,216 +762,430 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
         recorder.start();
         let frame = 0;
 
+        // Dibuja una fotografía en modo 'cover' con Ken Burns alternado (zoom-in / zoom-out + paneo suave)
+        const drawCoverSlide = (img: HTMLImageElement, slideIndex: number, progress01: number, alpha: number) => {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          const imgW = img.naturalWidth || WIDTH;
+          const imgH = img.naturalHeight || HEIGHT;
+          const baseScale = Math.max(WIDTH / imgW, HEIGHT / imgH);
+          const ease = 0.5 - Math.cos(progress01 * Math.PI) / 2; // Ease-in-out sinusoidal
+          const isEven = slideIndex % 2 === 0;
+          const zoom = isEven ? 1.0 + ease * 0.065 : 1.065 - ease * 0.065;
+          const panX = (isEven ? 1 : -1) * (ease - 0.5) * 18;
+          const panY = (slideIndex % 3 === 0 ? -1 : 1) * (ease - 0.5) * 14;
+
+          const drawW = imgW * baseScale * zoom;
+          const drawH = imgH * baseScale * zoom;
+          const drawX = (WIDTH - drawW) / 2 + panX;
+          const drawY = (HEIGHT - drawH) / 2 + panY;
+          ctx.drawImage(img, drawX, drawY, drawW, drawH);
+          ctx.restore();
+        };
+
+        // Función que dibuja la escena de cierre (Outro) con soporte de opacidad para transición cruzada
+        const drawOutroScene = (outroProgress01: number, sceneAlpha = 1) => {
+          ctx.save();
+          ctx.globalAlpha = sceneAlpha;
+
+          // 1. Fondo Radial Vinotinto & Obsidiana de Lujo
+          const outroGrad = ctx.createRadialGradient(
+            WIDTH / 2,
+            HEIGHT * 0.42,
+            60,
+            WIDTH / 2,
+            HEIGHT * 0.5,
+            HEIGHT * 0.72
+          );
+          outroGrad.addColorStop(0, '#6B001B');
+          outroGrad.addColorStop(0.55, '#2D000B');
+          outroGrad.addColorStop(1, '#080808');
+          ctx.fillStyle = outroGrad;
+          ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+          // 2. Doble Marco Perimetral Dorado Simétrico
+          drawRoundRect(ctx, 44, 44, WIDTH - 88, HEIGHT - 88, 40, undefined, 'rgba(212, 175, 55, 0.55)', 2.5);
+          drawRoundRect(ctx, 60, 60, WIDTH - 120, HEIGHT - 120, 32, undefined, 'rgba(212, 175, 55, 0.2)', 1);
+
+          // Animación suave de entrada vertical
+          const entryEase = Math.min(1, outroProgress01 / 0.28);
+          const slideUp = (1 - Math.pow(1 - entryEase, 3)) * 0; // Estabilizado al centro
+          ctx.translate(0, slideUp);
+
+          // 3. Píldora Blanca Superior con Logo Oficial (Sin deformación)
+          const logoPillW = 420;
+          const logoPillH = 128;
+          const logoPillX = (WIDTH - logoPillW) / 2;
+          const logoPillY = 160;
+          drawRoundRect(ctx, logoPillX, logoPillY, logoPillW, logoPillH, 32, '#FFFFFF', '#D4AF37', 3);
+          if (logoImg) {
+            drawContainedImage(ctx, logoImg, logoPillX + 36, logoPillY + 18, logoPillW - 72, logoPillH - 36);
+          } else {
+            ctx.fillStyle = '#800020';
+            ctx.font = `900 32px ${EXPORT_FONT}`;
+            drawCenteredText(ctx, 'RIV MARGARITA PREMIER', WIDTH / 2, logoPillY + logoPillH / 2);
+          }
+
+          // 4. Píldora Dorada de Exclusividad
+          ctx.font = `800 18px ${EXPORT_FONT}`;
+          const tagStr = 'EXCLUSIVA OPORTUNIDAD INMOBILIARIA';
+          const tagTextW = ctx.measureText(tagStr).width;
+          const tagPillW = tagTextW + 104;
+          const tagPillH = 50;
+          const tagPillX = (WIDTH - tagPillW) / 2;
+          const tagPillY = 340;
+          drawRoundRect(ctx, tagPillX, tagPillY, tagPillW, tagPillH, 25, 'rgba(212, 175, 55, 0.16)', '#D4AF37', 1.5);
+          drawCanvasStar(ctx, tagPillX + 28, tagPillY + tagPillH / 2, 9, '#D4AF37');
+          drawCanvasStar(ctx, tagPillX + tagPillW - 28, tagPillY + tagPillH / 2, 9, '#D4AF37');
+          ctx.fillStyle = '#D4AF37';
+          drawCenteredText(ctx, tagStr, WIDTH / 2, tagPillY + tagPillH / 2);
+
+          // 5. Título de la Propiedad Centrado (Hasta 2 líneas)
+          const outroTitleSize = getAdaptiveTitleSize(property.title, 52, 36);
+          ctx.font = `900 ${outroTitleSize}px ${EXPORT_FONT}`;
+          ctx.fillStyle = '#FFFFFF';
+          const titleBottomY = drawWrappedCenteredText(ctx, property.title, WIDTH / 2, 455, WIDTH - 180, outroTitleSize * 1.18, 2);
+
+          // 6. Ubicación con Pin Vectorial Centrado
+          const locY = titleBottomY + 34;
+          ctx.font = `700 22px ${EXPORT_FONT}`;
+          const shortLoc = locationLabel.length > 42 ? locationLabel.slice(0, 41) + '…' : locationLabel;
+          const locW = ctx.measureText(shortLoc).width;
+          const totalLocW = 24 + 10 + locW;
+          const locStartX = (WIDTH - totalLocW) / 2;
+          drawCanvasPin(ctx, locStartX + 12, locY, 22, '#D4AF37');
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+          drawCenteredText(ctx, shortLoc, locStartX + 24 + 10 + locW / 2, locY);
+
+          // 7. Banner Central de Precio de Inversión
+          const priceBoxW = 720;
+          const priceBoxH = 148;
+          const priceBoxX = (WIDTH - priceBoxW) / 2;
+          const priceBoxY = 640;
+          drawRoundRect(ctx, priceBoxX, priceBoxY, priceBoxW, priceBoxH, 30, 'rgba(212, 175, 55, 0.14)', '#D4AF37', 2.5);
+          ctx.font = `800 17px ${EXPORT_FONT}`;
+          ctx.fillStyle = '#D4AF37';
+          drawCenteredText(ctx, 'PRECIO DE INVERSIÓN', WIDTH / 2, priceBoxY + 40);
+          ctx.font = `900 64px ${EXPORT_FONT}`;
+          ctx.fillStyle = '#FFFFFF';
+          drawCenteredText(ctx, priceLabel, WIDTH / 2, priceBoxY + 102);
+
+          // 8. Grilla de 3 Especificaciones en el Outro
+          const specGap = 20;
+          const specTotalW = WIDTH - 180;
+          const specCardW = (specTotalW - specGap * 2) / 3;
+          const specCardH = 136;
+          const specY = 835;
+          specsForVideo.forEach((sp, i) => {
+            const sx = 90 + i * (specCardW + specGap);
+            drawRoundRect(ctx, sx, specY, specCardW, specCardH, 24, 'rgba(255, 255, 255, 0.06)', 'rgba(212, 175, 55, 0.4)', 1.5);
+            const iconCx = sx + specCardW / 2;
+            const iconCy = specY + 36;
+            if (sp.kind === 'bed') drawCanvasBed(ctx, iconCx, iconCy, 30, '#D4AF37');
+            if (sp.kind === 'bath') drawCanvasBath(ctx, iconCx, iconCy, 30, '#D4AF37');
+            if (sp.kind === 'area') drawCanvasRuler(ctx, iconCx, iconCy, 28, '#D4AF37');
+
+            ctx.font = `900 30px ${EXPORT_FONT}`;
+            ctx.fillStyle = '#FFFFFF';
+            drawCenteredText(ctx, sp.value, iconCx, specY + 80);
+
+            ctx.font = `800 13px ${EXPORT_FONT}`;
+            ctx.fillStyle = '#D4AF37';
+            drawCenteredText(ctx, sp.label, iconCx, specY + 112);
+          });
+
+          // 9. Tarjeta Simétrica de Contacto del Asesor + QR
+          const cardW = WIDTH - 180;
+          const cardH = 380;
+          const cardX = 90;
+          const cardY = 1025;
+          drawRoundRect(ctx, cardX, cardY, cardW, cardH, 32, 'rgba(14, 14, 14, 0.86)', '#D4AF37', 2);
+
+          ctx.font = `800 16px ${EXPORT_FONT}`;
+          ctx.fillStyle = '#D4AF37';
+          drawCenteredText(ctx, 'ASESOR INMOBILIARIO EXCLUSIVO', WIDTH / 2, cardY + 52);
+
+          ctx.font = `900 42px ${EXPORT_FONT}`;
+          ctx.fillStyle = '#FFFFFF';
+          drawCenteredText(ctx, advisorLabel, WIDTH / 2, cardY + 104);
+
+          // Píldora Destacada de Teléfono Grande y Legible
+          const phPillW = 460;
+          const phPillH = 74;
+          const phPillX = (WIDTH - phPillW) / 2;
+          const phPillY = cardY + 148;
+          drawRoundRect(ctx, phPillX, phPillY, phPillW, phPillH, 37, '#800020', '#D4AF37', 2);
+          ctx.font = `900 34px ${EXPORT_FONT}`;
+          const phTextW = ctx.measureText(phoneLabel).width;
+          const phTotalW = 28 + 14 + phTextW;
+          const phStartX = WIDTH / 2 - phTotalW / 2;
+          drawCanvasPhone(ctx, phStartX + 14, phPillY + phPillH / 2, 28, '#D4AF37');
+          ctx.fillStyle = '#FFFFFF';
+          drawCenteredText(ctx, phoneLabel, phStartX + 28 + 14 + phTextW / 2, phPillY + phPillH / 2);
+
+          // Llamado a la acción + QR opcional o Código
+          if (qrImg) {
+            const qrBoxSize = 96;
+            const qrX = cardX + cardW - qrBoxSize - 36;
+            const qrY = cardY + cardH - qrBoxSize - 28;
+            drawRoundRect(ctx, qrX - 6, qrY - 6, qrBoxSize + 12, qrBoxSize + 12, 14, '#FFFFFF', '#D4AF37', 1.5);
+            ctx.drawImage(qrImg, qrX, qrY, qrBoxSize, qrBoxSize);
+
+            ctx.font = `700 22px ${EXPORT_FONT}`;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+            drawCenteredText(ctx, 'Agenda tu visita privada hoy mismo', WIDTH / 2 - 44, cardY + 276);
+            ctx.font = `700 16px ${EXPORT_FONT}`;
+            ctx.fillStyle = '#D4AF37';
+            drawCenteredText(
+              ctx,
+              `RIV MARGARITA PREMIER · RIF: J-11055496-2${property.codigo ? ` · CÓD: ${property.codigo}` : ''}`,
+              WIDTH / 2 - 44,
+              cardY + 318
+            );
+          } else {
+            ctx.font = `700 22px ${EXPORT_FONT}`;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+            drawCenteredText(ctx, 'Agenda tu visita privada hoy mismo', WIDTH / 2, cardY + 276);
+            ctx.font = `700 16px ${EXPORT_FONT}`;
+            ctx.fillStyle = '#D4AF37';
+            drawCenteredText(
+              ctx,
+              `RIV MARGARITA PREMIER · RIF: J-11055496-2${property.codigo ? ` · CÓD: ${property.codigo}` : ''}`,
+              WIDTH / 2,
+              cardY + 322
+            );
+          }
+
+          ctx.restore();
+        };
+
         const drawFrame = () => {
           if (frame >= totalFrames) {
             recorder.stop();
             return;
           }
 
-          // ── A. FASE 1: DIAPOSITIVAS DE FOTOS ──────────────────────────────
+          // ── A. FASE 1: DIAPOSITIVAS DE FOTOS CON DISEÑO SIMÉTRICO 9:16 ─────
           if (frame < photoFrames) {
             const slideIdx = Math.floor(frame / SLIDE_FRAMES);
             const frameInSlide = frame % SLIDE_FRAMES;
+            const slideProgress = frameInSlide / SLIDE_FRAMES;
             const currentImg = imgs[slideIdx];
+            const isLastSlide = slideIdx === imgs.length - 1;
             const nextImg = imgs[(slideIdx + 1) % imgs.length];
 
-            // Opacidad de fade
-            let alpha = 1;
-            if (frameInSlide >= SLIDE_FRAMES - FADE_FRAMES) {
-              alpha = 1 - (frameInSlide - (SLIDE_FRAMES - FADE_FRAMES)) / FADE_FRAMES;
-            }
-
-            // Efecto Ken Burns (Zoom sutil de 1.0 a 1.045)
-            const zoomRatio = 1.0 + (frameInSlide / SLIDE_FRAMES) * 0.045;
-
-            const drawCover = (img: HTMLImageElement, a: number, scaleFactor = 1) => {
-              ctx.globalAlpha = a;
-              const baseScale = Math.max(WIDTH / img.naturalWidth, HEIGHT / img.naturalHeight);
-              const scale = baseScale * scaleFactor;
-              const w = img.naturalWidth * scale;
-              const h = img.naturalHeight * scale;
-              const x = (WIDTH - w) / 2;
-              const y = (HEIGHT - h) / 2;
-              ctx.drawImage(img, x, y, w, h);
-              ctx.globalAlpha = 1;
-            };
-
-            // Fondo negro
-            ctx.fillStyle = '#050505';
+            // Fondo base
+            ctx.fillStyle = '#0A0A0A';
             ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-            drawCover(currentImg, 1, zoomRatio);
+            // Dibujar foto actual con Ken Burns
+            drawCoverSlide(currentImg, slideIdx, slideProgress, 1);
 
-            if (alpha < 1 && frameInSlide >= SLIDE_FRAMES - FADE_FRAMES) {
-              drawCover(nextImg, 1 - alpha, 1.0);
+            // Crossfade hacia la siguiente foto (o hacia el Outro si es la última foto)
+            if (frameInSlide >= SLIDE_FRAMES - FADE_FRAMES) {
+              const fadeAlpha = (frameInSlide - (SLIDE_FRAMES - FADE_FRAMES)) / FADE_FRAMES;
+              if (!isLastSlide) {
+                drawCoverSlide(nextImg, slideIdx + 1, 0, fadeAlpha);
+              }
             }
 
-            // 1. Top Vignette Gradient
-            const topGrad = ctx.createLinearGradient(0, 0, 0, 320);
-            topGrad.addColorStop(0, 'rgba(0,0,0,0.85)');
+            // 1. Degradado Superior
+            const topGrad = ctx.createLinearGradient(0, 0, 0, 340);
+            topGrad.addColorStop(0, 'rgba(0,0,0,0.84)');
+            topGrad.addColorStop(0.6, 'rgba(0,0,0,0.35)');
             topGrad.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = topGrad;
-            ctx.fillRect(0, 0, WIDTH, 320);
+            ctx.fillRect(0, 0, WIDTH, 340);
 
-            // 2. Animated Gold Progress Bar
-            const progressWidth = ((frame + 1) / totalFrames) * WIDTH;
-            const lineGrad = ctx.createLinearGradient(0, 0, WIDTH, 0);
-            lineGrad.addColorStop(0, '#800020');
-            lineGrad.addColorStop(0.5, '#D4AF37');
-            lineGrad.addColorStop(1, '#FFF2B2');
-            ctx.fillStyle = lineGrad;
-            ctx.fillRect(0, 0, progressWidth, 8);
+            // 2. Degradado Inferior Profundo
+            const bottomGrad = ctx.createLinearGradient(0, HEIGHT - 1080, 0, HEIGHT);
+            bottomGrad.addColorStop(0, 'rgba(0,0,0,0)');
+            bottomGrad.addColorStop(0.25, 'rgba(10,10,10,0.45)');
+            bottomGrad.addColorStop(0.6, 'rgba(10,10,10,0.9)');
+            bottomGrad.addColorStop(1, 'rgba(5,5,5,0.98)');
+            ctx.fillStyle = bottomGrad;
+            ctx.fillRect(0, HEIGHT - 1080, WIDTH, 1080);
 
-            // 3. Top Header: Watermark Vector SVG & Counter
-            // Watermark Logo
-            if (logoImg) {
-              drawRoundRect(ctx, 48, 48, 220, 80, 20, 'rgba(255,255,255,0.95)', '#D4AF37', 1.5);
-              ctx.drawImage(logoImg, 58, 54, 200, 68);
-            } else {
-              // Fallback badge si falla el logo
-              drawRoundRect(ctx, 48, 48, 290, 60, 20, '#800020', '#D4AF37', 1.5);
-              ctx.fillStyle = '#FFFFFF';
-              ctx.font = 'bold 20px system-ui, sans-serif';
-              ctx.textBaseline = 'middle';
-              ctx.textAlign = 'center';
-              ctx.fillText('✦ RIV MARGARITA PREMIER', 193, 78);
+            // 3. Barras de Progreso Segmentadas Estilo Instagram Stories / Reels
+            const segGap = 10;
+            const segTotalW = WIDTH - 112;
+            const segW = (segTotalW - segGap * (imgs.length - 1)) / imgs.length;
+            const segY = 28;
+            for (let i = 0; i < imgs.length; i++) {
+              const sx = 56 + i * (segW + segGap);
+              drawRoundRect(ctx, sx, segY, segW, 6, 3, 'rgba(255, 255, 255, 0.28)');
+              const fillRatio = i < slideIdx ? 1 : i === slideIdx ? slideProgress : 0;
+              if (fillRatio > 0) {
+                drawRoundRect(ctx, sx, segY, Math.max(6, segW * fillRatio), 6, 3, '#D4AF37');
+              }
             }
 
-            // Photo Counter
-            drawRoundRect(ctx, WIDTH - 228, 48, 180, 56, 20, 'rgba(0,0,0,0.5)', 'rgba(255,255,255,0.2)', 1);
+            // 4. Barra Superior Simétrica (Logo a la izquierda, Precio + Contador a la derecha)
+            const headerY = 56;
+            const logoBoxW = 236;
+            const logoBoxH = 84;
+            drawRoundRect(ctx, 56, headerY, logoBoxW, logoBoxH, 24, '#FFFFFF', '#D4AF37', 2);
+            if (logoImg) {
+              drawContainedImage(ctx, logoImg, 56 + 24, headerY + 12, logoBoxW - 48, logoBoxH - 24);
+            } else {
+              ctx.font = `900 22px ${EXPORT_FONT}`;
+              ctx.fillStyle = '#800020';
+              drawCenteredText(ctx, 'RIV PREMIER', 56 + logoBoxW / 2, headerY + logoBoxH / 2);
+            }
+
+            // Píldora de Precio Superior Derecha
+            ctx.font = `900 40px ${EXPORT_FONT}`;
+            const priceTextW = ctx.measureText(priceLabel).width;
+            const priceBoxW = Math.max(300, priceTextW + 76);
+            const priceBoxH = 84;
+            const priceBoxX = WIDTH - 56 - priceBoxW;
+            drawRoundRect(ctx, priceBoxX, headerY, priceBoxW, priceBoxH, 24, '#800020', '#D4AF37', 2);
             ctx.fillStyle = '#FFFFFF';
-            ctx.font = '600 20px system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`Foto ${slideIdx + 1} de ${imgs.length}`, WIDTH - 138, 76);
+            drawCenteredText(ctx, priceLabel, priceBoxX + priceBoxW / 2, headerY + priceBoxH / 2);
 
-            // 4. Bottom Cinematic Deep Gradient
-            const bottomGrad = ctx.createLinearGradient(0, HEIGHT * 0.45, 0, HEIGHT);
-            bottomGrad.addColorStop(0, 'rgba(0,0,0,0)');
-            bottomGrad.addColorStop(0.25, 'rgba(5,5,5,0.45)');
-            bottomGrad.addColorStop(0.6, 'rgba(5,5,5,0.85)');
-            bottomGrad.addColorStop(1, 'rgba(0,0,0,0.98)');
-            ctx.fillStyle = bottomGrad;
-            ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-            // 5. Property Tag
-            const pType = (property.propertyType || 'INMUEBLE').toUpperCase();
-            drawRoundRect(ctx, 56, HEIGHT - 460, 320, 48, 24, 'rgba(212, 175, 55, 0.25)', '#D4AF37', 1.5);
+            // Píldora Flotante de Contador de Fotos debajo del Precio
+            const counterW = 148;
+            const counterH = 42;
+            const counterX = WIDTH - 56 - counterW;
+            const counterY = headerY + priceBoxH + 14;
+            drawRoundRect(ctx, counterX, counterY, counterW, counterH, 21, 'rgba(14, 14, 14, 0.82)', 'rgba(212, 175, 55, 0.5)', 1.5);
+            ctx.font = `800 17px ${EXPORT_FONT}`;
             ctx.fillStyle = '#D4AF37';
-            ctx.font = 'bold 18px system-ui, sans-serif';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`★  ${pType} EN VENTA`, 80, HEIGHT - 436);
+            drawCenteredText(ctx, `FOTO ${slideIdx + 1} / ${imgs.length}`, counterX + counterW / 2, counterY + counterH / 2);
 
-            // 6. Price
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = '900 84px system-ui, sans-serif';
-            ctx.textBaseline = 'alphabetic';
-            ctx.fillText(`$${fmt(property.price)}`, 56, HEIGHT - 340);
+            // 5. Tarjeta Inferior Contenedora Simétrica (Idéntica en proporción a Instagram 9:16)
+            const cardX = 56;
+            const cardW = 968;
+            const cardH = 520;
+            const cardY = HEIGHT - 56 - cardH;
+            drawRoundRect(ctx, cardX, cardY, cardW, cardH, 36, 'rgba(14, 14, 14, 0.92)', 'rgba(212, 175, 55, 0.45)', 1.8);
 
-            const pWidth = ctx.measureText(`$${fmt(property.price)}`).width;
+            // 5.1 Píldora Centrada de Tipo de Inmueble con Estrella Vectorial
+            ctx.font = `800 16px ${EXPORT_FONT}`;
+            const typeTextW = ctx.measureText(pTypeLabel).width;
+            const typePillW = typeTextW + 68;
+            const typePillH = 44;
+            const typePillX = (WIDTH - typePillW) / 2;
+            const typePillY = cardY + 32;
+            drawRoundRect(ctx, typePillX, typePillY, typePillW, typePillH, 14, 'rgba(212, 175, 55, 0.18)', '#D4AF37', 1.5);
+            const starX = typePillX + 24;
+            const starY = typePillY + typePillH / 2;
+            drawCanvasStar(ctx, starX, starY, 8, '#D4AF37');
             ctx.fillStyle = '#D4AF37';
-            ctx.font = 'bold 34px system-ui, sans-serif';
-            ctx.fillText('USD', 56 + pWidth + 18, HEIGHT - 340);
+            drawCenteredText(ctx, pTypeLabel, starX + 14 + typeTextW / 2, starY);
 
-            // 7. Title & Location
+            // 5.2 Ubicación Centrada con Pin Vectorial
+            const slideLocY = typePillY + typePillH + 26;
+            ctx.font = `700 20px ${EXPORT_FONT}`;
+            const shortSlideLoc = locationLabel.length > 44 ? locationLabel.slice(0, 43) + '…' : locationLabel;
+            const slideLocW = ctx.measureText(shortSlideLoc).width;
+            const slideLocTotalW = 20 + 8 + slideLocW;
+            const slideLocStartX = (WIDTH - slideLocTotalW) / 2;
+            drawCanvasPin(ctx, slideLocStartX + 10, slideLocY, 20, '#D4AF37');
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+            drawCenteredText(ctx, shortSlideLoc, slideLocStartX + 20 + 8 + slideLocW / 2, slideLocY);
+
+            // 5.3 Título de la Propiedad Centrado
+            const slideTitleSize = getAdaptiveTitleSize(property.title, 44, 30);
+            ctx.font = `900 ${slideTitleSize}px ${EXPORT_FONT}`;
             ctx.fillStyle = '#FFFFFF';
-            ctx.font = 'bold 38px system-ui, sans-serif';
-            const displayTitle = property.title.length > 38 ? property.title.slice(0, 37) + '…' : property.title;
-            ctx.fillText(displayTitle, 56, HEIGHT - 275);
+            drawWrappedCenteredText(ctx, property.title, WIDTH / 2, slideLocY + 46, cardW - 88, slideTitleSize * 1.15, 2);
 
-            ctx.fillStyle = 'rgba(255,255,255,0.75)';
-            ctx.font = '500 26px system-ui, sans-serif';
-            ctx.fillText(`📍 ${property.location}`, 56, HEIGHT - 225);
+            // 5.4 Grilla Simétrica de 3 Especificaciones con Íconos Vectoriales
+            const sGap = 16;
+            const sTotalW = cardW - 88;
+            const sCardW = (sTotalW - sGap * 2) / 3;
+            const sCardH = 128;
+            const sCardY = cardY + 258;
+            specsForVideo.forEach((sp, idx) => {
+              const sx = cardX + 44 + idx * (sCardW + sGap);
+              drawRoundRect(ctx, sx, sCardY, sCardW, sCardH, 22, 'rgba(255, 255, 255, 0.07)', 'rgba(212, 175, 55, 0.4)', 1.5);
+              const icx = sx + sCardW / 2;
+              const icy = sCardY + 34;
+              if (sp.kind === 'bed') drawCanvasBed(ctx, icx, icy, 28, '#D4AF37');
+              if (sp.kind === 'bath') drawCanvasBath(ctx, icx, icy, 28, '#D4AF37');
+              if (sp.kind === 'area') drawCanvasRuler(ctx, icx, icy, 26, '#D4AF37');
 
-            // 8. Dynamic Spec Badges (Filtrados sin 0 habs/baños)
-            const specsList: Array<{ icon: string; text: string }> = [];
-            if (property.beds > 0) specsList.push({ icon: '🛏', text: `${property.beds} Hab` });
-            if (property.baths > 0) specsList.push({ icon: '🚿', text: `${property.baths} Baños` });
-            if (property.sqm > 0) specsList.push({ icon: '📐', text: `${property.sqm} m²` });
-            specsList.push({ icon: '👤', text: property.captador ? property.captador.split(' ')[0] : 'Asesor' });
-
-            const badgeW = (WIDTH - 112 - (specsList.length - 1) * 16) / specsList.length;
-            const badgeH = 74;
-            const badgeY = HEIGHT - 145;
-
-            specsList.forEach((s, idx) => {
-              const bX = 56 + idx * (badgeW + 16);
-              drawRoundRect(ctx, bX, badgeY, badgeW, badgeH, 18, 'rgba(255, 255, 255, 0.12)', 'rgba(255, 255, 255, 0.25)', 1);
+              ctx.font = `900 28px ${EXPORT_FONT}`;
               ctx.fillStyle = '#FFFFFF';
-              ctx.font = 'bold 22px system-ui, sans-serif';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(`${s.icon} ${s.text}`, bX + badgeW / 2, badgeY + badgeH / 2);
+              drawCenteredText(ctx, sp.value, icx, sCardY + 76);
+
+              ctx.font = `800 12px ${EXPORT_FONT}`;
+              ctx.fillStyle = '#D4AF37';
+              drawCenteredText(ctx, sp.label, icx, sCardY + 106);
             });
 
+            // 5.5 Footer Simétrico de 3 Columnas dentro de la Tarjeta
+            const dividerY = cardY + cardH - 96;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(cardX + 44, dividerY);
+            ctx.lineTo(cardX + cardW - 44, dividerY);
+            ctx.stroke();
+
+            const footerCenterY = dividerY + 48;
+
+            // Izquierda: Asesor
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+            ctx.font = `800 12px ${EXPORT_FONT}`;
+            ctx.fillStyle = '#D4AF37';
+            ctx.fillText('ASESOR INMOBILIARIO', cardX + 44, footerCenterY - 10);
+            ctx.font = `900 21px ${EXPORT_FONT}`;
+            ctx.fillStyle = '#FFFFFF';
+            const shortAdvisor = advisorLabel.length > 20 ? advisorLabel.slice(0, 19) + '…' : advisorLabel;
+            ctx.fillText(shortAdvisor, cardX + 44, footerCenterY + 16);
+
+            // Centro: Píldora de Teléfono
+            const fPhoneW = 248;
+            const fPhoneH = 48;
+            const fPhoneX = WIDTH / 2 - fPhoneW / 2;
+            const fPhoneY = footerCenterY - fPhoneH / 2;
+            drawRoundRect(ctx, fPhoneX, fPhoneY, fPhoneW, fPhoneH, 24, '#800020', '#D4AF37', 1.5);
+            ctx.font = `900 20px ${EXPORT_FONT}`;
+            const fpTextW = ctx.measureText(phoneLabel).width;
+            const fpTotalW = 18 + 8 + fpTextW;
+            const fpStartX = WIDTH / 2 - fpTotalW / 2;
+            drawCanvasPhone(ctx, fpStartX + 9, footerCenterY, 18, '#D4AF37');
+            ctx.fillStyle = '#FFFFFF';
+            drawCenteredText(ctx, phoneLabel, fpStartX + 18 + 8 + fpTextW / 2, footerCenterY);
+
+            // Derecha: RIV + RIF + Código
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'alphabetic';
+            ctx.font = `800 13px ${EXPORT_FONT}`;
+            ctx.fillStyle = '#D4AF37';
+            ctx.fillText('RIV MARGARITA PREMIER', cardX + cardW - 44, footerCenterY - 8);
+            ctx.font = `600 12px ${EXPORT_FONT}`;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+            ctx.fillText(
+              `RIF: J-11055496-2${property.codigo ? ` · ${property.codigo}` : ''}`,
+              cardX + cardW - 44,
+              footerCenterY + 14
+            );
+
+            // Si estamos en los últimos cuadros de la última diapositiva, fundir suavemente hacia el Outro
+            if (isLastSlide && frameInSlide >= SLIDE_FRAMES - FADE_FRAMES) {
+              const outroFade = (frameInSlide - (SLIDE_FRAMES - FADE_FRAMES)) / FADE_FRAMES;
+              drawOutroScene(0, outroFade);
+            }
           } else {
             // ── B. FASE 2: TARJETA DE CIERRE (OUTRO CARD) ─────────────────────
-            // Fondo con degradado profundo Vinotinto & Dorado
-            const outroGrad = ctx.createRadialGradient(WIDTH / 2, HEIGHT / 2, 80, WIDTH / 2, HEIGHT / 2, HEIGHT * 0.75);
-            outroGrad.addColorStop(0, '#5e0017');
-            outroGrad.addColorStop(0.6, '#2a000a');
-            outroGrad.addColorStop(1, '#080808');
-            ctx.fillStyle = outroGrad;
-            ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-            // Borde perimetral dorado
-            drawRoundRect(ctx, 40, 40, WIDTH - 80, HEIGHT - 80, 36, undefined, 'rgba(212, 175, 55, 0.4)', 2);
-
-            // Logotipo Central
-            if (logoImg) {
-              const outroLogoW = 540;
-              const outroLogoH = 135;
-              ctx.drawImage(logoImg, (WIDTH - outroLogoW) / 2, HEIGHT * 0.22, outroLogoW, outroLogoH);
-            } else {
-              drawRoundRect(ctx, (WIDTH - 500) / 2, HEIGHT * 0.22, 500, 110, 24, '#800020', '#D4AF37', 2);
-              ctx.fillStyle = '#FFFFFF';
-              ctx.font = '900 32px system-ui, sans-serif';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText('RIV MARGARITA PREMIER', WIDTH / 2, HEIGHT * 0.22 + 55);
-            }
-
-            // Separador con estrella
-            ctx.fillStyle = '#D4AF37';
-            ctx.font = 'bold 24px system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('✦  TU PRÓXIMO HOGAR EN MARGARITA  ✦', WIDTH / 2, HEIGHT * 0.38);
-
-            // Título de la propiedad en Outro
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = 'bold 44px system-ui, sans-serif';
-            const shortTitle = property.title.length > 32 ? property.title.slice(0, 31) + '…' : property.title;
-            ctx.fillText(shortTitle, WIDTH / 2, HEIGHT * 0.48);
-
-            // Precio en Outro
-            ctx.fillStyle = '#D4AF37';
-            ctx.font = '900 76px system-ui, sans-serif';
-            ctx.fillText(`$${fmt(property.price)} USD`, WIDTH / 2, HEIGHT * 0.56);
-
-            // Tarjeta de contacto del asesor
-            const cardW = WIDTH - 160;
-            const cardH = 260;
-            const cardX = 80;
-            const cardY = HEIGHT * 0.65;
-            drawRoundRect(ctx, cardX, cardY, cardW, cardH, 28, 'rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.2)', 1.5);
-
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = 'bold 32px system-ui, sans-serif';
-            ctx.fillText(property.captador || 'Asesor Inmobiliario', WIDTH / 2, cardY + 70);
-
-            if (advisorPhone) {
-              ctx.fillStyle = '#D4AF37';
-              ctx.font = '600 28px system-ui, sans-serif';
-              ctx.fillText(`📲 WhatsApp: ${advisorPhone}`, WIDTH / 2, cardY + 125);
-            }
-
-            ctx.fillStyle = 'rgba(255,255,255,0.7)';
-            ctx.font = '500 24px system-ui, sans-serif';
-            ctx.fillText('Contáctanos para coordinar tu visita privada', WIDTH / 2, cardY + 185);
+            const outroProgress = (frame - photoFrames) / OUTRO_FRAMES;
+            drawOutroScene(outroProgress, 1);
           }
 
-          setVideoProgress(Math.round((frame / totalFrames) * 100));
+          // Barra de progreso dorada general en el borde superior (6px)
+          const totalProgressW = ((frame + 1) / totalFrames) * WIDTH;
+          const barGrad = ctx.createLinearGradient(0, 0, WIDTH, 0);
+          barGrad.addColorStop(0, '#800020');
+          barGrad.addColorStop(0.5, '#D4AF37');
+          barGrad.addColorStop(1, '#FFF2B2');
+          ctx.fillStyle = barGrad;
+          ctx.fillRect(0, 0, totalProgressW, 6);
+
+          setVideoProgress(Math.round(((frame + 1) / totalFrames) * 100));
           frame++;
           requestAnimationFrame(drawFrame);
         };
@@ -960,7 +1197,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
       setDone(true);
     } catch (e) {
       console.error(e);
-      showToast('Error al generar el video. Tu navegador debe soportar MediaRecorder (Chrome/Edge).', 'error');
+      showToast('Error al generar el video. Tu navegador debe soportar MediaRecorder (Chrome/Edge/Safari).', 'error');
     } finally {
       setIsExporting(false);
     }
@@ -1168,6 +1405,17 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                             />
                           </div>
                         </div>
+                      )}
+
+                      {/* VISTA PREVIA INTERACTIVA DEL SLIDESHOW 9:16 ANTES DE GENERAR */}
+                      {selectedFormat === 'video' && !done && !isExporting && (
+                        <LiveSlideshowPreview
+                          images={allImages}
+                          property={property}
+                          advisorPhone={advisorPhone}
+                          base64Logo={base64Logo}
+                          base64Qr={base64Qr || qrUrl}
+                        />
                       )}
 
                       {/* SUBMÓDULO WHATSAPP: COPYWRITING & DEEP LINKING */}
@@ -3377,7 +3625,283 @@ function LiveTemplatePreview(props: SharedTemplateProps) {
   );
 }
 
-// ─── Canvas Helper ─────────────────────────────────────────────────────────────
+// ─── VISTA PREVIA INTERACTIVA DEL VIDEO SLIDESHOW 9:16 ────────────────────────
+function LiveSlideshowPreview({
+  images,
+  property,
+  advisorPhone,
+  base64Logo,
+  base64Qr,
+}: {
+  images: string[];
+  property: Property;
+  advisorPhone: string;
+  base64Logo: string;
+  base64Qr: string;
+}) {
+  // Índice: 0..(images.length - 1) para fotos, images.length para la tarjeta de cierre (Outro)
+  const totalSlides = images.length + 1;
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveIdx((prev) => (prev + 1) % totalSlides);
+    }, 2600);
+    return () => clearInterval(timer);
+  }, [totalSlides]);
+
+  const isOutro = activeIdx === images.length;
+  const currentImg = images[Math.min(activeIdx, Math.max(0, images.length - 1))] || property.image;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.2);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      if (w > 0) setScale(w / 1080);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const validSpecs = getValidSpecs(property);
+  const logoSrc = base64Logo || '/logo-riv.png';
+  const typeLabel = property.propertyType
+    ? `${property.propertyType.toUpperCase()} EN VENTA`
+    : 'PROPIEDAD EN VENTA';
+  const priceText = property.status === 'Vendida' ? 'VENDIDO' : `$${fmt(property.price)} USD`;
+  const phone = advisorPhone || '0414-7901111';
+
+  return (
+    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 space-y-2.5">
+      <div className="flex items-center justify-between px-1">
+        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+          <Eye size={13} className="text-violet-600" />
+          Vista Previa Animada ({isOutro ? 'Cierre Corporativo' : `Foto ${activeIdx + 1} de ${images.length}`})
+        </span>
+        <div className="flex items-center gap-1">
+          {images.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setActiveIdx(i)}
+              className={`h-2 rounded-full transition-all ${
+                activeIdx === i ? 'w-5 bg-vinotinto' : 'w-2 bg-gray-300 hover:bg-gray-400'
+              }`}
+              title={`Foto ${i + 1}`}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={() => setActiveIdx(images.length)}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+              isOutro
+                ? 'bg-amber-500 text-black shadow-sm'
+                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+            }`}
+          >
+            Outro
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-[220px] mx-auto">
+        <div
+          ref={containerRef}
+          style={{
+            width: '100%',
+            aspectRatio: '1080 / 1920',
+            position: 'relative',
+            overflow: 'hidden',
+            borderRadius: '14px',
+            background: '#0A0A0A',
+            border: '1px solid #E5E7EB',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+          }}
+        >
+          <div
+            style={{
+              width: '1080px',
+              height: '1920px',
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+              pointerEvents: 'none',
+              userSelect: 'none',
+              fontFamily: EXPORT_FONT,
+            }}
+          >
+            {!isOutro ? (
+              <RenderExportTemplate
+                format="instagram"
+                template="A"
+                property={{ ...property, image: currentImg }}
+                advisorPhone={phone}
+                base64Img={currentImg}
+                base64PdfImg=""
+                base64IgImg={currentImg}
+                base64WaImg=""
+                base64Logo={logoSrc}
+                base64Qr={base64Qr}
+              />
+            ) : (
+              /* Vista Previa de la Tarjeta de Cierre (Outro) */
+              <div
+                style={{
+                  width: '1080px',
+                  height: '1920px',
+                  background: 'radial-gradient(circle at 50% 42%, #6B001B 0%, #2D000B 55%, #080808 100%)',
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '150px 90px 140px',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: '44px',
+                    borderRadius: '40px',
+                    border: '2.5px solid rgba(212, 175, 55, 0.55)',
+                    pointerEvents: 'none',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: '60px',
+                    borderRadius: '32px',
+                    border: '1px solid rgba(212, 175, 55, 0.2)',
+                    pointerEvents: 'none',
+                  }}
+                />
+
+                <ExportLogoBadge
+                  logoSrc={logoSrc}
+                  height={128}
+                  imgHeight={90}
+                  paddingX={44}
+                  borderRadius={32}
+                  borderColor="#D4AF37"
+                />
+
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px', width: '100%', textAlign: 'center' }}>
+                  <ExportTypePill
+                    label="EXCLUSIVA OPORTUNIDAD INMOBILIARIA"
+                    height={50}
+                    paddingX={28}
+                    fontSize={17}
+                    iconSize={18}
+                    bg="rgba(212, 175, 55, 0.16)"
+                    color="#D4AF37"
+                    borderColor="#D4AF37"
+                  />
+                  <h2 style={{ color: '#FFFFFF', fontSize: '48px', fontWeight: 900, margin: 0, lineHeight: 1.15, textAlign: 'center' }}>
+                    {property.title}
+                  </h2>
+                  <ExportLocationRow
+                    location={property.location}
+                    fontSize={22}
+                    iconSize={22}
+                    color="rgba(255,255,255,0.88)"
+                    iconColor="#D4AF37"
+                    uppercase={true}
+                  />
+                </div>
+
+                <div
+                  style={{
+                    width: '720px',
+                    height: '148px',
+                    background: 'rgba(212, 175, 55, 0.14)',
+                    border: '2.5px solid #D4AF37',
+                    borderRadius: '30px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <span style={{ color: '#D4AF37', fontSize: '17px', fontWeight: 800, letterSpacing: '2px', paddingLeft: '2px' }}>
+                    PRECIO DE INVERSIÓN
+                  </span>
+                  <span style={{ color: '#FFFFFF', fontSize: '60px', fontWeight: 900, lineHeight: 1 }}>
+                    {priceText}
+                  </span>
+                </div>
+
+                <ExportSpecsGrid
+                  specs={validSpecs}
+                  cardHeight={132}
+                  borderRadius={24}
+                  iconSize={30}
+                  valueSize={30}
+                  labelSize={13}
+                  gap={20}
+                  bg="rgba(255, 255, 255, 0.06)"
+                  borderColor="rgba(212, 175, 55, 0.4)"
+                  iconColor="#D4AF37"
+                  valueColor="#FFFFFF"
+                  labelColor="#D4AF37"
+                />
+
+                <div
+                  style={{
+                    width: '100%',
+                    background: 'rgba(14, 14, 14, 0.86)',
+                    border: '2px solid #D4AF37',
+                    borderRadius: '32px',
+                    padding: '32px 36px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '14px',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <span style={{ color: '#D4AF37', fontSize: '16px', fontWeight: 800, letterSpacing: '2px', paddingLeft: '2px' }}>
+                    ASESOR INMOBILIARIO EXCLUSIVO
+                  </span>
+                  <span style={{ color: '#FFFFFF', fontSize: '40px', fontWeight: 900, lineHeight: 1.1 }}>
+                    {property.captador || 'RIV Margarita Premier'}
+                  </span>
+                  <div
+                    style={{
+                      height: '70px',
+                      padding: '0 36px',
+                      background: '#800020',
+                      border: '2px solid #D4AF37',
+                      borderRadius: '999px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '12px',
+                    }}
+                  >
+                    <Smartphone size={28} color="#D4AF37" strokeWidth={2.4} />
+                    <span style={{ color: '#FFFFFF', fontSize: '32px', fontWeight: 900, lineHeight: 1 }}>{phone}</span>
+                  </div>
+                  <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: '20px', fontWeight: 600 }}>
+                    Agenda tu visita privada hoy mismo
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Canvas 2D Helpers (Centrado Óptico Real e Íconos Vectoriales) ─────────────
 function drawRoundRect(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -3409,5 +3933,219 @@ function drawRoundRect(
     ctx.lineWidth = lineWidth;
     ctx.stroke();
   }
+}
+
+/** Centra un texto horizontal y verticalmente usando el bounding-box real de los glifos */
+function drawCenteredText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  centerX: number,
+  centerY: number
+) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  const m = ctx.measureText(text);
+  const ascent = m.actualBoundingBoxAscent;
+  const descent = m.actualBoundingBoxDescent ?? 0;
+  if (typeof ascent === 'number' && ascent > 0) {
+    const opticalY = centerY + (ascent - descent) / 2;
+    ctx.fillText(text, centerX, opticalY);
+  } else {
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, centerX, centerY);
+  }
+  ctx.restore();
+}
+
+/** Parte un título largo en hasta `maxLines` líneas centradas y devuelve el Y inferior */
+function drawWrappedCenteredText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  centerX: number,
+  firstLineCenterY: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines = 2
+): number {
+  const words = (text || '').trim().split(/\s+/);
+  const lines: string[] = [];
+  let current = '';
+
+  for (const w of words) {
+    const candidate = current ? `${current} ${w}` : w;
+    if (ctx.measureText(candidate).width <= maxWidth || !current) {
+      current = candidate;
+    } else {
+      lines.push(current);
+      current = w;
+    }
+  }
+  if (current) lines.push(current);
+
+  const finalLines = lines.slice(0, maxLines);
+  if (lines.length > maxLines) {
+    let last = finalLines[maxLines - 1];
+    while (last.length > 3 && ctx.measureText(`${last}…`).width > maxWidth) {
+      last = last.slice(0, -1).trim();
+    }
+    finalLines[maxLines - 1] = `${last}…`;
+  }
+
+  const totalH = (finalLines.length - 1) * lineHeight;
+  const startY = finalLines.length === 1 ? firstLineCenterY : firstLineCenterY - totalH / 2 + 8;
+  finalLines.forEach((line, i) => {
+    drawCenteredText(ctx, line, centerX, startY + i * lineHeight);
+  });
+  return startY + (finalLines.length - 1) * lineHeight;
+}
+
+/** Dibuja una imagen preservando su proporción ('contain') y centrada dentro de una caja */
+function drawContainedImage(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  boxX: number,
+  boxY: number,
+  boxW: number,
+  boxH: number
+) {
+  const iw = img.naturalWidth || img.width || boxW;
+  const ih = img.naturalHeight || img.height || boxH;
+  const scale = Math.min(boxW / iw, boxH / ih);
+  const dw = iw * scale;
+  const dh = ih * scale;
+  const dx = boxX + (boxW - dw) / 2;
+  const dy = boxY + (boxH - dh) / 2;
+  ctx.drawImage(img, dx, dy, dw, dh);
+}
+
+/** Estrella vectorial de 5 puntas centrada en (cx, cy) */
+function drawCanvasStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, outerR: number, color: string) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  const innerR = outerR * 0.45;
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const angle = (Math.PI / 5) * i - Math.PI / 2;
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Pin de ubicación vectorial centrado en (cx, cy) */
+function drawCanvasPin(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2.2;
+  const r = size * 0.36;
+  const topCy = cy - size * 0.12;
+  ctx.beginPath();
+  ctx.arc(cx, topCy, r, Math.PI * 0.85, Math.PI * 0.15, false);
+  ctx.lineTo(cx, cy + size * 0.46);
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, topCy, r * 0.38, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Ícono vectorial de Cama (Habitaciones) centrado en (cx, cy) */
+function drawCanvasBed(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const w = size;
+  const h = size * 0.72;
+  const left = cx - w / 2;
+  const top = cy - h / 2;
+  // Cabecera y pie
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  ctx.lineTo(left, top + h);
+  ctx.moveTo(left + w, top + h * 0.35);
+  ctx.lineTo(left + w, top + h);
+  // Colchón horizontal
+  ctx.moveTo(left, top + h * 0.62);
+  ctx.lineTo(left + w, top + h * 0.62);
+  // Almohada / domo superior
+  ctx.moveTo(left + w * 0.14, top + h * 0.62);
+  ctx.lineTo(left + w * 0.14, top + h * 0.3);
+  ctx.lineTo(left + w * 0.88, top + h * 0.3);
+  ctx.lineTo(left + w * 0.88, top + h * 0.62);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Ícono vectorial de Baño / Ducha centrado en (cx, cy) */
+function drawCanvasBath(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const w = size;
+  const h = size * 0.78;
+  const left = cx - w / 2;
+  const top = cy - h / 2;
+  // Tina
+  ctx.beginPath();
+  ctx.moveTo(left, cy);
+  ctx.lineTo(left + w, cy);
+  ctx.lineTo(left + w * 0.9, top + h);
+  ctx.lineTo(left + w * 0.1, top + h);
+  ctx.closePath();
+  // Grifo superior
+  ctx.moveTo(left + w * 0.18, cy);
+  ctx.lineTo(left + w * 0.18, top + h * 0.15);
+  ctx.quadraticCurveTo(left + w * 0.18, top, left + w * 0.36, top);
+  ctx.lineTo(left + w * 0.46, top);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Ícono vectorial de Regla / Área centrado en (cx, cy) */
+function drawCanvasRuler(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const r = size / 2;
+  ctx.strokeRect(cx - r, cy - r * 0.65, size, size * 0.65);
+  // Marcas de graduación
+  ctx.beginPath();
+  for (let i = 1; i <= 3; i++) {
+    const mx = cx - r + (size / 4) * i;
+    ctx.moveTo(mx, cy - r * 0.65);
+    ctx.lineTo(mx, cy - r * 0.2);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Ícono vectorial de Smartphone centrado en (cx, cy) */
+function drawCanvasPhone(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2.4;
+  const w = size * 0.64;
+  const h = size;
+  drawRoundRect(ctx, cx - w / 2, cy - h / 2, w, h, 4, undefined, color, 2.4);
+  ctx.beginPath();
+  ctx.arc(cx, cy + h * 0.3, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
