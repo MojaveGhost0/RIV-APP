@@ -1350,7 +1350,8 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             position: 'absolute',
             top: 56,
             left: 56,
-            right: 56,
+            width: '968px',
+            boxSizing: 'border-box',
             zIndex: 20,
             display: 'flex',
             justifyContent: 'space-between',
@@ -1405,9 +1406,9 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                 lineHeight: 1,
                 margin: 0,
                 padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                position: 'relative',
+                top: '-5px',
+                display: 'block',
                 textAlign: 'center'
               }}>
                 {property.status === 'Vendida'
@@ -1422,24 +1423,25 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             position: 'absolute',
             bottom: 60,
             left: 56,
-            right: 56,
+            width: '968px',
+            boxSizing: 'border-box',
             zIndex: 10,
             background: 'rgba(15, 15, 15, 0.88)',
             border: '1.5px solid rgba(255, 255, 255, 0.15)',
             borderRadius: '36px',
-            padding: '40px 44px 34px',
+            padding: '38px 44px 34px',
             boxShadow: '0 24px 60px rgba(0,0,0,0.7)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '22px'
+            gap: '20px'
           }}>
-            {/* Header de la tarjeta: Tag y Ubicación centrados */}
+            {/* Header de la tarjeta: Tag y Ubicación en stack centrado simétrico */}
             <div style={{
               display: 'flex',
-              justifyContent: 'center',
+              flexDirection: 'column',
               alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '18px',
+              justifyContent: 'center',
+              gap: '10px',
               width: '100%',
               textAlign: 'center'
             }}>
@@ -1464,24 +1466,29 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                   lineHeight: 1,
                   margin: 0,
                   padding: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  position: 'relative',
+                  top: '-3px',
+                  display: 'block',
+                  textAlign: 'center'
                 }}>
                   ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'PROPIEDAD EXCLUSIVA'}
                 </span>
               </div>
-              <span style={{
+              <div style={{
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '22px',
                 fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '8px',
-                lineHeight: 1
+                lineHeight: 1,
+                width: '100%',
+                textAlign: 'center'
               }}>
-                📍 {property.location.toUpperCase()}
-              </span>
+                <span>📍</span>
+                <span>{property.location.toUpperCase()}</span>
+              </div>
             </div>
 
             {/* Título de la propiedad centrado */}
@@ -1515,7 +1522,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         background: 'rgba(255, 255, 255, 0.08)',
                         border: '1.5px solid rgba(212, 175, 55, 0.35)',
                         borderRadius: '20px',
-                        padding: '16px 12px 18px',
+                        padding: '18px 12px 18px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -1524,42 +1531,42 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         boxSizing: 'border-box'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
-                        <SpecIcon size={32} color="#D4AF37" strokeWidth={1.8} />
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+                        <SpecIcon size={34} color="#D4AF37" strokeWidth={1.8} />
                       </div>
-                      <span style={{
+                      <div style={{
                         color: '#FFFFFF',
-                        fontSize: '28px',
+                        fontSize: '30px',
                         fontWeight: 900,
                         lineHeight: 1,
                         textAlign: 'center',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '4px 0 0'
+                        width: '100%',
+                        margin: '0 0 6px 0',
+                        position: 'relative',
+                        top: '-2px'
                       }}>
                         {s.v}
-                      </span>
-                      <span style={{
+                      </div>
+                      <div style={{
                         color: '#D4AF37',
                         fontSize: '13px',
                         fontWeight: 700,
                         textTransform: 'uppercase',
                         letterSpacing: '1px',
                         textAlign: 'center',
-                        display: 'block',
-                        marginTop: '6px',
-                        lineHeight: 1
+                        width: '100%',
+                        lineHeight: 1,
+                        margin: 0
                       }}>
                         {s.label}
-                      </span>
+                      </div>
                     </div>
                   );
                 })}
               </div>
             )}
 
-            {/* Footer de la tarjeta: Asesor y RIF */}
+            {/* Footer de la tarjeta: Asesor con Teléfono (sin la G) y RIF */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
@@ -1568,52 +1575,57 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               paddingTop: '18px',
               marginTop: '2px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  background: '#800020',
-                  border: '1.5px solid #D4AF37',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#FFFFFF',
-                  fontSize: '20px',
-                  fontWeight: 900,
-                  flexShrink: 0
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <p style={{
+                  color: '#D4AF37',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  margin: 0,
+                  letterSpacing: '1.5px',
+                  lineHeight: 1
                 }}>
-                  <span style={{ margin: 0, padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {property.captador ? property.captador.charAt(0).toUpperCase() : 'R'}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <p style={{
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    margin: 0,
-                    letterSpacing: '1px',
-                    lineHeight: 1.2
+                  ASESOR INMOBILIARIO
+                </p>
+                <p style={{
+                  color: '#FFFFFF',
+                  fontSize: '22px',
+                  fontWeight: 900,
+                  margin: '4px 0 0',
+                  lineHeight: 1.15,
+                  letterSpacing: '-0.3px'
+                }}>
+                  {property.captador || 'RIV Premier'}
+                </p>
+                {(advisorPhone || '0414-7901111') && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginTop: '6px'
                   }}>
-                    ASESOR INMOBILIARIO
-                  </p>
-                  <p style={{
-                    color: '#FFFFFF',
-                    fontSize: '19px',
-                    fontWeight: 800,
-                    margin: '3px 0 0',
-                    lineHeight: 1.2
-                  }}>
-                    {property.captador || 'RIV Premier'}
-                  </p>
-                </div>
+                    <Smartphone size={22} color="#D4AF37" strokeWidth={2.2} />
+                    <span style={{
+                      color: '#FFFFFF',
+                      fontSize: '22px',
+                      fontWeight: 900,
+                      letterSpacing: '0.5px',
+                      lineHeight: 1
+                    }}>
+                      {advisorPhone || '0414-7901111'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <p style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 800, letterSpacing: '1.5px', margin: 0, textTransform: 'uppercase', lineHeight: 1.2 }}>RIV MARGARITA PREMIER</p>
+                <p style={{ color: '#D4AF37', fontSize: '15px', fontWeight: 800, letterSpacing: '1.5px', margin: 0, textTransform: 'uppercase', lineHeight: 1.2 }}>RIV MARGARITA PREMIER</p>
                 <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', margin: '3px 0 0', letterSpacing: '0.5px', lineHeight: 1.2 }}>RIF J-11055496-2</p>
+                {property.codigo && (
+                  <p style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 800, margin: '4px 0 0', letterSpacing: '1px', lineHeight: 1.2 }}>
+                    CÓD: {property.codigo}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -1676,7 +1688,8 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             position: 'absolute',
             top: 56,
             left: 56,
-            right: 56,
+            width: '968px',
+            boxSizing: 'border-box',
             zIndex: 20,
             display: 'flex',
             justifyContent: 'space-between',
@@ -1731,9 +1744,9 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                 lineHeight: 1,
                 margin: 0,
                 padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                position: 'relative',
+                top: '-5px',
+                display: 'block',
                 textAlign: 'center'
               }}>
                 {property.status === 'Vendida'
@@ -1748,24 +1761,25 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             position: 'absolute',
             bottom: 60,
             left: 56,
-            right: 56,
+            width: '968px',
+            boxSizing: 'border-box',
             zIndex: 10,
             background: 'rgba(26, 6, 12, 0.90)',
             border: '1.5px solid #D4AF37',
             borderRadius: '36px',
-            padding: '40px 44px 34px',
+            padding: '38px 44px 34px',
             boxShadow: '0 24px 60px rgba(0,0,0,0.8)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '22px'
+            gap: '20px'
           }}>
-            {/* Header: Tag y Ubicación centrados */}
+            {/* Header: Tag y Ubicación en stack centrado simétrico */}
             <div style={{
               display: 'flex',
-              justifyContent: 'center',
+              flexDirection: 'column',
               alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '18px',
+              justifyContent: 'center',
+              gap: '10px',
               width: '100%',
               textAlign: 'center'
             }}>
@@ -1789,24 +1803,29 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                   lineHeight: 1,
                   margin: 0,
                   padding: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  position: 'relative',
+                  top: '-3px',
+                  display: 'block',
+                  textAlign: 'center'
                 }}>
                   ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'PROPIEDAD EXCLUSIVA'}
                 </span>
               </div>
-              <span style={{
+              <div style={{
                 color: '#D4AF37',
                 fontSize: '22px',
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '8px',
-                lineHeight: 1
+                lineHeight: 1,
+                width: '100%',
+                textAlign: 'center'
               }}>
-                📍 {property.location.toUpperCase()}
-              </span>
+                <span>📍</span>
+                <span>{property.location.toUpperCase()}</span>
+              </div>
             </div>
 
             {/* Título de la propiedad centrado */}
@@ -1840,7 +1859,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         background: 'rgba(212, 175, 55, 0.12)',
                         border: '1.5px solid #D4AF37',
                         borderRadius: '20px',
-                        padding: '16px 12px 18px',
+                        padding: '18px 12px 18px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -1849,42 +1868,42 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         boxSizing: 'border-box'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
-                        <SpecIcon size={32} color="#D4AF37" strokeWidth={1.8} />
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+                        <SpecIcon size={34} color="#D4AF37" strokeWidth={1.8} />
                       </div>
-                      <span style={{
+                      <div style={{
                         color: '#FFFFFF',
-                        fontSize: '28px',
+                        fontSize: '30px',
                         fontWeight: 900,
                         lineHeight: 1,
                         textAlign: 'center',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '4px 0 0'
+                        width: '100%',
+                        margin: '0 0 6px 0',
+                        position: 'relative',
+                        top: '-2px'
                       }}>
                         {s.v}
-                      </span>
-                      <span style={{
+                      </div>
+                      <div style={{
                         color: '#D4AF37',
                         fontSize: '13px',
                         fontWeight: 700,
                         textTransform: 'uppercase',
                         letterSpacing: '1px',
                         textAlign: 'center',
-                        display: 'block',
-                        marginTop: '6px',
-                        lineHeight: 1
+                        width: '100%',
+                        lineHeight: 1,
+                        margin: 0
                       }}>
                         {s.label}
-                      </span>
+                      </div>
                     </div>
                   );
                 })}
               </div>
             )}
 
-            {/* Footer de la tarjeta: Asesor y RIF */}
+            {/* Footer de la tarjeta: Asesor con Teléfono (sin la G) y RIF */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
@@ -1893,52 +1912,57 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               paddingTop: '18px',
               marginTop: '2px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  background: '#D4AF37',
-                  border: '1.5px solid #FFFFFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#000000',
-                  fontSize: '20px',
-                  fontWeight: 900,
-                  flexShrink: 0
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <p style={{
+                  color: 'rgba(212, 175, 55, 0.85)',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  margin: 0,
+                  letterSpacing: '1.5px',
+                  lineHeight: 1
                 }}>
-                  <span style={{ margin: 0, padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {property.captador ? property.captador.charAt(0).toUpperCase() : 'R'}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <p style={{
-                    color: 'rgba(212, 175, 55, 0.75)',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    margin: 0,
-                    letterSpacing: '1px',
-                    lineHeight: 1.2
+                  ASESOR INMOBILIARIO
+                </p>
+                <p style={{
+                  color: '#FFFFFF',
+                  fontSize: '22px',
+                  fontWeight: 900,
+                  margin: '4px 0 0',
+                  lineHeight: 1.15,
+                  letterSpacing: '-0.3px'
+                }}>
+                  {property.captador || 'RIV Premier'}
+                </p>
+                {(advisorPhone || '0414-7901111') && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginTop: '6px'
                   }}>
-                    ASESOR INMOBILIARIO
-                  </p>
-                  <p style={{
-                    color: '#FFFFFF',
-                    fontSize: '19px',
-                    fontWeight: 800,
-                    margin: '3px 0 0',
-                    lineHeight: 1.2
-                  }}>
-                    {property.captador || 'RIV Premier'}
-                  </p>
-                </div>
+                    <Smartphone size={22} color="#D4AF37" strokeWidth={2.2} />
+                    <span style={{
+                      color: '#FFFFFF',
+                      fontSize: '22px',
+                      fontWeight: 900,
+                      letterSpacing: '0.5px',
+                      lineHeight: 1
+                    }}>
+                      {advisorPhone || '0414-7901111'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <p style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 800, letterSpacing: '1.5px', margin: 0, textTransform: 'uppercase', lineHeight: 1.2 }}>RIV MARGARITA PREMIER</p>
+                <p style={{ color: '#D4AF37', fontSize: '15px', fontWeight: 800, letterSpacing: '1.5px', margin: 0, textTransform: 'uppercase', lineHeight: 1.2 }}>RIV MARGARITA PREMIER</p>
                 <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', margin: '3px 0 0', letterSpacing: '0.5px', lineHeight: 1.2 }}>RIF J-11055496-2</p>
+                {property.codigo && (
+                  <p style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 800, margin: '4px 0 0', letterSpacing: '1px', lineHeight: 1.2 }}>
+                    CÓD: {property.codigo}
+                  </p>
+                )}
               </div>
             </div>
           </div>
