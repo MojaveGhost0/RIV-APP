@@ -602,8 +602,8 @@ export default function CRMPage() {
       {/* HEADER CON GLASSMORPHISM */}
       <header className="bg-white/85 backdrop-blur-md px-4 pt-safe pt-6 pb-4 flex justify-between items-center shadow-xs border-b border-gray-100 sticky top-0 z-30 transition-all">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">CRM Clientes</h1>
-          <p className="text-xs text-gray-500 font-medium mt-0.5">{isAdmin ? 'Registro global de la agencia' : `Mis clientes · ${user?.nombre}`}</p>
+          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">CRM</h1>
+          <p className="text-xs text-gray-500 font-medium mt-0.5 whitespace-nowrap">{clientData.length} {clientData.length === 1 ? 'cliente' : 'clientes'}</p>
         </div>
         <div className="flex items-center gap-2">
           <BrandLogo size="xs" className="shrink-0 drop-shadow-xs" />

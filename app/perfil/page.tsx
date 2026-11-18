@@ -403,55 +403,54 @@ export default function Perfil() {
           )}
         </motion.div>
 
-        {/* BRANDING Y GESTIÓN DE LOGO CORPORATIVO */}
-        <motion.div
-          variants={itemVariants}
-          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-vinotinto/10 flex items-center justify-center text-vinotinto">
-                <Sparkles size={16} />
+        {/* BRANDING Y GESTIÓN DE LOGO CORPORATIVO (SOLO visible para ADMIN) */}
+        {isAdmin && (
+          <motion.div
+            variants={itemVariants}
+            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-vinotinto/10 flex items-center justify-center text-vinotinto">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-800">Identidad Corporativa & Logo</h3>
+                  <p className="text-[11px] text-gray-400">Branding global para fichas, catálogo, PDFs y redes</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-800">Identidad Corporativa & Logo</h3>
-                <p className="text-[11px] text-gray-400">Branding global para fichas, catálogo, PDFs y redes</p>
+              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                user?.agencyLogo 
+                  ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                  : 'bg-amber-50 text-amber-800 border-amber-200'
+              }`}>
+                {user?.agencyLogo ? 'Logo Franquicia' : 'Logo Oficial RIV'}
+              </span>
+            </div>
+
+            {/* PREVIEW DEL LOGO ACTUAL */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-gray-900 to-gray-800 flex items-center justify-center min-h-[95px] shadow-inner relative overflow-hidden group">
+              <div className="absolute top-2 left-3 text-[9px] font-mono uppercase tracking-widest text-white/40">
+                Vista previa activa
               </div>
+              <BrandLogo size="md" className="z-10 transition-transform duration-300 group-hover:scale-105" />
             </div>
-            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-              user?.agencyLogo 
-                ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                : 'bg-amber-50 text-amber-800 border-amber-200'
-            }`}>
-              {user?.agencyLogo ? 'Logo Franquicia' : 'Logo Oficial RIV'}
-            </span>
-          </div>
 
-          {/* PREVIEW DEL LOGO ACTUAL */}
-          <div className="p-4 rounded-xl bg-gradient-to-r from-gray-900 to-gray-800 flex items-center justify-center min-h-[95px] shadow-inner relative overflow-hidden group">
-            <div className="absolute top-2 left-3 text-[9px] font-mono uppercase tracking-widest text-white/40">
-              Vista previa activa
-            </div>
-            <BrandLogo size="md" className="z-10 transition-transform duration-300 group-hover:scale-105" />
-          </div>
+            {logoFeedback && (
+              <div className={`p-2.5 text-xs rounded-xl flex items-center gap-2 ${
+                logoFeedback.type === 'success' 
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                  : 'bg-red-50 text-red-800 border border-red-200'
+              }`}>
+                {logoFeedback.type === 'success' ? (
+                  <CheckCircle size={14} className="text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle size={14} className="text-red-600 shrink-0" />
+                )}
+                <span>{logoFeedback.message}</span>
+              </div>
+            )}
 
-          {logoFeedback && (
-            <div className={`p-2.5 text-xs rounded-xl flex items-center gap-2 ${
-              logoFeedback.type === 'success' 
-                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
-                : 'bg-red-50 text-red-800 border border-red-200'
-            }`}>
-              {logoFeedback.type === 'success' ? (
-                <CheckCircle size={14} className="text-emerald-600 shrink-0" />
-              ) : (
-                <AlertCircle size={14} className="text-red-600 shrink-0" />
-              )}
-              <span>{logoFeedback.message}</span>
-            </div>
-          )}
-
-          {/* BOTONES DE ACCIÓN (SOLO ADMINISTRADORES) */}
-          {isAdmin ? (
             <div className="flex items-center gap-2 pt-1 flex-wrap">
               <input
                 ref={logoFileInputRef}
@@ -481,18 +480,11 @@ export default function Perfil() {
                 </button>
               )}
             </div>
-          ) : (
-            <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-600">
-              <Shield size={16} className="text-vinotinto shrink-0" />
-              <span>
-                El logotipo corporativo solo puede ser configurado por usuarios con rol de <strong>Administrador</strong>.
-              </span>
-            </div>
-          )}
-          <p className="text-[10px] text-gray-400 leading-normal">
-            Acepta SVG vectorial oficial o PNG transparente (máx. 3MB). Este logo se reflejará automáticamente en la barra superior, fichas técnicas PDF, plantillas de Instagram Stories / Feed y marcas de agua de videos.
-          </p>
-        </motion.div>
+            <p className="text-[10px] text-gray-400 leading-normal">
+              Acepta SVG vectorial oficial o PNG transparente (máx. 3MB). Este logo se reflejará automáticamente en la barra superior, fichas técnicas PDF, plantillas de Instagram Stories / Feed y marcas de agua de videos.
+            </p>
+          </motion.div>
+        )}
 
         {/* GESTIÓN DE USUARIOS (SOLO ADMIN) */}
         {isAdmin && (

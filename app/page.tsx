@@ -62,26 +62,20 @@ export default function Dashboard() {
 
       {/* HEADER PRINCIPAL BLANCO */}
       <header className="bg-white/95 backdrop-blur-md px-4 sm:px-6 pt-safe pt-5 pb-4 border-b border-gray-100 shadow-xs sticky top-0 z-30 transition-all">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-                Hola, {user?.nombre?.split(' ')[0] ?? 'Bienvenido'}
-              </h1>
-              <span className="text-xl">👋</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {isAdmin ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-dorado/15 text-dorado-dark border border-dorado/30 shadow-xs">
-                  <Sparkles size={12} className="text-dorado" /> Administrador
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-vinotinto/10 text-vinotinto border border-vinotinto/20">
-                  Asesor Inmobiliario
-                </span>
-              )}
-              <span className="text-xs text-gray-400">• RIV Premier</span>
-            </div>
+        <div className="max-w-7xl mx-auto flex justify-between items-center gap-3">
+          <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight whitespace-nowrap">
+              Hola, {user?.nombre?.split(' ')[0] ?? 'Bienvenido'}
+            </h1>
+            {isAdmin ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-dorado/15 text-dorado-dark border border-dorado/30 shadow-xs whitespace-nowrap">
+                <Sparkles size={11} className="text-dorado" /> Administrador
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-vinotinto/10 text-vinotinto border border-vinotinto/20 whitespace-nowrap">
+                Asesor Inmobiliario
+              </span>
+            )}
           </div>
           <BrandLogo size="sm" className="shrink-0 drop-shadow-xs" />
         </div>

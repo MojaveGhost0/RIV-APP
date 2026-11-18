@@ -707,7 +707,7 @@ export default function Inventario() {
         <div className="flex justify-between items-center mb-3">
           <div>
             <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Inventario</h1>
-            <p className="text-xs text-gray-500 font-medium mt-0.5">{filteredProperties.length} inmuebles en catálogo</p>
+            <p className="text-xs text-gray-500 font-medium mt-0.5 whitespace-nowrap">{filteredProperties.length} inmuebles</p>
           </div>
           <div className="flex items-center gap-2">
             <BrandLogo size="xs" className="shrink-0 drop-shadow-xs" />

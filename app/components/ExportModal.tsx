@@ -33,12 +33,61 @@ interface ExportModalProps {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string' && reader.result.startsWith('data:')) {
+        resolve(reader.result);
+      } else {
+        reject(new Error('FileReader did not return data URL'));
+      }
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Convierte cualquier URL de imagen (local o remota) en un DataURL Base64 real.
+ * Usa fetch + FileReader (y proxy same-origin de respaldo) para evitar bloqueos de caché CORS en iOS Safari / Chrome.
+ */
 async function urlToBase64(url: string, mimeType: string = 'image/jpeg'): Promise<string> {
   if (!url) return '';
   if (url.startsWith('data:')) return url;
   const isPng = url.toLowerCase().includes('.png') || mimeType === 'image/png';
   const outMime = isPng ? 'image/png' : mimeType;
 
+  // 1. Intentar fetch directo a Blob -> FileReader (evita el bug de caché de <img> en iOS WebKit)
+  try {
+    const isLocal = url.startsWith('/');
+    const res = await fetch(url, isLocal ? { cache: 'default' } : { mode: 'cors', cache: 'no-store' });
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob.size > 0) {
+        return await blobToDataUrl(blob);
+      }
+    }
+  } catch {
+    // Continuar al proxy same-origin si es URL externa
+  }
+
+  // 2. Si es URL externa (http/https) y falló por CORS en móvil, usar nuestro proxy same-origin /api/image-proxy
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      const proxyRes = await fetch(`/api/image-proxy?url=${encodeURIComponent(url)}`, { cache: 'no-store' });
+      if (proxyRes.ok) {
+        const blob = await proxyRes.blob();
+        if (blob.size > 0) {
+          return await blobToDataUrl(blob);
+        }
+      }
+    } catch {
+      // Continuar al respaldo por Canvas
+    }
+  }
+
+  // 3. Respaldo por HTMLImageElement + cache-buster
   return new Promise<string>((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -58,120 +107,112 @@ async function urlToBase64(url: string, mimeType: string = 'image/jpeg'): Promis
       }
       resolve(url);
     };
-    img.onerror = () => {
-      const fallback = new Image();
-      fallback.onload = () => {
-        try {
-          const c = document.createElement('canvas');
-          c.width = fallback.naturalWidth || 1080;
-          c.height = fallback.naturalHeight || 720;
-          const ctx = c.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(fallback, 0, 0);
-            resolve(c.toDataURL(outMime, 0.95));
-            return;
-          }
-        } catch {
-          // ignore
-        }
-        resolve(url);
-      };
-      fallback.onerror = () => resolve(url);
-      fallback.src = url;
-    };
-    img.src = url;
+    img.onerror = () => resolve(url);
+    const sep = url.includes('?') ? '&' : '?';
+    img.src = url.startsWith('/') ? url : `${url}${sep}_cb=${Date.now()}`;
   });
 }
 
-/** Pre-recorta una imagen con matemática 'cover' centrada para evitar que html2canvas la estire o deforme */
+/**
+ * Carga y decodifica un HTMLImageElement en memoria a partir de cualquier URL o DataURL.
+ * No asigna crossOrigin cuando ya es data: para evitar bloqueos de WebKit en iOS.
+ */
+async function loadDecodedImage(src: string, isPng = false): Promise<HTMLImageElement | null> {
+  if (!src) return null;
+  const dataUrl = src.startsWith('data:') ? src : await urlToBase64(src, isPng ? 'image/png' : 'image/jpeg');
+  if (!dataUrl) return null;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    if (!dataUrl.startsWith('data:')) {
+      img.crossOrigin = 'anonymous';
+    }
+    img.onload = async () => {
+      try {
+        if (typeof img.decode === 'function') {
+          await img.decode();
+        }
+      } catch {
+        // ignore decode warning
+      }
+      resolve(img);
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+/** Pre-recorta una imagen con matemática 'cover' centrada para evitar estiramiento */
 async function getCoverCroppedImage(url: string, targetWidth: number, targetHeight: number): Promise<string> {
   if (!url) return '';
-  return new Promise<string>((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      try {
-        const c = document.createElement('canvas');
-        c.width = targetWidth;
-        c.height = targetHeight;
-        const ctx = c.getContext('2d');
-        if (ctx) {
-          const imgWidth = img.naturalWidth || img.width || targetWidth;
-          const imgHeight = img.naturalHeight || img.height || targetHeight;
-          const imgRatio = imgWidth / imgHeight;
-          const targetRatio = targetWidth / targetHeight;
+  const img = await loadDecodedImage(url, false);
+  if (!img) return '';
+  try {
+    const c = document.createElement('canvas');
+    c.width = targetWidth;
+    c.height = targetHeight;
+    const ctx = c.getContext('2d');
+    if (ctx) {
+      drawCoverImageBox(ctx, img, 0, 0, targetWidth, targetHeight, 0, 1);
+      return c.toDataURL('image/jpeg', 0.95);
+    }
+  } catch (err) {
+    console.warn('Canvas cover crop failed:', err);
+  }
+  return '';
+}
 
-          let sWidth = imgWidth;
-          let sHeight = imgHeight;
-          let sx = 0;
-          let sy = 0;
+/** Dibuja un HTMLImageElement en modo 'cover' dentro de una caja (x, y, w, h) con soporte de border-radius y opacidad */
+function drawCoverImageBox(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  boxX: number,
+  boxY: number,
+  boxW: number,
+  boxH: number,
+  radius = 0,
+  opacity = 1
+) {
+  const imgWidth = img.naturalWidth || img.width || boxW;
+  const imgHeight = img.naturalHeight || img.height || boxH;
+  const imgRatio = imgWidth / imgHeight;
+  const targetRatio = boxW / boxH;
 
-          if (imgRatio > targetRatio) {
-            sHeight = imgHeight;
-            sWidth = imgHeight * targetRatio;
-            sx = (imgWidth - sWidth) / 2;
-            sy = 0;
-          } else {
-            sWidth = imgWidth;
-            sHeight = imgWidth / targetRatio;
-            sx = 0;
-            sy = (imgHeight - sHeight) / 2;
-          }
+  let sWidth = imgWidth;
+  let sHeight = imgHeight;
+  let sx = 0;
+  let sy = 0;
 
-          ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
-          resolve(c.toDataURL('image/jpeg', 0.95));
-          return;
-        }
-      } catch (err) {
-        console.warn('Canvas cover crop failed:', err);
-      }
-      resolve(url);
-    };
-    img.onerror = () => {
-      const fallback = new Image();
-      fallback.onload = () => {
-        try {
-          const c = document.createElement('canvas');
-          c.width = targetWidth;
-          c.height = targetHeight;
-          const ctx = c.getContext('2d');
-          if (ctx) {
-            const imgWidth = fallback.naturalWidth || fallback.width || targetWidth;
-            const imgHeight = fallback.naturalHeight || fallback.height || targetHeight;
-            const imgRatio = imgWidth / imgHeight;
-            const targetRatio = targetWidth / targetHeight;
+  if (imgRatio > targetRatio) {
+    sHeight = imgHeight;
+    sWidth = imgHeight * targetRatio;
+    sx = (imgWidth - sWidth) / 2;
+    sy = 0;
+  } else {
+    sWidth = imgWidth;
+    sHeight = imgWidth / targetRatio;
+    sx = 0;
+    sy = (imgHeight - sHeight) / 2;
+  }
 
-            let sWidth = imgWidth;
-            let sHeight = imgHeight;
-            let sx = 0;
-            let sy = 0;
-
-            if (imgRatio > targetRatio) {
-              sHeight = imgHeight;
-              sWidth = imgHeight * targetRatio;
-              sx = (imgWidth - sWidth) / 2;
-              sy = 0;
-            } else {
-              sWidth = imgWidth;
-              sHeight = imgWidth / targetRatio;
-              sx = 0;
-              sy = (imgHeight - sHeight) / 2;
-            }
-
-            ctx.drawImage(fallback, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
-            resolve(c.toDataURL('image/jpeg', 0.95));
-            return;
-          }
-        } catch {
-          // ignore
-        }
-        resolve(url);
-      };
-      fallback.onerror = () => resolve(url);
-      fallback.src = url;
-    };
-    img.src = url;
-  });
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  if (radius > 0) {
+    ctx.beginPath();
+    ctx.moveTo(boxX + radius, boxY);
+    ctx.lineTo(boxX + boxW - radius, boxY);
+    ctx.quadraticCurveTo(boxX + boxW, boxY, boxX + boxW, boxY + radius);
+    ctx.lineTo(boxX + boxW, boxY + boxH - radius);
+    ctx.quadraticCurveTo(boxX + boxW, boxY + boxH, boxX + boxW - radius, boxY + boxH);
+    ctx.lineTo(boxX + radius, boxY + boxH);
+    ctx.quadraticCurveTo(boxX, boxY + boxH, boxX, boxY + boxH - radius);
+    ctx.lineTo(boxX, boxY + radius);
+    ctx.quadraticCurveTo(boxX, boxY, boxX + radius, boxY);
+    ctx.closePath();
+    ctx.clip();
+  }
+  ctx.drawImage(img, sx, sy, sWidth, sHeight, boxX, boxY, boxW, boxH);
+  ctx.restore();
 }
 
 /** Convierte un HTMLCanvasElement en un objeto File y Blob de forma cross-browser */
@@ -527,34 +568,27 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
     if (!ref?.current) return;
     setIsExporting(true);
     try {
-      // Ensure image is preloaded into base64 and pre-cropped to prevent distortion
-      let activeImg = base64Img;
-      if (!activeImg && property.image) {
-        activeImg = await urlToBase64(property.image);
-        if (activeImg) setBase64Img(activeImg);
+      const rootEl = ref.current;
+
+      // 1. Cargar y decodificar en memoria los HTMLImageElement reales (Foto, Logo y QR)
+      // Esto evita por completo el bug de iOS WebKit (Safari y Chrome en iPhone) donde <foreignObject> no pinta etiquetas <img>.
+      const [photoImgEl, logoImgEl, qrImgEl] = await Promise.all([
+        loadDecodedImage(base64Img || property.image, false),
+        loadDecodedImage(base64Logo || '/logo-riv.png', true),
+        selectedFormat === 'pdf' ? loadDecodedImage(base64Qr || qrUrl, true) : Promise.resolve(null),
+      ]);
+
+      if (photoImgEl?.src?.startsWith('data:') && !base64Img) {
+        setBase64Img(photoImgEl.src);
       }
-      if (selectedFormat === 'pdf' && !base64PdfImg && property.image) {
-        const croppedPdf = await getCoverCroppedImage(property.image, 1380, 680);
-        if (croppedPdf) setBase64PdfImg(croppedPdf);
+      if (logoImgEl?.src?.startsWith('data:') && !base64Logo) {
+        setBase64Logo(logoImgEl.src);
       }
-      if (selectedFormat === 'instagram' && !base64IgImg && property.image) {
-        const croppedIg = await getCoverCroppedImage(property.image, 1080, 1920);
-        if (croppedIg) setBase64IgImg(croppedIg);
-      }
-      if (selectedFormat === 'whatsapp' && !base64WaImg && property.image) {
-        const croppedWa = await getCoverCroppedImage(property.image, 1080, 1080);
-        if (croppedWa) setBase64WaImg(croppedWa);
-      }
-      if (!base64Logo) {
-        const logoB64 = await urlToBase64('/logo-riv.png', 'image/png');
-        if (logoB64) setBase64Logo(logoB64);
-      }
-      if (!base64Qr && qrUrl) {
-        const qrB64 = await urlToBase64(qrUrl, 'image/png');
-        if (qrB64) setBase64Qr(qrB64);
+      if (qrImgEl?.src?.startsWith('data:') && !base64Qr) {
+        setBase64Qr(qrImgEl.src);
       }
 
-      // Cargar explícitamente los pesos de Inter antes de capturar para garantizar métricas idénticas
+      // 2. Cargar explícitamente los pesos de Inter antes de capturar para garantizar métricas idénticas
       if (typeof document !== 'undefined' && document.fonts) {
         await Promise.allSettled([
           document.fonts.load('600 16px Inter'),
@@ -564,9 +598,8 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
         ]);
         await document.fonts.ready;
       }
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise(r => setTimeout(r, 80));
 
-      // Determine background color so transparent canvas doesn't convert to solid black JPEG
       const isDark = (selectedFormat === 'pdf' && selectedTemplate === 'B') ||
                      (selectedFormat === 'instagram') ||
                      (selectedFormat === 'whatsapp' && selectedTemplate === 'A');
@@ -578,33 +611,138 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
           ? { width: 1080, height: 1920 }
           : { width: 1080, height: 1080 };
 
-      let canvas: HTMLCanvasElement;
+      const SCALE = 2;
+
+      // 3. Medir coordenadas exactas de todas las imágenes dentro de la plantilla antes de capturar
+      const rootRect = rootEl.getBoundingClientRect();
+      const imgNodes = Array.from(rootEl.querySelectorAll('img[data-canvas-role]')) as HTMLImageElement[];
+      const measuredLayers = imgNodes.map((node) => {
+        const rect = node.getBoundingClientRect();
+        return {
+          node,
+          role: node.getAttribute('data-canvas-role') as 'photo' | 'logo' | 'qr',
+          layer: (node.getAttribute('data-canvas-layer') || 'overlay') as 'underlay' | 'overlay',
+          radius: parseFloat(node.getAttribute('data-canvas-radius') || '0'),
+          opacity: parseFloat(node.getAttribute('data-canvas-opacity') || '1'),
+          x: rect.left - rootRect.left,
+          y: rect.top - rootRect.top,
+          w: rect.width,
+          h: rect.height,
+        };
+      });
+
+      const hasUnderlay = measuredLayers.some((l) => l.layer === 'underlay');
+      const templateContainer = rootEl.firstElementChild as HTMLElement | null;
+      const prevContainerBg = templateContainer ? templateContainer.style.background : '';
+
+      // 4. Ocultar temporalmente las etiquetas <img> durante la captura de la interfaz con html-to-image
+      // para que las fotos y el logo se pinten con Canvas 2D nativo a máxima nitidez en iPhone y Android.
+      measuredLayers.forEach((l) => {
+        l.node.style.visibility = 'hidden';
+      });
+      if (hasUnderlay && templateContainer) {
+        templateContainer.style.background = 'transparent';
+      }
+
+      let uiCanvas: HTMLCanvasElement;
       try {
-        const captureOptions = {
-          pixelRatio: 2,
+        uiCanvas = await toCanvas(rootEl, {
+          pixelRatio: SCALE,
           width: dims.width,
           height: dims.height,
-          backgroundColor: bgColor,
+          backgroundColor: hasUnderlay ? 'rgba(0,0,0,0)' : bgColor,
           cacheBust: false,
           style: {
             transform: 'none',
             transformOrigin: 'top left',
             margin: '0',
           },
-        };
-        // Primer pase warm-up para asegurar decodificación de imágenes data: en WebKit/Safari
-        await toCanvas(ref.current, { ...captureOptions, pixelRatio: 1 }).catch(() => null);
-        canvas = await toCanvas(ref.current, captureOptions);
+        });
       } catch (err) {
         console.warn('html-to-image fallback a html2canvas:', err);
-        canvas = await html2canvas(ref.current, {
-          scale: 2,
+        uiCanvas = await html2canvas(rootEl, {
+          scale: SCALE,
           useCORS: true,
           allowTaint: false,
-          backgroundColor: bgColor,
+          backgroundColor: hasUnderlay ? null : bgColor,
           logging: false,
         });
+      } finally {
+        measuredLayers.forEach((l) => {
+          l.node.style.visibility = '';
+        });
+        if (hasUnderlay && templateContainer) {
+          templateContainer.style.background = prevContainerBg;
+        }
       }
+
+      // 5. Composición Híbrida en 3 Capas sobre el Canvas Final (100% compatible con iOS Safari y Chrome)
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = dims.width * SCALE;
+      finalCanvas.height = dims.height * SCALE;
+      const finalCtx = finalCanvas.getContext('2d');
+      if (!finalCtx) throw new Error('No se pudo inicializar el canvas de composición.');
+
+      // Capa 0: Color de fondo sólido base
+      finalCtx.fillStyle = bgColor;
+      finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+      // Capa 1 (Underlay): Fotografías que van debajo de degradados y tarjetas (IG-A, IG-B, WA-A, WA-B, PDF-B)
+      for (const item of measuredLayers) {
+        if (item.layer !== 'underlay') continue;
+        if (item.role === 'photo' && photoImgEl && item.w > 0 && item.h > 0) {
+          drawCoverImageBox(
+            finalCtx,
+            photoImgEl,
+            item.x * SCALE,
+            item.y * SCALE,
+            item.w * SCALE,
+            item.h * SCALE,
+            item.radius * SCALE,
+            item.opacity
+          );
+        }
+      }
+
+      // Capa 2 (UI): Degradados, tarjetas glassmorphism, bordes, íconos Lucide SVG y textos Inter centrados
+      finalCtx.drawImage(uiCanvas, 0, 0, finalCanvas.width, finalCanvas.height);
+
+      // Capa 3 (Overlay): Logo corporativo en su píldora blanca, código QR y foto enmarcada de PDF-A
+      for (const item of measuredLayers) {
+        if (item.layer !== 'overlay' || item.w <= 0 || item.h <= 0) continue;
+        if (item.role === 'photo' && photoImgEl) {
+          drawCoverImageBox(
+            finalCtx,
+            photoImgEl,
+            item.x * SCALE,
+            item.y * SCALE,
+            item.w * SCALE,
+            item.h * SCALE,
+            item.radius * SCALE,
+            item.opacity
+          );
+        } else if (item.role === 'logo' && logoImgEl) {
+          drawContainedImage(
+            finalCtx,
+            logoImgEl,
+            item.x * SCALE,
+            item.y * SCALE,
+            item.w * SCALE,
+            item.h * SCALE
+          );
+        } else if (item.role === 'qr' && qrImgEl) {
+          drawContainedImage(
+            finalCtx,
+            qrImgEl,
+            item.x * SCALE,
+            item.y * SCALE,
+            item.w * SCALE,
+            item.h * SCALE
+          );
+        }
+      }
+
+      const canvas = finalCanvas;
 
       if (selectedFormat === 'pdf') {
         const imgData = canvas.toDataURL('image/jpeg', 0.96);
@@ -1690,7 +1828,7 @@ interface SharedTemplateProps {
   base64Qr: string;
 }
 
-/** Píldora del logo oficial siempre centrada y pre-cargada en Base64 */
+/** Píldora del logo oficial siempre centrada y con ancho explícito 4:3 para evitar colapso en iOS */
 function ExportLogoBadge({
   logoSrc,
   height,
@@ -1706,6 +1844,7 @@ function ExportLogoBadge({
   borderRadius: number;
   borderColor?: string;
 }) {
+  const imgWidth = Math.round(imgHeight * 1.34);
   return (
     <div
       style={{
@@ -1725,10 +1864,11 @@ function ExportLogoBadge({
       <img
         src={logoSrc}
         alt="RIV Margarita Premier"
-        crossOrigin="anonymous"
+        data-canvas-role="logo"
+        data-canvas-layer="overlay"
         style={{
           height: `${imgHeight}px`,
-          width: 'auto',
+          width: `${imgWidth}px`,
           objectFit: 'contain',
           display: 'block',
         }}
@@ -2203,8 +2343,9 @@ function RenderExportTemplate({
             <img
               src={logoSrc}
               alt="RIV Margarita Premier"
-              crossOrigin="anonymous"
-              style={{ height: '72px', width: 'auto', objectFit: 'contain', display: 'block' }}
+              data-canvas-role="logo"
+              data-canvas-layer="overlay"
+              style={{ height: '72px', width: '98px', objectFit: 'contain', display: 'block' }}
             />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
               <div
@@ -2355,7 +2496,9 @@ function RenderExportTemplate({
           <div style={{ width: '100%', height: '300px', borderRadius: '18px', overflow: 'hidden', flexShrink: 0, border: '1px solid #E5E7EB' }}>
             <img
               src={pdfPhoto}
-              crossOrigin="anonymous"
+              data-canvas-role="photo"
+              data-canvas-layer="overlay"
+              data-canvas-radius="18"
               alt=""
               style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
             />
@@ -2588,7 +2731,8 @@ function RenderExportTemplate({
               <img
                 src={base64Qr}
                 alt="QR Ficha"
-                crossOrigin="anonymous"
+                data-canvas-role="qr"
+                data-canvas-layer="overlay"
                 style={{
                   width: '60px',
                   height: '60px',
@@ -2625,7 +2769,9 @@ function RenderExportTemplate({
         <div style={{ position: 'relative', height: '390px', flexShrink: 0, overflow: 'hidden' }}>
           <img
             src={pdfPhoto}
-            crossOrigin="anonymous"
+            data-canvas-role="photo"
+            data-canvas-layer="underlay"
+            data-canvas-opacity="0.72"
             alt=""
             style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', opacity: 0.72, display: 'block' }}
           />
@@ -2719,6 +2865,7 @@ function RenderExportTemplate({
           style={{
             padding: '20px 48px 24px',
             flex: 1,
+            background: '#0F0F0F',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -2958,7 +3105,8 @@ function RenderExportTemplate({
             <img
               src={base64Qr}
               alt="QR"
-              crossOrigin="anonymous"
+              data-canvas-role="qr"
+              data-canvas-layer="overlay"
               style={{
                 width: '60px',
                 height: '60px',
@@ -2999,7 +3147,8 @@ function RenderExportTemplate({
         {/* Foto Full-Bleed Pre-Recortada 9:16 */}
         <img
           src={igPhoto}
-          crossOrigin="anonymous"
+          data-canvas-role="photo"
+          data-canvas-layer="underlay"
           alt=""
           style={{
             position: 'absolute',
@@ -3204,7 +3353,8 @@ function RenderExportTemplate({
       >
         <img
           src={waPhoto}
-          crossOrigin="anonymous"
+          data-canvas-role="photo"
+          data-canvas-layer="underlay"
           alt=""
           style={{
             position: 'absolute',
@@ -3400,7 +3550,8 @@ function RenderExportTemplate({
       <div style={{ position: 'relative', height: '540px', flexShrink: 0, overflow: 'hidden' }}>
         <img
           src={waPhoto}
-          crossOrigin="anonymous"
+          data-canvas-role="photo"
+          data-canvas-layer="underlay"
           alt=""
           style={{
             width: '100%',
