@@ -29,9 +29,11 @@ interface ExportModalProps {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-async function urlToBase64(url: string): Promise<string> {
+async function urlToBase64(url: string, mimeType: string = 'image/jpeg'): Promise<string> {
   if (!url) return '';
   if (url.startsWith('data:')) return url;
+  const isPng = url.toLowerCase().includes('.png') || mimeType === 'image/png';
+  const outMime = isPng ? 'image/png' : mimeType;
 
   return new Promise<string>((resolve) => {
     const img = new Image();
@@ -44,7 +46,7 @@ async function urlToBase64(url: string): Promise<string> {
         const ctx = c.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0);
-          resolve(c.toDataURL('image/jpeg', 0.95));
+          resolve(c.toDataURL(outMime, 0.95));
           return;
         }
       } catch (err) {
@@ -62,7 +64,7 @@ async function urlToBase64(url: string): Promise<string> {
           const ctx = c.getContext('2d');
           if (ctx) {
             ctx.drawImage(fallback, 0, 0);
-            resolve(c.toDataURL('image/jpeg', 0.95));
+            resolve(c.toDataURL(outMime, 0.95));
             return;
           }
         } catch {
@@ -232,18 +234,32 @@ async function triggerDownloadOrShare(file: File, blob: Blob, title: string): Pr
   return 'downloaded';
 }
 
-/** Filtro dinámico de atributos para evitar mostrar 0 Habs / Baños en Terrenos o Locales */
+/** Filtro dinámico de atributos: garantiza siempre la tríada Habitaciones, Baños y Área para que nunca se vea vacío */
 function getValidSpecs(p: Property) {
   const specs: Array<{ label: string; v: string | number; emoji: string; icon: any }> = [];
-  if (p.beds > 0) {
-    specs.push({ label: 'Habitaciones', v: p.beds, emoji: '🛏', icon: Bed });
+  const typeLower = (p.propertyType || '').toLowerCase();
+  const titleLower = (p.title || '').toLowerCase();
+  const isLand = typeLower.includes('terreno') || typeLower.includes('parcela') || typeLower.includes('lote') ||
+                 titleLower.includes('terreno') || titleLower.includes('parcela');
+
+  if (isLand) {
+    const sqmVal = p.sqm > 0 ? `${p.sqm} m²` : '— m²';
+    specs.push({ label: 'Área Terreno', v: sqmVal, emoji: '📐', icon: Ruler });
+    return specs;
   }
-  if (p.baths > 0) {
-    specs.push({ label: 'Baños', v: p.baths, emoji: '🚿', icon: Bath });
-  }
-  if (p.sqm > 0) {
-    specs.push({ label: 'Área Total', v: `${p.sqm} m²`, emoji: '📐', icon: Ruler });
-  }
+
+  // 1. Habitaciones (al menos 1 si no está configurado o si es 0 en residencial)
+  const bedsVal = p.beds > 0 ? p.beds : 1;
+  specs.push({ label: 'Habitaciones', v: bedsVal, emoji: '🛏', icon: Bed });
+
+  // 2. Baños: SIEMPRE mostrar para que nunca quede el espacio vacío (solicitado por usuario)
+  const bathsVal = p.baths > 0 ? p.baths : 1;
+  specs.push({ label: 'Baños', v: bathsVal, emoji: '🚿', icon: Bath });
+
+  // 3. Área Total
+  const sqmVal = p.sqm > 0 ? `${p.sqm} m²` : '— m²';
+  specs.push({ label: 'Área Total', v: sqmVal, emoji: '📐', icon: Ruler });
+
   return specs;
 }
 
@@ -310,11 +326,30 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
   const [base64Img, setBase64Img] = useState<string>('');
   const [base64IgImg, setBase64IgImg] = useState<string>('');
   const [base64WaImg, setBase64WaImg] = useState<string>('');
+  const [base64Logo, setBase64Logo] = useState<string>('');
+  const [base64Qr, setBase64Qr] = useState<string>('');
   const [generatedPreviewUrl, setGeneratedPreviewUrl] = useState<string | null>(null);
   const [generatedFile, setGeneratedFile] = useState<File | null>(null);
   const [generatedBlob, setGeneratedBlob] = useState<Blob | null>(null);
 
   const advisorPhone = property.captador ? getAdvisorPhone(property.captador) : '';
+
+  const shareUrl = typeof window !== 'undefined' ? window.location.href : 'https://rivmargaritapremier.com';
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareUrl)}`;
+
+  // Preload logo and QR to base64 DataURL (evita fallos de red o CORS en html2canvas)
+  useEffect(() => {
+    let isMounted = true;
+    urlToBase64('/logo-riv.png', 'image/png').then(b64 => {
+      if (isMounted && b64) setBase64Logo(b64);
+    });
+    if (qrUrl) {
+      urlToBase64(qrUrl, 'image/png').then(b64 => {
+        if (isMounted && b64) setBase64Qr(b64);
+      });
+    }
+    return () => { isMounted = false; };
+  }, [qrUrl]);
 
   // Preload property image to base64 DataURL (y versiones proporcionales pre-recortadas para evitar estiramiento)
   useEffect(() => {
@@ -451,6 +486,14 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
       if (selectedFormat === 'whatsapp' && !base64WaImg && property.image) {
         const croppedWa = await getCoverCroppedImage(property.image, 1080, 1080);
         if (croppedWa) setBase64WaImg(croppedWa);
+      }
+      if (!base64Logo) {
+        const logoB64 = await urlToBase64('/logo-riv.png', 'image/png');
+        if (logoB64) setBase64Logo(logoB64);
+      }
+      if (!base64Qr && qrUrl) {
+        const qrB64 = await urlToBase64(qrUrl, 'image/png');
+        if (qrB64) setBase64Qr(qrB64);
       }
       await new Promise(r => setTimeout(r, 150));
       if (typeof document !== 'undefined' && document.fonts) {
@@ -830,9 +873,6 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
     }
   };
 
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : 'https://rivmargaritapremier.com';
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareUrl)}`;
-
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
@@ -1150,81 +1190,171 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
         }}
       >
         {/* ── PDF – Plantilla A: Clásica con Membrete Corporativo y QR ─────── */}
-        <div ref={pdfARef} style={{ width: '794px', minHeight: '1123px', background: '#FFFFFF', padding: '50px 60px', fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+        <div ref={pdfARef} style={{ width: '794px', minHeight: '1123px', background: '#FFFFFF', padding: '44px 52px', fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
           {/* Header Corporativo con LOGO RIV MARGARITA PREMIER */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #800020', paddingBottom: '20px', marginBottom: '32px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #800020', paddingBottom: '16px', marginBottom: '22px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <img src="/logo-riv.png" alt="RIV Margarita Premier" style={{ height: '78px', width: 'auto', objectFit: 'contain' }} crossOrigin="anonymous" />
+              <img src={base64Logo || '/logo-riv.png'} alt="RIV Margarita Premier" style={{ height: '76px', width: 'auto', objectFit: 'contain' }} crossOrigin="anonymous" />
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ background: '#800020', color: '#fff', padding: '6px 18px', borderRadius: '999px', fontSize: '11px', fontWeight: 800, letterSpacing: '2px' }}>FICHA TÉCNICA OFICIAL</span>
-              <p style={{ fontSize: '12px', color: '#6B7280', margin: '6px 0 0', fontWeight: 600 }}>RIF: J-11055496-2 · Isla de Margarita, Venezuela</p>
+            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '32px',
+                background: '#800020',
+                borderRadius: '999px',
+                padding: '0 20px',
+                boxSizing: 'border-box'
+              }}>
+                <span style={{
+                  color: '#FFFFFF',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  letterSpacing: '2px',
+                  lineHeight: 1,
+                  position: 'relative',
+                  top: '-1px'
+                }}>
+                  FICHA TÉCNICA OFICIAL
+                </span>
+              </div>
+              <p style={{ fontSize: '11px', color: '#6B7280', margin: 0, fontWeight: 600 }}>RIF: J-11055496-2 · Isla de Margarita, Venezuela</p>
             </div>
           </div>
 
-          {/* Título y Precio */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-            <div style={{ flex: 1, paddingRight: '20px' }}>
-              <span style={{ color: '#800020', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>{property.propertyType || 'Inmueble'} en Venta</span>
-              <h1 style={{ fontSize: '36px', fontWeight: 900, color: '#111', margin: '4px 0 0', lineHeight: 1.15 }}>{property.title}</h1>
-              <p style={{ color: '#6B7280', marginTop: '6px', fontSize: '15px' }}>📍 {property.location}</p>
+          {/* Bloque Título, Ubicación y Precio Centrados con Máxima Elegancia */}
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            {/* Tag Badge Centrado */}
+            <div style={{ marginBottom: '8px' }}>
+              <span style={{
+                display: 'inline-block',
+                background: '#FFF1F4',
+                color: '#800020',
+                border: '1px solid #FECDD3',
+                borderRadius: '999px',
+                padding: '5px 22px',
+                fontSize: '12px',
+                fontWeight: 800,
+                letterSpacing: '1.5px',
+                textTransform: 'uppercase'
+              }}>
+                ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'INMUEBLE EN VENTA'}
+              </span>
             </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <p style={{ fontSize: '38px', fontWeight: 900, color: '#800020', margin: 0 }}>${fmt(property.price)}</p>
-              <p style={{ color: '#9CA3AF', fontSize: '14px', margin: '2px 0 0', fontWeight: 600 }}>USD</p>
+
+            {/* Título de la propiedad */}
+            <h1 style={{
+              fontSize: '34px',
+              fontWeight: 900,
+              color: '#111827',
+              margin: '0 0 6px 0',
+              lineHeight: 1.15
+            }}>
+              {property.title}
+            </h1>
+
+            {/* Ubicación */}
+            <p style={{
+              color: '#4B5563',
+              fontSize: '15px',
+              fontWeight: 600,
+              margin: '0 0 14px 0'
+            }}>
+              📍 {property.location}
+            </p>
+
+            {/* Banner de Precio de Inversión Centrado */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '14px',
+              background: 'linear-gradient(135deg, #800020 0%, #4A0012 100%)',
+              color: '#FFFFFF',
+              borderRadius: '16px',
+              padding: '10px 32px',
+              boxShadow: '0 4px 16px rgba(128, 0, 32, 0.2)'
+            }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '2px', textTransform: 'uppercase', color: '#D4AF37' }}>
+                PRECIO DE INVERSIÓN:
+              </span>
+              <span style={{ fontSize: '32px', fontWeight: 900, color: '#FFFFFF', lineHeight: 1 }}>
+                ${fmt(property.price)} USD
+              </span>
+              {property.codigo && (
+                <span style={{
+                  background: 'rgba(212, 175, 55, 0.25)',
+                  color: '#D4AF37',
+                  border: '1px solid #D4AF37',
+                  padding: '3px 10px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  marginLeft: '4px'
+                }}>
+                  {property.codigo}
+                </span>
+              )}
             </div>
           </div>
 
           {/* Foto Principal */}
-          <img src={base64Img || property.image} crossOrigin="anonymous" style={{ width: '100%', height: '360px', objectFit: 'cover', borderRadius: '18px', marginBottom: '28px' }} alt="" />
+          <img src={base64Img || property.image} crossOrigin="anonymous" style={{ width: '100%', height: '340px', objectFit: 'cover', borderRadius: '18px', marginBottom: '22px' }} alt="" />
 
-          {/* Specs Dinámicos (Filtrados sin 0 habs) */}
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${validSpecs.length}, 1fr)`, gap: '16px', marginBottom: '28px' }}>
+          {/* Specs Dinámicos (Habitaciones, Baños y Área Total siempre presentes) */}
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${validSpecs.length}, 1fr)`, gap: '14px', marginBottom: '22px' }}>
             {validSpecs.map(s => {
               const Icon = s.icon;
               return (
-              <div key={s.label} style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '16px', padding: '18px 12px', textAlign: 'center' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}><Icon size={28} color="#111" /></div>
-                <p style={{ fontSize: '26px', fontWeight: 800, color: '#111', margin: 0 }}>{s.v}</p>
-                <p style={{ fontSize: '12px', color: '#6B7280', margin: '4px 0 0', fontWeight: 600 }}>{s.label}</p>
+              <div key={s.label} style={{ background: '#F9FAFB', border: '1.5px solid #E5E7EB', borderRadius: '16px', padding: '16px 12px', textAlign: 'center', boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}><Icon size={26} color="#800020" /></div>
+                <p style={{ fontSize: '24px', fontWeight: 900, color: '#111827', margin: 0, lineHeight: 1 }}>{s.v}</p>
+                <p style={{ fontSize: '12px', color: '#6B7280', margin: '4px 0 0', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</p>
               </div>
             )})}
           </div>
 
-          {/* Descripción */}
-          <div style={{ flex: 1, marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#111', marginBottom: '8px' }}>Descripción de la Propiedad</h2>
-            <p style={{ color: '#4B5563', fontSize: '14px', lineHeight: 1.7, margin: 0 }}>{property.description}</p>
+          {/* Descripción y Comodidades estructuradas para eliminar vacíos */}
+          <div style={{ flex: 1, marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 800, color: '#800020', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Descripción de la Propiedad</h2>
+            <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '14px 18px' }}>
+              <p style={{ color: '#374151', fontSize: '13.5px', lineHeight: 1.6, margin: 0 }}>{property.description}</p>
+            </div>
             {property.amenities && property.amenities.length > 0 && (
-              <div style={{ marginTop: '20px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#111', marginBottom: '10px' }}>Comodidades y Atributos</h3>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ marginTop: '16px' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: 800, color: '#800020', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>Comodidades y Atributos Destacados</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
                   {property.amenities.map(a => (
-                    <span key={a} style={{ background: '#FFF1F4', color: '#800020', border: '1px solid #FECDD3', borderRadius: '999px', padding: '5px 14px', fontSize: '12px', fontWeight: 600 }}>{a}</span>
+                    <div key={a} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#FFF1F4', border: '1px solid #FECDD3', borderRadius: '10px', padding: '8px 12px', boxSizing: 'border-box' }}>
+                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#800020', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 900, flexShrink: 0 }}>✓</div>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#800020' }}>{a}</span>
+                    </div>
                   ))}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Footer Corporativo con Asesor y Código QR */}
-          <div style={{ borderTop: '2px solid #E5E7EB', paddingTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F9FAFB', borderRadius: '18px', padding: '18px 24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#800020', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '22px', fontWeight: 800, flexShrink: 0 }}>
-                {property.captador ? property.captador.charAt(0).toUpperCase() : 'R'}
-              </div>
-              <div>
-                <p style={{ fontSize: '11px', color: '#9CA3AF', margin: 0, fontWeight: 700, textTransform: 'uppercase' }}>Asesor Inmobiliario</p>
-                <p style={{ fontSize: '18px', fontWeight: 800, color: '#111', margin: '2px 0 0' }}>{property.captador || 'RIV Premier'}</p>
-                {advisorPhone && <p style={{ fontSize: '13px', color: '#800020', fontWeight: 700, margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}><Smartphone size={14} /> {advisorPhone}</p>}
+          {/* Footer Corporativo con Asesor (sin círculo de inicial) y Teléfono Grande Legible */}
+          <div style={{ borderTop: '2px solid #800020', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '18px', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '11px', color: '#800020', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1.5px' }}>Asesor Inmobiliario Exclusivo</span>
+              <p style={{ fontSize: '20px', fontWeight: 900, color: '#111827', margin: '3px 0 0', lineHeight: 1.2 }}>{property.captador || 'RIV Margarita Premier'}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                <Smartphone size={18} color="#800020" strokeWidth={2.2} />
+                <span style={{ fontSize: '18px', fontWeight: 900, color: '#800020', letterSpacing: '0.5px' }}>
+                  {advisorPhone || '0414-7901111'}
+                </span>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'right' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'right' }}>
               <div>
-                <p style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: 700, margin: 0 }}>ESCANEA PARA MÁS INFO</p>
-                <p style={{ fontSize: '12px', color: '#111', fontWeight: 700, margin: '2px 0 0' }}>Ficha en Línea</p>
+                <p style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: 800, margin: 0, letterSpacing: '1px' }}>ESCANEA PARA MÁS INFO</p>
+                <p style={{ fontSize: '13px', color: '#111827', fontWeight: 800, margin: '2px 0 0' }}>Ficha en Línea</p>
+                <p style={{ fontSize: '10px', color: '#6B7280', margin: '2px 0 0', fontWeight: 600 }}>RIV Margarita Premier</p>
               </div>
-              <img src={qrUrl} alt="QR Ficha" style={{ width: '64px', height: '64px', borderRadius: '8px', border: '1px solid #E5E7EB' }} crossOrigin="anonymous" />
+              <img src={base64Qr || qrUrl} alt="QR Ficha" style={{ width: '64px', height: '64px', borderRadius: '8px', border: '1px solid #D1D5DB', padding: '3px', background: '#FFFFFF' }} crossOrigin="anonymous" />
             </div>
           </div>
         </div>
@@ -1232,66 +1362,115 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
         {/* ── PDF – Plantilla B: Lujosa Gold Edition con QR ───────────────── */}
         <div ref={pdfBRef} style={{ width: '794px', minHeight: '1123px', background: '#0F0F0F', fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', overflow: 'hidden' }}>
           {/* Hero con Membrete Dorado */}
-          <div style={{ position: 'relative', height: '480px', overflow: 'hidden' }}>
+          <div style={{ position: 'relative', height: '440px', overflow: 'hidden' }}>
             <img src={base64Img || property.image} crossOrigin="anonymous" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.65 }} alt="" />
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.9) 100%)' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.92) 100%)' }} />
             {/* Top Bar con Logo */}
-            <div style={{ position: 'absolute', top: 40, left: 60, right: 60, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <img src="/logo-riv.png" alt="RIV Margarita Premier" style={{ height: '70px', width: 'auto', objectFit: 'contain' }} crossOrigin="anonymous" />
-              <div style={{ background: '#D4AF37', color: '#000', padding: '6px 18px', borderRadius: '999px', fontSize: '11px', fontWeight: 900, letterSpacing: '2px' }}>PREMIUM COLLECTION</div>
+            <div style={{ position: 'absolute', top: 36, left: 52, right: 52, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <img src={base64Logo || '/logo-riv.png'} alt="RIV Margarita Premier" style={{ height: '68px', width: 'auto', objectFit: 'contain' }} crossOrigin="anonymous" />
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '32px',
+                background: '#D4AF37',
+                borderRadius: '999px',
+                padding: '0 20px',
+                boxSizing: 'border-box'
+              }}>
+                <span style={{
+                  color: '#000000',
+                  fontSize: '11px',
+                  fontWeight: 900,
+                  letterSpacing: '2px',
+                  lineHeight: 1,
+                  position: 'relative',
+                  top: '-1px'
+                }}>
+                  PREMIUM COLLECTION
+                </span>
+              </div>
             </div>
-            {/* Title Bottom */}
-            <div style={{ position: 'absolute', bottom: 40, left: 60, right: 60 }}>
-              <h1 style={{ fontSize: '42px', fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.1 }}>{property.title}</h1>
-              <p style={{ color: 'rgba(255,255,255,0.7)', marginTop: '8px', fontSize: '16px' }}>📍 {property.location}</p>
+            {/* Title Bottom Centered */}
+            <div style={{ position: 'absolute', bottom: 32, left: 52, right: 52, textAlign: 'center' }}>
+              <div style={{ marginBottom: '8px' }}>
+                <span style={{
+                  display: 'inline-block',
+                  background: 'rgba(212, 175, 55, 0.18)',
+                  color: '#D4AF37',
+                  border: '1px solid #D4AF37',
+                  borderRadius: '999px',
+                  padding: '4px 18px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  letterSpacing: '1.5px',
+                  textTransform: 'uppercase'
+                }}>
+                  ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'INMUEBLE EN VENTA'}
+                </span>
+              </div>
+              <h1 style={{ fontSize: '38px', fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.15 }}>{property.title}</h1>
+              <p style={{ color: 'rgba(255,255,255,0.75)', marginTop: '6px', fontSize: '15px' }}>📍 {property.location}</p>
             </div>
           </div>
 
           {/* Body */}
-          <div style={{ padding: '40px 60px', flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', borderBottom: '1px solid rgba(212,175,55,0.3)', paddingBottom: '24px' }}>
+          <div style={{ padding: '32px 52px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(212,175,55,0.3)', paddingBottom: '20px' }}>
               <div>
-                <p style={{ color: '#D4AF37', fontSize: '12px', fontWeight: 700, letterSpacing: '2px', margin: 0 }}>PRECIO DE INVERSIÓN</p>
-                <p style={{ color: '#fff', fontSize: '46px', fontWeight: 900, margin: '4px 0 0' }}>${fmt(property.price)} <span style={{ fontSize: '18px', fontWeight: 400, color: '#9CA3AF' }}>USD</span></p>
+                <p style={{ color: '#D4AF37', fontSize: '12px', fontWeight: 800, letterSpacing: '2px', margin: 0 }}>PRECIO DE INVERSIÓN</p>
+                <p style={{ color: '#fff', fontSize: '42px', fontWeight: 900, margin: '4px 0 0', lineHeight: 1 }}>${fmt(property.price)} <span style={{ fontSize: '18px', fontWeight: 700, color: '#D4AF37' }}>USD</span></p>
               </div>
-              <div style={{ display: 'flex', gap: '20px' }}>
+              <div style={{ display: 'flex', gap: '16px' }}>
                 {validSpecs.map(s => (
-                  <div key={s.label} style={{ textAlign: 'center' }}>
-                    <p style={{ color: '#D4AF37', fontSize: '28px', fontWeight: 900, margin: 0 }}>{s.v}</p>
-                    <p style={{ color: '#9CA3AF', fontSize: '12px', margin: '4px 0 0' }}>{s.label}</p>
+                  <div key={s.label} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '14px', padding: '12px 18px', textAlign: 'center' }}>
+                    <p style={{ color: '#D4AF37', fontSize: '24px', fontWeight: 900, margin: 0, lineHeight: 1 }}>{s.v}</p>
+                    <p style={{ color: '#9CA3AF', fontSize: '11px', fontWeight: 700, margin: '4px 0 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            <h2 style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 700, letterSpacing: '2px', margin: '0 0 10px' }}>DESCRIPCIÓN</h2>
-            <p style={{ color: '#D1D5DB', fontSize: '15px', lineHeight: 1.8, margin: 0 }}>{property.description}</p>
+            <h2 style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 800, letterSpacing: '2px', margin: '0 0 10px', textTransform: 'uppercase' }}>DESCRIPCIÓN DE LA PROPIEDAD</h2>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', padding: '14px 18px' }}>
+              <p style={{ color: '#D1D5DB', fontSize: '13.5px', lineHeight: 1.7, margin: 0 }}>{property.description}</p>
+            </div>
 
             {property.amenities && property.amenities.length > 0 && (
-              <div style={{ marginTop: '28px' }}>
-                <h2 style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 700, letterSpacing: '2px', margin: '0 0 12px' }}>COMODIDADES DESTACADAS</h2>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ marginTop: '20px' }}>
+                <h2 style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 800, letterSpacing: '2px', margin: '0 0 12px', textTransform: 'uppercase' }}>COMODIDADES DESTACADAS</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
                   {property.amenities.map(a => (
-                    <span key={a} style={{ background: 'rgba(212,175,55,0.1)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '999px', padding: '6px 16px', fontSize: '12px', fontWeight: 600 }}>{a}</span>
+                    <div key={a} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '10px', padding: '8px 12px', boxSizing: 'border-box' }}>
+                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#D4AF37', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 900, flexShrink: 0 }}>✓</div>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#D4AF37' }}>{a}</span>
+                    </div>
                   ))}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Footer Dorado con QR */}
-          <div style={{ background: '#D4AF37', padding: '24px 60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D4AF37', fontSize: '22px', fontWeight: 900, flexShrink: 0 }}>
-                {property.captador ? property.captador.charAt(0).toUpperCase() : 'R'}
-              </div>
-              <div>
-                <p style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(0,0,0,0.6)', margin: 0, letterSpacing: '1px' }}>ASESOR EXCLUSIVO</p>
-                <p style={{ fontSize: '20px', fontWeight: 900, color: '#000', margin: '2px 0 0' }}>{property.captador}</p>
-                {advisorPhone && <p style={{ fontSize: '13px', fontWeight: 800, color: '#000', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}><Smartphone size={14} /> {advisorPhone}</p>}
+          {/* Footer Dorado con QR (sin círculo de letra) */}
+          <div style={{ background: '#D4AF37', padding: '20px 52px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(0,0,0,0.65)', margin: 0, letterSpacing: '1.5px', textTransform: 'uppercase' }}>ASESOR INMOBILIARIO EXCLUSIVO</span>
+              <p style={{ fontSize: '22px', fontWeight: 900, color: '#000000', margin: '2px 0 0', lineHeight: 1.2 }}>{property.captador || 'RIV Margarita Premier'}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                <Smartphone size={18} color="#000000" strokeWidth={2.4} />
+                <span style={{ fontSize: '18px', fontWeight: 900, color: '#000000', letterSpacing: '0.5px' }}>
+                  {advisorPhone || '0414-7901111'}
+                </span>
               </div>
             </div>
-            <img src={qrUrl} alt="QR" style={{ width: '60px', height: '60px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.2)' }} crossOrigin="anonymous" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'right' }}>
+              <div>
+                <p style={{ fontSize: '10px', color: 'rgba(0,0,0,0.6)', fontWeight: 800, margin: 0, letterSpacing: '1px' }}>ESCANEA PARA MÁS INFO</p>
+                <p style={{ fontSize: '13px', color: '#000000', fontWeight: 800, margin: '2px 0 0' }}>Ficha en Línea</p>
+                <p style={{ fontSize: '10px', color: 'rgba(0,0,0,0.7)', margin: '2px 0 0', fontWeight: 600 }}>RIV Margarita Premier</p>
+              </div>
+              <img src={base64Qr || qrUrl} alt="QR" style={{ width: '64px', height: '64px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.3)', padding: '3px', background: '#FFFFFF' }} crossOrigin="anonymous" />
+            </div>
           </div>
         </div>
 
@@ -1371,7 +1550,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
             }}>
               <img
-                src="/logo-riv.png"
+                src={base64Logo || '/logo-riv.png'}
                 alt="RIV Margarita Premier"
                 style={{
                   height: '62px',
@@ -1709,7 +1888,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
             }}>
               <img
-                src="/logo-riv.png"
+                src={base64Logo || '/logo-riv.png'}
                 alt="RIV Margarita Premier"
                 style={{
                   height: '62px',
@@ -2031,24 +2210,24 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            {/* LOGO BADGE — Logo oficial nítido y de gran presencia */}
+            {/* LOGO BADGE */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              height: '62px',
+              height: '68px',
               boxSizing: 'border-box',
               background: '#FFFFFF',
               border: '1.5px solid #D4AF37',
               borderRadius: '20px',
-              padding: '0 24px',
+              padding: '0 28px',
               boxShadow: '0 6px 24px rgba(0,0,0,0.5)'
             }}>
               <img
-                src="/logo-riv.png"
+                src={base64Logo || '/logo-riv.png'}
                 alt="RIV Margarita Premier"
                 style={{
-                  height: '46px',
+                  height: '50px',
                   width: 'auto',
                   objectFit: 'contain',
                   display: 'block'
@@ -2057,14 +2236,14 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               />
             </div>
 
-            {/* PRECIO BADGE — Texto centrado verticalmente */}
+            {/* PRECIO BADGE — Texto centrado verticalmente con compensación óptica */}
             <div style={{
-              height: '62px',
+              height: '68px',
               boxSizing: 'border-box',
               background: '#800020',
               border: '1.5px solid rgba(255, 255, 255, 0.25)',
               borderRadius: '20px',
-              padding: '0 28px',
+              padding: '0 32px',
               boxShadow: '0 6px 24px rgba(0,0,0,0.5)',
               display: 'flex',
               alignItems: 'center',
@@ -2074,15 +2253,15 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               <span style={{
                 color: '#FFFFFF',
                 fontWeight: 900,
-                fontSize: '26px',
+                fontSize: '28px',
                 letterSpacing: '0.5px',
                 textTransform: 'uppercase',
                 lineHeight: 1,
                 margin: 0,
                 padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                position: 'relative',
+                top: '-4px',
+                display: 'block',
                 textAlign: 'center'
               }}>
                 {property.status === 'Vendida'
@@ -2099,29 +2278,37 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             left: 40,
             right: 40,
             zIndex: 10,
-            background: 'rgba(14, 14, 14, 0.90)',
+            background: 'rgba(14, 14, 14, 0.92)',
             border: '1.5px solid rgba(255, 255, 255, 0.16)',
-            borderRadius: '28px',
-            padding: '28px 32px 22px',
+            borderRadius: '30px',
+            padding: '28px 36px 24px',
             boxShadow: '0 20px 50px rgba(0,0,0,0.7)',
             display: 'flex',
             flexDirection: 'column',
             gap: '16px'
           }}>
-            {/* Header: Tag & Ubicación */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Header: Tag & Ubicación en stack centrado simétrico */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              width: '100%',
+              textAlign: 'center'
+            }}>
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 textAlign: 'center',
-                height: '36px',
+                height: '38px',
                 boxSizing: 'border-box',
-                padding: '0 16px',
+                padding: '0 22px',
                 background: 'rgba(212, 175, 55, 0.18)',
                 color: '#D4AF37',
                 border: '1px solid #D4AF37',
-                borderRadius: '10px'
+                borderRadius: '12px'
               }}>
                 <span style={{
                   fontSize: '14px',
@@ -2131,29 +2318,40 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                   lineHeight: 1,
                   margin: 0,
                   padding: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  position: 'relative',
+                  top: '-2.5px',
+                  display: 'block',
+                  textAlign: 'center'
                 }}>
-                  ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'EN VENTA'}
+                  ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'INMUEBLE EN VENTA'}
                 </span>
               </div>
-              <span style={{
+              <div style={{
                 color: 'rgba(255, 255, 255, 0.9)',
-                fontSize: '18px',
-                fontWeight: 600
+                fontSize: '17px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                lineHeight: 1,
+                width: '100%',
+                textAlign: 'center'
               }}>
-                📍 {property.location.toUpperCase()}
-              </span>
+                <span>📍</span>
+                <span>{property.location.toUpperCase()}</span>
+              </div>
             </div>
 
-            {/* Título de la propiedad */}
+            {/* Título de la propiedad centrado */}
             <h2 style={{
               color: '#FFFFFF',
-              fontSize: '32px',
+              fontSize: '34px',
               fontWeight: 900,
               margin: 0,
-              lineHeight: 1.15
+              lineHeight: 1.15,
+              textAlign: 'center',
+              width: '100%'
             }}>
               {property.title}
             </h2>
@@ -2174,8 +2372,8 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         flex: 1,
                         background: 'rgba(255, 255, 255, 0.08)',
                         border: '1.5px solid rgba(212, 175, 55, 0.35)',
-                        borderRadius: '16px',
-                        padding: '12px 10px 14px',
+                        borderRadius: '18px',
+                        padding: '14px 10px 14px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -2184,52 +2382,105 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         boxSizing: 'border-box'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
-                        <SpecIcon size={26} color="#D4AF37" strokeWidth={1.8} />
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                        <SpecIcon size={28} color="#D4AF37" strokeWidth={1.8} />
                       </div>
-                      <span style={{
+                      <div style={{
                         color: '#FFFFFF',
-                        fontSize: '22px',
+                        fontSize: '24px',
                         fontWeight: 900,
-                        lineHeight: 'normal',
+                        lineHeight: 1,
                         textAlign: 'center',
-                        display: 'block',
-                        marginTop: '-2px'
+                        width: '100%',
+                        margin: '0 0 4px 0',
+                        position: 'relative',
+                        top: '-2px'
                       }}>
                         {s.v}
-                      </span>
-                      <span style={{
+                      </div>
+                      <div style={{
                         color: '#D4AF37',
-                        fontSize: '11px',
+                        fontSize: '12px',
                         fontWeight: 700,
                         textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
+                        letterSpacing: '0.8px',
                         textAlign: 'center',
-                        display: 'block',
-                        marginTop: '3px'
+                        width: '100%',
+                        lineHeight: 1,
+                        margin: 0
                       }}>
                         {s.label}
-                      </span>
+                      </div>
                     </div>
                   );
                 })}
               </div>
             )}
 
-            {/* Footer de la tarjeta */}
+            {/* Footer de la tarjeta: Asesor con Teléfono (sin la G) y RIF */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               borderTop: '1px solid rgba(255, 255, 255, 0.12)',
-              paddingTop: '12px'
+              paddingTop: '14px',
+              marginTop: '2px'
             }}>
-              <p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: 700, margin: 0 }}>
-                👤 Asesor: {property.captador || 'RIV Premier'}
-              </p>
-              <p style={{ color: 'rgba(255, 255, 255, 0.55)', fontSize: '12px', margin: 0, letterSpacing: '0.5px' }}>
-                RIV MARGARITA PREMIER · J-11055496-2
-              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <p style={{
+                  color: '#D4AF37',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  margin: 0,
+                  letterSpacing: '1.5px',
+                  lineHeight: 1
+                }}>
+                  ASESOR INMOBILIARIO
+                </p>
+                <p style={{
+                  color: '#FFFFFF',
+                  fontSize: '20px',
+                  fontWeight: 900,
+                  margin: '4px 0 0',
+                  lineHeight: 1.15
+                }}>
+                  {property.captador || 'RIV Premier'}
+                </p>
+                {(advisorPhone || '0414-7901111') && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    marginTop: '5px'
+                  }}>
+                    <Smartphone size={20} color="#D4AF37" strokeWidth={2.2} />
+                    <span style={{
+                      color: '#FFFFFF',
+                      fontSize: '20px',
+                      fontWeight: 900,
+                      letterSpacing: '0.5px',
+                      lineHeight: 1
+                    }}>
+                      {advisorPhone || '0414-7901111'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <p style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 800, letterSpacing: '1px', margin: 0, textTransform: 'uppercase' }}>
+                  RIV MARGARITA PREMIER
+                </p>
+                <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '11px', margin: '2px 0 0', letterSpacing: '0.5px' }}>
+                  RIF J-11055496-2
+                </p>
+                {property.codigo && (
+                  <p style={{ color: '#D4AF37', fontSize: '12px', fontWeight: 800, margin: '3px 0 0', letterSpacing: '1px' }}>
+                    CÓD: {property.codigo}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -2250,8 +2501,8 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             boxSizing: 'border-box'
           }}
         >
-          {/* FOTO SUPERIOR — 580px */}
-          <div style={{ position: 'relative', height: '580px', flexShrink: 0, overflow: 'hidden' }}>
+          {/* FOTO SUPERIOR — 560px */}
+          <div style={{ position: 'relative', height: '560px', flexShrink: 0, overflow: 'hidden' }}>
             <img
               src={base64WaImg || base64Img || property.image}
               crossOrigin="anonymous"
@@ -2287,19 +2538,19 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                height: '58px',
+                height: '62px',
                 boxSizing: 'border-box',
                 background: '#FFFFFF',
                 border: '1.5px solid #800020',
                 borderRadius: '18px',
-                padding: '0 22px',
+                padding: '0 24px',
                 boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
               }}>
                 <img
-                  src="/logo-riv.png"
+                  src={base64Logo || '/logo-riv.png'}
                   alt="RIV Margarita Premier"
                   style={{
-                    height: '42px',
+                    height: '46px',
                     width: 'auto',
                     objectFit: 'contain',
                     display: 'block'
@@ -2310,12 +2561,12 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
 
               {/* TAG ESTADO — Texto centrado verticalmente */}
               <div style={{
-                height: '58px',
+                height: '62px',
                 boxSizing: 'border-box',
                 background: '#800020',
                 border: '1.5px solid #FFFFFF',
                 borderRadius: '18px',
-                padding: '0 24px',
+                padding: '0 28px',
                 boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
                 display: 'flex',
                 alignItems: 'center',
@@ -2325,15 +2576,15 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                 <span style={{
                   color: '#FFFFFF',
                   fontWeight: 900,
-                  fontSize: '20px',
+                  fontSize: '22px',
                   textTransform: 'uppercase',
                   letterSpacing: '1px',
                   lineHeight: 1,
                   margin: 0,
                   padding: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  position: 'relative',
+                  top: '-3px',
+                  display: 'block',
                   textAlign: 'center'
                 }}>
                   {property.status === 'Vendida' ? 'VENDIDO' : 'EN VENTA'}
@@ -2342,55 +2593,69 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             </div>
           </div>
 
-          {/* PANEL INFERIOR EDITORIAL BLANCO — 500px */}
+          {/* PANEL INFERIOR EDITORIAL BLANCO — 520px */}
           <div style={{
             flex: 1,
-            padding: '36px 48px 32px',
+            padding: '28px 44px 28px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
             background: '#FFFFFF',
             boxSizing: 'border-box'
           }}>
-            {/* Header: Ubicación + Título y Precio */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{
-                    color: '#800020',
-                    fontSize: '15px',
-                    fontWeight: 800,
-                    letterSpacing: '1.5px',
-                    textTransform: 'uppercase',
-                    margin: '0 0 6px 0'
-                  }}>
-                    📍 {property.location.toUpperCase()}
-                  </p>
-                  <h2 style={{
-                    color: '#111827',
-                    fontSize: '32px',
-                    fontWeight: 900,
-                    lineHeight: 1.15,
-                    margin: 0
-                  }}>
-                    {property.title}
-                  </h2>
-                </div>
-
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <p style={{
-                    fontSize: '40px',
-                    fontWeight: 900,
-                    color: '#800020',
-                    margin: 0,
-                    lineHeight: 1
-                  }}>
-                    ${fmt(property.price)}
-                  </p>
-                  <p style={{ fontSize: '15px', fontWeight: 700, color: '#6B7280', margin: '4px 0 0', letterSpacing: '1px' }}>
-                    USD
-                  </p>
-                </div>
+            {/* Header: Ubicación + Título y Precio centrados */}
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                color: '#800020',
+                fontSize: '15px',
+                fontWeight: 800,
+                letterSpacing: '1.5px',
+                textTransform: 'uppercase',
+                marginBottom: '6px'
+              }}>
+                <span>📍</span>
+                <span>{property.location.toUpperCase()}</span>
+              </div>
+              <h2 style={{
+                color: '#111827',
+                fontSize: '34px',
+                fontWeight: 900,
+                lineHeight: 1.15,
+                margin: '0 0 10px 0',
+                textAlign: 'center'
+              }}>
+                {property.title}
+              </h2>
+              {/* Precio Centrado con estilo luxury */}
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'baseline',
+                gap: '8px',
+                background: '#FFF1F4',
+                border: '1.5px solid #FECDD3',
+                borderRadius: '16px',
+                padding: '8px 28px'
+              }}>
+                <span style={{
+                  fontSize: '36px',
+                  fontWeight: 900,
+                  color: '#800020',
+                  lineHeight: 1
+                }}>
+                  ${fmt(property.price)}
+                </span>
+                <span style={{
+                  fontSize: '16px',
+                  fontWeight: 800,
+                  color: '#800020',
+                  letterSpacing: '1px'
+                }}>
+                  USD
+                </span>
               </div>
             </div>
 
@@ -2400,7 +2665,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                 display: 'flex',
                 gap: '14px',
                 width: '100%',
-                margin: '12px 0'
+                margin: '10px 0'
               }}>
                 {validSpecs.map(s => {
                   const SpecIcon = s.icon;
@@ -2412,7 +2677,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         background: '#F8FAFC',
                         border: '1.5px solid #E2E8F0',
                         borderRadius: '16px',
-                        padding: '12px 10px 14px',
+                        padding: '12px 10px 12px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -2425,49 +2690,100 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
                         <SpecIcon size={26} color="#800020" strokeWidth={1.8} />
                       </div>
-                      <span style={{
+                      <div style={{
                         color: '#0F172A',
                         fontSize: '22px',
                         fontWeight: 900,
-                        lineHeight: 'normal',
+                        lineHeight: 1,
                         textAlign: 'center',
-                        display: 'block',
-                        marginTop: '-2px'
+                        width: '100%',
+                        margin: '0 0 3px 0',
+                        position: 'relative',
+                        top: '-2px'
                       }}>
                         {s.v}
-                      </span>
-                      <span style={{
+                      </div>
+                      <div style={{
                         color: '#800020',
                         fontSize: '11px',
                         fontWeight: 800,
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px',
                         textAlign: 'center',
-                        display: 'block',
-                        marginTop: '3px'
+                        width: '100%',
+                        lineHeight: 1,
+                        margin: 0
                       }}>
                         {s.label}
-                      </span>
+                      </div>
                     </div>
                   );
                 })}
               </div>
             )}
 
-            {/* Footer Editorial: Asesor y RIF */}
+            {/* Footer Editorial: Asesor con Teléfono (sin la G) y RIF */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               borderTop: '1.5px solid #F1F5F9',
-              paddingTop: '14px'
+              paddingTop: '12px'
             }}>
-              <p style={{ color: '#334155', fontSize: '15px', fontWeight: 700, margin: 0 }}>
-                👤 Asesor: {property.captador || 'RIV Premier'}
-              </p>
-              <p style={{ color: '#94A3B8', fontSize: '12px', margin: 0, fontWeight: 600, letterSpacing: '0.5px' }}>
-                RIV MARGARITA PREMIER · J-11055496-2
-              </p>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <p style={{
+                  color: '#800020',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  margin: 0,
+                  letterSpacing: '1px'
+                }}>
+                  ASESOR INMOBILIARIO
+                </p>
+                <p style={{
+                  color: '#111827',
+                  fontSize: '18px',
+                  fontWeight: 800,
+                  margin: '2px 0 0',
+                  lineHeight: 1.15
+                }}>
+                  {property.captador || 'RIV Premier'}
+                </p>
+                {(advisorPhone || '0414-7901111') && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    marginTop: '4px'
+                  }}>
+                    <Smartphone size={18} color="#800020" strokeWidth={2.2} />
+                    <span style={{
+                      color: '#800020',
+                      fontSize: '18px',
+                      fontWeight: 900,
+                      letterSpacing: '0.5px',
+                      lineHeight: 1
+                    }}>
+                      {advisorPhone || '0414-7901111'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ color: '#111827', fontSize: '13px', fontWeight: 800, letterSpacing: '0.5px', margin: 0 }}>
+                  RIV MARGARITA PREMIER
+                </p>
+                <p style={{ color: '#94A3B8', fontSize: '11px', margin: '2px 0 0', fontWeight: 600, letterSpacing: '0.5px' }}>
+                  RIF: J-11055496-2
+                </p>
+                {property.codigo && (
+                  <p style={{ color: '#800020', fontSize: '12px', fontWeight: 800, margin: '2px 0 0', letterSpacing: '0.5px' }}>
+                    CÓD: {property.codigo}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -2528,10 +2844,10 @@ function TemplateThumbnail({ format, template, property }: { format: FormatType;
           <p style={{ fontSize: '7px', fontWeight: 800, color: '#fff', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{property.title}</p>
           <div style={{ display: 'flex', gap: '3px' }}>
             <div style={{ flex: 1, background: 'rgba(212,175,55,0.15)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.beds} Hab</span>
+              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.beds || 1} Hab</span>
             </div>
             <div style={{ flex: 1, background: 'rgba(212,175,55,0.15)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.baths} Bñ</span>
+              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.baths || 1} Bñ</span>
             </div>
             <div style={{ flex: 1, background: 'rgba(212,175,55,0.15)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
               <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.sqm} m²</span>
@@ -2558,10 +2874,10 @@ function TemplateThumbnail({ format, template, property }: { format: FormatType;
           <p style={{ fontSize: '7px', fontWeight: 800, color: '#fff', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{property.title}</p>
           <div style={{ display: 'flex', gap: '3px' }}>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.beds} Hab</span>
+              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.beds || 1} Hab</span>
             </div>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.baths} Bñ</span>
+              <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.baths || 1} Bñ</span>
             </div>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
               <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.sqm} m²</span>
@@ -2594,10 +2910,10 @@ function TemplateThumbnail({ format, template, property }: { format: FormatType;
           </div>
           <div style={{ display: 'flex', gap: '3px', marginTop: '2px' }}>
             <div style={{ flex: 1, background: '#F8FAFC', border: '0.5px solid #E2E8F0', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '5px', color: '#111', fontWeight: 800 }}>{property.beds} Hab</span>
+              <span style={{ fontSize: '5px', color: '#111', fontWeight: 800 }}>{property.beds || 1} Hab</span>
             </div>
             <div style={{ flex: 1, background: '#F8FAFC', border: '0.5px solid #E2E8F0', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
-              <span style={{ fontSize: '5px', color: '#111', fontWeight: 800 }}>{property.baths} Bñ</span>
+              <span style={{ fontSize: '5px', color: '#111', fontWeight: 800 }}>{property.baths || 1} Bñ</span>
             </div>
             <div style={{ flex: 1, background: '#F8FAFC', border: '0.5px solid #E2E8F0', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
               <span style={{ fontSize: '5px', color: '#111', fontWeight: 800 }}>{property.sqm} m²</span>
@@ -2624,10 +2940,10 @@ function TemplateThumbnail({ format, template, property }: { format: FormatType;
           <p style={{ fontSize: '6px', fontWeight: 800, color: '#fff', margin: '0 0 3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{property.title}</p>
           <div style={{ display: 'flex', gap: '2px' }}>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '2px', padding: '1px', textAlign: 'center' }}>
-              <span style={{ fontSize: '5px', color: '#fff', fontWeight: 800 }}>{property.beds} Hab</span>
+              <span style={{ fontSize: '5px', color: '#fff', fontWeight: 800 }}>{property.beds || 1} Hab</span>
             </div>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '2px', padding: '1px', textAlign: 'center' }}>
-              <span style={{ fontSize: '5px', color: '#fff', fontWeight: 800 }}>{property.baths} Bñ</span>
+              <span style={{ fontSize: '5px', color: '#fff', fontWeight: 800 }}>{property.baths || 1} Bñ</span>
             </div>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '2px', padding: '1px', textAlign: 'center' }}>
               <span style={{ fontSize: '5px', color: '#fff', fontWeight: 800 }}>{property.sqm} m²</span>
