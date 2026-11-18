@@ -77,6 +77,97 @@ async function urlToBase64(url: string): Promise<string> {
   });
 }
 
+/** Pre-recorta una imagen con matemática 'cover' centrada para evitar que html2canvas la estire o deforme */
+async function getCoverCroppedImage(url: string, targetWidth: number, targetHeight: number): Promise<string> {
+  if (!url) return '';
+  return new Promise<string>((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = targetWidth;
+        c.height = targetHeight;
+        const ctx = c.getContext('2d');
+        if (ctx) {
+          const imgWidth = img.naturalWidth || img.width || targetWidth;
+          const imgHeight = img.naturalHeight || img.height || targetHeight;
+          const imgRatio = imgWidth / imgHeight;
+          const targetRatio = targetWidth / targetHeight;
+
+          let sWidth = imgWidth;
+          let sHeight = imgHeight;
+          let sx = 0;
+          let sy = 0;
+
+          if (imgRatio > targetRatio) {
+            sHeight = imgHeight;
+            sWidth = imgHeight * targetRatio;
+            sx = (imgWidth - sWidth) / 2;
+            sy = 0;
+          } else {
+            sWidth = imgWidth;
+            sHeight = imgWidth / targetRatio;
+            sx = 0;
+            sy = (imgHeight - sHeight) / 2;
+          }
+
+          ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+          resolve(c.toDataURL('image/jpeg', 0.95));
+          return;
+        }
+      } catch (err) {
+        console.warn('Canvas cover crop failed:', err);
+      }
+      resolve(url);
+    };
+    img.onerror = () => {
+      const fallback = new Image();
+      fallback.onload = () => {
+        try {
+          const c = document.createElement('canvas');
+          c.width = targetWidth;
+          c.height = targetHeight;
+          const ctx = c.getContext('2d');
+          if (ctx) {
+            const imgWidth = fallback.naturalWidth || fallback.width || targetWidth;
+            const imgHeight = fallback.naturalHeight || fallback.height || targetHeight;
+            const imgRatio = imgWidth / imgHeight;
+            const targetRatio = targetWidth / targetHeight;
+
+            let sWidth = imgWidth;
+            let sHeight = imgHeight;
+            let sx = 0;
+            let sy = 0;
+
+            if (imgRatio > targetRatio) {
+              sHeight = imgHeight;
+              sWidth = imgHeight * targetRatio;
+              sx = (imgWidth - sWidth) / 2;
+              sy = 0;
+            } else {
+              sWidth = imgWidth;
+              sHeight = imgWidth / targetRatio;
+              sx = 0;
+              sy = (imgHeight - sHeight) / 2;
+            }
+
+            ctx.drawImage(fallback, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+            resolve(c.toDataURL('image/jpeg', 0.95));
+            return;
+          }
+        } catch {
+          // ignore
+        }
+        resolve(url);
+      };
+      fallback.onerror = () => resolve(url);
+      fallback.src = url;
+    };
+    img.src = url;
+  });
+}
+
 /** Convierte un HTMLCanvasElement en un objeto File y Blob de forma cross-browser */
 async function canvasToFile(canvas: HTMLCanvasElement, filename: string): Promise<{ file: File; blob: Blob }> {
   return new Promise((resolve) => {
@@ -217,18 +308,26 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
   const [done, setDone] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
   const [base64Img, setBase64Img] = useState<string>('');
+  const [base64IgImg, setBase64IgImg] = useState<string>('');
+  const [base64WaImg, setBase64WaImg] = useState<string>('');
   const [generatedPreviewUrl, setGeneratedPreviewUrl] = useState<string | null>(null);
   const [generatedFile, setGeneratedFile] = useState<File | null>(null);
   const [generatedBlob, setGeneratedBlob] = useState<Blob | null>(null);
 
   const advisorPhone = property.captador ? getAdvisorPhone(property.captador) : '';
 
-  // Preload property image to base64 DataURL to prevent CORS canvas tainting and black output
+  // Preload property image to base64 DataURL (y versiones proporcionales pre-recortadas para evitar estiramiento)
   useEffect(() => {
     let isMounted = true;
     if (property.image) {
       urlToBase64(property.image).then(b64 => {
         if (isMounted && b64) setBase64Img(b64);
+      });
+      getCoverCroppedImage(property.image, 1080, 1920).then(b64 => {
+        if (isMounted && b64) setBase64IgImg(b64);
+      });
+      getCoverCroppedImage(property.image, 1080, 1080).then(b64 => {
+        if (isMounted && b64) setBase64WaImg(b64);
       });
     }
     return () => { isMounted = false; };
@@ -339,13 +438,21 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
     if (!ref?.current) return;
     setIsExporting(true);
     try {
-      // Ensure image is preloaded into base64
+      // Ensure image is preloaded into base64 and pre-cropped to prevent distortion
       let activeImg = base64Img;
       if (!activeImg && property.image) {
         activeImg = await urlToBase64(property.image);
         if (activeImg) setBase64Img(activeImg);
-        await new Promise(r => setTimeout(r, 150));
       }
+      if (selectedFormat === 'instagram' && !base64IgImg && property.image) {
+        const croppedIg = await getCoverCroppedImage(property.image, 1080, 1920);
+        if (croppedIg) setBase64IgImg(croppedIg);
+      }
+      if (selectedFormat === 'whatsapp' && !base64WaImg && property.image) {
+        const croppedWa = await getCoverCroppedImage(property.image, 1080, 1080);
+        if (croppedWa) setBase64WaImg(croppedWa);
+      }
+      await new Promise(r => setTimeout(r, 150));
       if (typeof document !== 'undefined' && document.fonts) {
         await document.fonts.ready;
       }
@@ -1201,15 +1308,15 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             boxSizing: 'border-box'
           }}
         >
-          {/* FOTO FULL BLEED */}
+          {/* FOTO FULL BLEED PROPORCIONAL (SIN ESTIRAMIENTO) */}
           <img
-            src={base64Img || property.image}
+            src={base64IgImg || base64Img || property.image}
             crossOrigin="anonymous"
             style={{
               position: 'absolute',
               inset: 0,
-              width: '100%',
-              height: '100%',
+              width: '1080px',
+              height: '1920px',
               objectFit: 'cover',
               objectPosition: 'center'
             }}
@@ -1249,24 +1356,24 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            {/* BADGE DEL LOGO CORPORATIVO RIV — Logo oficial nítido y de gran presencia */}
+            {/* BADGE DEL LOGO CORPORATIVO RIV — 84px de altura */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              height: '76px',
+              height: '84px',
               boxSizing: 'border-box',
               background: '#FFFFFF',
               border: '1.5px solid #D4AF37',
-              borderRadius: '24px',
-              padding: '0 28px',
+              borderRadius: '26px',
+              padding: '0 32px',
               boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
             }}>
               <img
                 src="/logo-riv.png"
                 alt="RIV Margarita Premier"
                 style={{
-                  height: '56px',
+                  height: '62px',
                   width: 'auto',
                   objectFit: 'contain',
                   display: 'block'
@@ -1275,14 +1382,14 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               />
             </div>
 
-            {/* BADGE DE PRECIO O ESTATUS — Texto ópticamente calibrado al centro vertical */}
+            {/* BADGE DE PRECIO O ESTATUS — Texto grande y centrado matemáticamente */}
             <div style={{
-              height: '76px',
+              height: '84px',
               boxSizing: 'border-box',
               background: '#800020',
               border: '1.5px solid rgba(255, 255, 255, 0.25)',
-              borderRadius: '24px',
-              padding: '0 36px',
+              borderRadius: '26px',
+              padding: '0 40px',
               boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
               display: 'flex',
               alignItems: 'center',
@@ -1292,12 +1399,15 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               <span style={{
                 color: '#FFFFFF',
                 fontWeight: 900,
-                fontSize: '34px',
-                letterSpacing: '1px',
+                fontSize: '44px',
+                letterSpacing: '0.5px',
                 textTransform: 'uppercase',
-                lineHeight: 'normal',
-                marginTop: '-5px',
-                display: 'block',
+                lineHeight: 1,
+                margin: 0,
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 textAlign: 'center'
               }}>
                 {property.status === 'Vendida'
@@ -1323,29 +1433,40 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             flexDirection: 'column',
             gap: '22px'
           }}>
-            {/* Header de la tarjeta: Tag y Ubicación */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            {/* Header de la tarjeta: Tag y Ubicación centrados */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '18px',
+              width: '100%',
+              textAlign: 'center'
+            }}>
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 textAlign: 'center',
-                height: '42px',
+                height: '46px',
                 boxSizing: 'border-box',
-                padding: '0 20px',
+                padding: '0 24px',
                 background: 'rgba(212, 175, 55, 0.18)',
                 color: '#D4AF37',
                 border: '1px solid #D4AF37',
-                borderRadius: '12px'
+                borderRadius: '14px'
               }}>
                 <span style={{
                   fontSize: '17px',
                   fontWeight: 800,
                   letterSpacing: '2px',
                   textTransform: 'uppercase',
-                  lineHeight: 'normal',
-                  marginTop: '-3px',
-                  display: 'block'
+                  lineHeight: 1,
+                  margin: 0,
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}>
                   ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'PROPIEDAD EXCLUSIVA'}
                 </span>
@@ -1356,20 +1477,23 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                 fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '8px',
+                lineHeight: 1
               }}>
                 📍 {property.location.toUpperCase()}
               </span>
             </div>
 
-            {/* Título de la propiedad */}
+            {/* Título de la propiedad centrado */}
             <h1 style={{
               color: '#FFFFFF',
-              fontSize: '44px',
+              fontSize: '48px',
               fontWeight: 900,
               margin: 0,
-              lineHeight: 1.15,
-              letterSpacing: '-0.5px'
+              lineHeight: 1.2,
+              letterSpacing: '-0.5px',
+              textAlign: 'center',
+              width: '100%'
             }}>
               {property.title}
             </h1>
@@ -1407,10 +1531,12 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         color: '#FFFFFF',
                         fontSize: '28px',
                         fontWeight: 900,
-                        lineHeight: 'normal',
+                        lineHeight: 1,
                         textAlign: 'center',
-                        display: 'block',
-                        marginTop: '-2px'
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '4px 0 0'
                       }}>
                         {s.v}
                       </span>
@@ -1422,7 +1548,8 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         letterSpacing: '1px',
                         textAlign: 'center',
                         display: 'block',
-                        marginTop: '4px'
+                        marginTop: '6px',
+                        lineHeight: 1
                       }}>
                         {s.label}
                       </span>
@@ -1441,33 +1568,52 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               paddingTop: '18px',
               marginTop: '2px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
-                  width: '42px',
-                  height: '42px',
+                  width: '48px',
+                  height: '48px',
                   borderRadius: '50%',
                   background: '#800020',
-                  border: '1px solid #D4AF37',
+                  border: '1.5px solid #D4AF37',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#FFFFFF',
-                  fontSize: '18px',
-                  fontWeight: 900
+                  fontSize: '20px',
+                  fontWeight: 900,
+                  flexShrink: 0
                 }}>
-                  <span style={{ marginTop: '-2px', display: 'block' }}>
+                  <span style={{ margin: 0, padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {property.captador ? property.captador.charAt(0).toUpperCase() : 'R'}
                   </span>
                 </div>
-                <div>
-                  <p style={{ color: 'rgba(255, 255, 255, 0.55)', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', margin: 0, letterSpacing: '1px' }}>ASESOR INMOBILIARIO</p>
-                  <p style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: 800, margin: '2px 0 0' }}>{property.captador || 'RIV Premier'}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <p style={{
+                    color: 'rgba(255, 255, 255, 0.6)',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    margin: 0,
+                    letterSpacing: '1px',
+                    lineHeight: 1.2
+                  }}>
+                    ASESOR INMOBILIARIO
+                  </p>
+                  <p style={{
+                    color: '#FFFFFF',
+                    fontSize: '19px',
+                    fontWeight: 800,
+                    margin: '3px 0 0',
+                    lineHeight: 1.2
+                  }}>
+                    {property.captador || 'RIV Premier'}
+                  </p>
                 </div>
               </div>
 
-              <div style={{ textAlign: 'right' }}>
-                <p style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 800, letterSpacing: '1.5px', margin: 0, textTransform: 'uppercase' }}>RIV MARGARITA PREMIER</p>
-                <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', margin: '2px 0 0', letterSpacing: '0.5px' }}>RIF J-11055496-2</p>
+              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <p style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 800, letterSpacing: '1.5px', margin: 0, textTransform: 'uppercase', lineHeight: 1.2 }}>RIV MARGARITA PREMIER</p>
+                <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', margin: '3px 0 0', letterSpacing: '0.5px', lineHeight: 1.2 }}>RIF J-11055496-2</p>
               </div>
             </div>
           </div>
@@ -1488,15 +1634,15 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             boxSizing: 'border-box'
           }}
         >
-          {/* FOTO FULL BLEED */}
+          {/* FOTO FULL BLEED PROPORCIONAL (SIN ESTIRAMIENTO) */}
           <img
-            src={base64Img || property.image}
+            src={base64IgImg || base64Img || property.image}
             crossOrigin="anonymous"
             style={{
               position: 'absolute',
               inset: 0,
-              width: '100%',
-              height: '100%',
+              width: '1080px',
+              height: '1920px',
               objectFit: 'cover',
               objectPosition: 'center'
             }}
@@ -1536,24 +1682,24 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            {/* BADGE DEL LOGO CORPORATIVO RIV - Variante Oro */}
+            {/* BADGE DEL LOGO CORPORATIVO RIV - Variante Oro 84px */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              height: '76px',
+              height: '84px',
               boxSizing: 'border-box',
               background: '#FFFFFF',
               border: '2px solid #D4AF37',
-              borderRadius: '24px',
-              padding: '0 28px',
+              borderRadius: '26px',
+              padding: '0 32px',
               boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
             }}>
               <img
                 src="/logo-riv.png"
                 alt="RIV Margarita Premier"
                 style={{
-                  height: '56px',
+                  height: '62px',
                   width: 'auto',
                   objectFit: 'contain',
                   display: 'block'
@@ -1562,14 +1708,14 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               />
             </div>
 
-            {/* BADGE DE PRECIO DORADO — Texto centrado verticalmente */}
+            {/* BADGE DE PRECIO DORADO — Texto grande y centrado matemáticamente */}
             <div style={{
-              height: '76px',
+              height: '84px',
               boxSizing: 'border-box',
               background: '#D4AF37',
               border: '1.5px solid #FFFFFF',
-              borderRadius: '24px',
-              padding: '0 36px',
+              borderRadius: '26px',
+              padding: '0 40px',
               boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
               display: 'flex',
               alignItems: 'center',
@@ -1579,12 +1725,15 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               <span style={{
                 color: '#000000',
                 fontWeight: 900,
-                fontSize: '34px',
-                letterSpacing: '1px',
+                fontSize: '44px',
+                letterSpacing: '0.5px',
                 textTransform: 'uppercase',
-                lineHeight: 'normal',
-                marginTop: '-5px',
-                display: 'block',
+                lineHeight: 1,
+                margin: 0,
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 textAlign: 'center'
               }}>
                 {property.status === 'Vendida'
@@ -1610,28 +1759,39 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             flexDirection: 'column',
             gap: '22px'
           }}>
-            {/* Header: Tag y Ubicación */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            {/* Header: Tag y Ubicación centrados */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '18px',
+              width: '100%',
+              textAlign: 'center'
+            }}>
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 textAlign: 'center',
-                height: '42px',
+                height: '46px',
                 boxSizing: 'border-box',
-                padding: '0 20px',
+                padding: '0 24px',
                 background: '#D4AF37',
                 color: '#000000',
-                borderRadius: '12px'
+                borderRadius: '14px'
               }}>
                 <span style={{
                   fontSize: '17px',
                   fontWeight: 900,
                   letterSpacing: '2px',
                   textTransform: 'uppercase',
-                  lineHeight: 'normal',
-                  marginTop: '-3px',
-                  display: 'block'
+                  lineHeight: 1,
+                  margin: 0,
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}>
                   ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'PROPIEDAD EXCLUSIVA'}
                 </span>
@@ -1642,20 +1802,23 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '8px',
+                lineHeight: 1
               }}>
                 📍 {property.location.toUpperCase()}
               </span>
             </div>
 
-            {/* Título de la propiedad */}
+            {/* Título de la propiedad centrado */}
             <h1 style={{
               color: '#FFFFFF',
-              fontSize: '44px',
+              fontSize: '48px',
               fontWeight: 900,
               margin: 0,
-              lineHeight: 1.15,
-              letterSpacing: '-0.5px'
+              lineHeight: 1.2,
+              letterSpacing: '-0.5px',
+              textAlign: 'center',
+              width: '100%'
             }}>
               {property.title}
             </h1>
@@ -1693,10 +1856,12 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         color: '#FFFFFF',
                         fontSize: '28px',
                         fontWeight: 900,
-                        lineHeight: 'normal',
+                        lineHeight: 1,
                         textAlign: 'center',
-                        display: 'block',
-                        marginTop: '-2px'
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '4px 0 0'
                       }}>
                         {s.v}
                       </span>
@@ -1708,7 +1873,8 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                         letterSpacing: '1px',
                         textAlign: 'center',
                         display: 'block',
-                        marginTop: '4px'
+                        marginTop: '6px',
+                        lineHeight: 1
                       }}>
                         {s.label}
                       </span>
@@ -1727,33 +1893,52 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
               paddingTop: '18px',
               marginTop: '2px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
-                  width: '42px',
-                  height: '42px',
+                  width: '48px',
+                  height: '48px',
                   borderRadius: '50%',
                   background: '#D4AF37',
-                  border: '1px solid #FFFFFF',
+                  border: '1.5px solid #FFFFFF',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#000000',
-                  fontSize: '18px',
-                  fontWeight: 900
+                  fontSize: '20px',
+                  fontWeight: 900,
+                  flexShrink: 0
                 }}>
-                  <span style={{ marginTop: '-2px', display: 'block' }}>
+                  <span style={{ margin: 0, padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {property.captador ? property.captador.charAt(0).toUpperCase() : 'R'}
                   </span>
                 </div>
-                <div>
-                  <p style={{ color: 'rgba(212, 175, 55, 0.7)', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', margin: 0, letterSpacing: '1px' }}>ASESOR INMOBILIARIO</p>
-                  <p style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: 800, margin: '2px 0 0' }}>{property.captador || 'RIV Premier'}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <p style={{
+                    color: 'rgba(212, 175, 55, 0.75)',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    margin: 0,
+                    letterSpacing: '1px',
+                    lineHeight: 1.2
+                  }}>
+                    ASESOR INMOBILIARIO
+                  </p>
+                  <p style={{
+                    color: '#FFFFFF',
+                    fontSize: '19px',
+                    fontWeight: 800,
+                    margin: '3px 0 0',
+                    lineHeight: 1.2
+                  }}>
+                    {property.captador || 'RIV Premier'}
+                  </p>
                 </div>
               </div>
 
-              <div style={{ textAlign: 'right' }}>
-                <p style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 800, letterSpacing: '1.5px', margin: 0, textTransform: 'uppercase' }}>RIV MARGARITA PREMIER</p>
-                <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', margin: '2px 0 0', letterSpacing: '0.5px' }}>RIF J-11055496-2</p>
+              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <p style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 800, letterSpacing: '1.5px', margin: 0, textTransform: 'uppercase', lineHeight: 1.2 }}>RIV MARGARITA PREMIER</p>
+                <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', margin: '3px 0 0', letterSpacing: '0.5px', lineHeight: 1.2 }}>RIF J-11055496-2</p>
               </div>
             </div>
           </div>
@@ -1774,15 +1959,15 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
             boxSizing: 'border-box'
           }}
         >
-          {/* FOTO FULL BLEED */}
+          {/* FOTO FULL BLEED PROPORCIONAL */}
           <img
-            src={base64Img || property.image}
+            src={base64WaImg || base64Img || property.image}
             crossOrigin="anonymous"
             style={{
               position: 'absolute',
               inset: 0,
-              width: '100%',
-              height: '100%',
+              width: '1080px',
+              height: '1080px',
               objectFit: 'cover',
               objectPosition: 'center'
             }}
@@ -1868,9 +2053,12 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                 fontSize: '26px',
                 letterSpacing: '0.5px',
                 textTransform: 'uppercase',
-                lineHeight: 'normal',
-                marginTop: '-4px',
-                display: 'block',
+                lineHeight: 1,
+                margin: 0,
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 textAlign: 'center'
               }}>
                 {property.status === 'Vendida'
@@ -1916,9 +2104,12 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                   fontWeight: 800,
                   letterSpacing: '1.5px',
                   textTransform: 'uppercase',
-                  lineHeight: 'normal',
-                  marginTop: '-2px',
-                  display: 'block'
+                  lineHeight: 1,
+                  margin: 0,
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}>
                   ★ {property.propertyType ? `${property.propertyType.toUpperCase()} EN VENTA` : 'EN VENTA'}
                 </span>
@@ -2038,7 +2229,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
           {/* FOTO SUPERIOR — 580px */}
           <div style={{ position: 'relative', height: '580px', flexShrink: 0, overflow: 'hidden' }}>
             <img
-              src={base64Img || property.image}
+              src={base64WaImg || base64Img || property.image}
               crossOrigin="anonymous"
               style={{
                 width: '100%',
@@ -2113,9 +2304,12 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
                   fontSize: '20px',
                   textTransform: 'uppercase',
                   letterSpacing: '1px',
-                  lineHeight: 'normal',
-                  marginTop: '-4px',
-                  display: 'block',
+                  lineHeight: 1,
+                  margin: 0,
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   textAlign: 'center'
                 }}>
                   {property.status === 'Vendida' ? 'VENDIDO' : 'EN VENTA'}
@@ -2307,7 +2501,7 @@ function TemplateThumbnail({ format, template, property }: { format: FormatType;
         </div>
         {/* Bottom card */}
         <div style={{ position: 'absolute', bottom: '8px', left: '7px', right: '7px', background: 'rgba(26,6,12,0.92)', borderRadius: '6px', padding: '6px', border: '0.5px solid #D4AF37' }}>
-          <p style={{ fontSize: '7px', fontWeight: 800, color: '#fff', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{property.title}</p>
+          <p style={{ fontSize: '7px', fontWeight: 800, color: '#fff', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{property.title}</p>
           <div style={{ display: 'flex', gap: '3px' }}>
             <div style={{ flex: 1, background: 'rgba(212,175,55,0.15)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
               <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.beds} Hab</span>
@@ -2337,7 +2531,7 @@ function TemplateThumbnail({ format, template, property }: { format: FormatType;
         </div>
         {/* Bottom card */}
         <div style={{ position: 'absolute', bottom: '8px', left: '7px', right: '7px', background: 'rgba(15,15,15,0.88)', borderRadius: '6px', padding: '6px', border: '0.5px solid rgba(255,255,255,0.2)' }}>
-          <p style={{ fontSize: '7px', fontWeight: 800, color: '#fff', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{property.title}</p>
+          <p style={{ fontSize: '7px', fontWeight: 800, color: '#fff', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{property.title}</p>
           <div style={{ display: 'flex', gap: '3px' }}>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: '0.5px solid #D4AF37', borderRadius: '3px', padding: '2px', textAlign: 'center' }}>
               <span style={{ fontSize: '6px', color: '#fff', fontWeight: 800 }}>{property.beds} Hab</span>
