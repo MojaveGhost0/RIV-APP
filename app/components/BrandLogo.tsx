@@ -58,13 +58,13 @@ export default function BrandLogo({
 
   return (
     <div
-      className={`inline-flex items-center justify-center relative select-none ${containerSizeClass} ${className}`}
+      className={`inline-flex items-center justify-center relative select-none shrink-0 ${containerSizeClass} ${className}`}
     >
       <img
         src={activeLogo}
         alt={alt}
         onError={() => setHasError(true)}
-        className={`w-full h-full object-contain max-h-full transition-opacity duration-300 drop-shadow-xs ${imgClassName}`}
+        className={`w-auto h-full object-contain max-h-full transition-opacity duration-300 drop-shadow-xs ${imgClassName}`}
         loading="eager"
       />
     </div>

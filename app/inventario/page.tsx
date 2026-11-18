@@ -22,13 +22,13 @@ import { formatPrice, fmt } from '../lib/currency';
 
 // Icono pequeño por tipo (para el badge de las tarjetas)
 const TYPE_BADGE: Partial<Record<PropertyType, { icon: React.ReactNode; label: string }>> = {
-  'Apartamento':     { icon: <Building2 size={10} />,  label: 'Apto' },
-  'Casa / Quinta':   { icon: <Home size={10} />,        label: 'Casa' },
-  'Townhouse':       { icon: <Layers size={10} />,      label: 'Townhouse' },
-  'Penthouse':       { icon: <Maximize2 size={10} />,   label: 'PH' },
-  'Local Comercial': { icon: <Store size={10} />,       label: 'Local' },
-  'Oficina':         { icon: <Briefcase size={10} />,   label: 'Oficina' },
-  'Terreno':         { icon: <TreePine size={10} />,    label: 'Terreno' },
+  'Apartamento': { icon: <Building2 size={10} />, label: 'Apto' },
+  'Casa / Quinta': { icon: <Home size={10} />, label: 'Casa' },
+  'Townhouse': { icon: <Layers size={10} />, label: 'Townhouse' },
+  'Penthouse': { icon: <Maximize2 size={10} />, label: 'PH' },
+  'Local Comercial': { icon: <Store size={10} />, label: 'Local' },
+  'Oficina': { icon: <Briefcase size={10} />, label: 'Oficina' },
+  'Terreno': { icon: <TreePine size={10} />, label: 'Terreno' },
 };
 
 const MUNICIPIOS_MARGARITA = [
@@ -428,26 +428,26 @@ export default function Inventario() {
   const { isAdmin } = useAuth();
   const { showToast } = useToast();
 
-  const [searchQuery, setSearchQuery]       = useState(searchParams.get('q') ?? '');
-  const [activeFilter, setActiveFilter]     = useState('Todas');
-  const [aiFilters, setAiFilters]           = useState<AIFilters | null>(null);
-  const [isAILoading, setIsAILoading]       = useState(false);
-  const [aiError, setAiError]               = useState(false);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') ?? '');
+  const [activeFilter, setActiveFilter] = useState('Todas');
+  const [aiFilters, setAiFilters] = useState<AIFilters | null>(null);
+  const [isAILoading, setIsAILoading] = useState(false);
+  const [aiError, setAiError] = useState(false);
   // Paso 5 — true solo cuando los resultados mostrados vienen realmente del motor IA
-  const [isAIResultSet, setIsAIResultSet]   = useState(false);
-  const [isExporting, setIsExporting]       = useState(false);
+  const [isAIResultSet, setIsAIResultSet] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Estados para modal de exportación personalizada
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportMode, setExportMode]               = useState<'custom' | 'view'>('custom');
-  const [exportType, setExportType]               = useState<string>('Todos');
-  const [exportMunicipio, setExportMunicipio]     = useState<string>('Todos');
+  const [exportMode, setExportMode] = useState<'custom' | 'view'>('custom');
+  const [exportType, setExportType] = useState<string>('Todos');
+  const [exportMunicipio, setExportMunicipio] = useState<string>('Todos');
   const [exportZoneKeyword, setExportZoneKeyword] = useState<string>('');
-  const [exportMinPrice, setExportMinPrice]       = useState<string>('');
-  const [exportMaxPrice, setExportMaxPrice]       = useState<string>('');
-  const [exportMinBeds, setExportMinBeds]         = useState<string>('Todos');
-  const [exportStatus, setExportStatus]           = useState<string>('Activa');
+  const [exportMinPrice, setExportMinPrice] = useState<string>('');
+  const [exportMaxPrice, setExportMaxPrice] = useState<string>('');
+  const [exportMinBeds, setExportMinBeds] = useState<string>('Todos');
+  const [exportStatus, setExportStatus] = useState<string>('Activa');
 
   const handleResetExportFilters = useCallback(() => {
     setExportType('Todos');
@@ -732,11 +732,10 @@ export default function Inventario() {
             value={searchQuery}
             onChange={e => handleSearchChange(e.target.value)}
             placeholder="Busca: '3 hab cerca del mar con piscina menos de 80k'..."
-            className={`w-full pl-10 pr-10 py-3 border rounded-2xl text-sm focus:outline-none transition-all ${
-              isAIActive
+            className={`w-full pl-10 pr-10 py-3 border rounded-2xl text-sm focus:outline-none transition-all ${isAIActive
                 ? 'border-vinotinto/50 bg-white/95 focus:ring-2 focus:ring-vinotinto/20 shadow-md shadow-vinotinto/10'
                 : 'border-gray-200/80 bg-white/80 focus:border-vinotinto focus:ring-2 focus:ring-vinotinto/15 shadow-xs'
-            }`}
+              }`}
           />
 
           {/* Icono derecho: spinner, X o Wand */}
@@ -806,11 +805,10 @@ export default function Inventario() {
             whileTap={{ scale: 0.95 }}
             key={f}
             onClick={() => setActiveFilter(f)}
-            className={`px-4 py-1.5 text-xs sm:text-sm font-bold rounded-full whitespace-nowrap border transition-all ${
-              activeFilter === f
+            className={`px-4 py-1.5 text-xs sm:text-sm font-bold rounded-full whitespace-nowrap border transition-all ${activeFilter === f
                 ? 'bg-gradient-to-r from-vinotinto to-vinotinto-light text-white border-vinotinto shadow-md shadow-vinotinto/20'
                 : 'bg-white/80 backdrop-blur-sm border-gray-200/80 text-gray-700 hover:border-dorado/40 shadow-xs'
-            }`}
+              }`}
           >
             {f}
           </motion.button>
@@ -818,7 +816,7 @@ export default function Inventario() {
       </div>
 
       {/* LISTADO */}
-      <motion.div 
+      <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
@@ -832,8 +830,8 @@ export default function Inventario() {
               {isAIActive
                 ? 'La búsqueda inteligente no encontró propiedades con esos criterios.'
                 : activeFilter !== 'Todas'
-                ? `No hay inmuebles con estado "${activeFilter}" que coincidan.`
-                : 'Intenta con otra búsqueda o ajusta los filtros.'}
+                  ? `No hay inmuebles con estado "${activeFilter}" que coincidan.`
+                  : 'Intenta con otra búsqueda o ajusta los filtros.'}
             </p>
             <div className="flex flex-col items-center gap-2 mt-4">
               {searchQuery && (
@@ -856,109 +854,108 @@ export default function Inventario() {
           </div>
         ) : (
           <AnimatePresence>
-          {filteredProperties.map((prop) => (
-            <motion.div
-              layout
-              variants={itemVariants}
-              initial="hidden"
-              animate="visible"
-              exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-              whileHover={{ y: -4 }}
-              whileTap={{ scale: 0.98 }}
-              key={prop.id}
-              onClick={() => router.push(`/inventario/${prop.id}`)}
-              className="bg-white/90 backdrop-blur-md rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 hover:border-dorado/40 hover:shadow-[0_12px_30px_rgba(128,0,32,0.08)] transition-all duration-300 group cursor-pointer"
-            >
-              {/* IMAGEN */}
-              <div className="relative w-full h-48 bg-gray-200 overflow-hidden">
-                <img
-                  src={prop.image}
-                  alt={prop.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                {/* BADGE ESTADO */}
-                <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-md shadow-xs border ${
-                  prop.status === 'Activa'
-                    ? 'bg-emerald-600/90 text-white border-emerald-400/30'
-                    : prop.status === 'Vendida'
-                    ? 'bg-gray-800/90 text-white border-gray-600/30'
-                    : 'bg-amber-500/90 text-white border-amber-300/30'
-                }`}>
-                  {prop.status}
-                </span>
-
-                {/* BADGE TIPO DE PROPIEDAD */}
-                {prop.propertyType && TYPE_BADGE[prop.propertyType] && (
-                  <span className="absolute bottom-3 left-3 flex items-center gap-1.5 px-2.5 py-1 bg-black/60 backdrop-blur-md text-white border border-white/20 rounded-xl text-[10px] font-bold shadow-xs">
-                    {TYPE_BADGE[prop.propertyType]!.icon}
-                    {TYPE_BADGE[prop.propertyType]!.label}
+            {filteredProperties.map((prop) => (
+              <motion.div
+                layout
+                variants={itemVariants}
+                initial="hidden"
+                animate="visible"
+                exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                whileHover={{ y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                key={prop.id}
+                onClick={() => router.push(`/inventario/${prop.id}`)}
+                className="bg-white/90 backdrop-blur-md rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 hover:border-dorado/40 hover:shadow-[0_12px_30px_rgba(128,0,32,0.08)] transition-all duration-300 group cursor-pointer"
+              >
+                {/* IMAGEN */}
+                <div className="relative w-full h-48 bg-gray-200 overflow-hidden">
+                  <img
+                    src={prop.image}
+                    alt={prop.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  {/* BADGE ESTADO */}
+                  <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-md shadow-xs border ${prop.status === 'Activa'
+                      ? 'bg-emerald-600/90 text-white border-emerald-400/30'
+                      : prop.status === 'Vendida'
+                        ? 'bg-gray-800/90 text-white border-gray-600/30'
+                        : 'bg-amber-500/90 text-white border-amber-300/30'
+                    }`}>
+                    {prop.status}
                   </span>
-                )}
 
-                {/* BADGE IA */}
-                {isAIActive && (
-                  <span className="absolute top-3 left-3 flex items-center gap-1 px-2.5 py-1 bg-vinotinto/90 backdrop-blur-md text-dorado-light border border-dorado/30 rounded-xl text-[10px] font-bold shadow-xs">
-                    <Wand2 size={10} /> IA
-                  </span>
-                )}
-              </div>
+                  {/* BADGE TIPO DE PROPIEDAD */}
+                  {prop.propertyType && TYPE_BADGE[prop.propertyType] && (
+                    <span className="absolute bottom-3 left-3 flex items-center gap-1.5 px-2.5 py-1 bg-black/60 backdrop-blur-md text-white border border-white/20 rounded-xl text-[10px] font-bold shadow-xs">
+                      {TYPE_BADGE[prop.propertyType]!.icon}
+                      {TYPE_BADGE[prop.propertyType]!.label}
+                    </span>
+                  )}
 
-              {/* INFO */}
-              <div className="p-4 sm:p-5">
-                {prop.codigo && (
-                  <div className="mb-1.5">
-                    <span className="inline-block px-2 py-0.5 text-[10px] font-bold tracking-wider text-vinotinto bg-vinotinto/10 border border-vinotinto/20 rounded-md">
-                      {prop.codigo}
+                  {/* BADGE IA */}
+                  {isAIActive && (
+                    <span className="absolute top-3 left-3 flex items-center gap-1 px-2.5 py-1 bg-vinotinto/90 backdrop-blur-md text-dorado-light border border-dorado/30 rounded-xl text-[10px] font-bold shadow-xs">
+                      <Wand2 size={10} /> IA
+                    </span>
+                  )}
+                </div>
+
+                {/* INFO */}
+                <div className="p-4 sm:p-5">
+                  <div className="flex justify-between items-start mb-1.5">
+                    <h3 className="font-bold text-base text-gray-900 leading-tight flex-1 pr-2 group-hover:text-vinotinto transition-colors">
+                      {prop.title}
+                    </h3>
+                    <span className="font-black text-lg text-vinotinto tracking-tight whitespace-nowrap">
+                      {formatPrice(prop.price)}
                     </span>
                   </div>
-                )}
-                <div className="flex justify-between items-start mb-1.5">
-                  <h3 className="font-bold text-base text-gray-900 leading-tight flex-1 pr-2 group-hover:text-vinotinto transition-colors">
-                    {prop.title}
-                  </h3>
-                  <span className="font-black text-lg text-vinotinto tracking-tight whitespace-nowrap">
-                    {formatPrice(prop.price)}
-                  </span>
-                </div>
 
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-3.5">
-                  <div className="flex items-center gap-1 flex-1 min-w-0">
-                    <MapPin size={13} className="text-vinotinto/70 shrink-0" />
-                    <span className="truncate">{prop.location}</span>
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-3.5">
+                    <div className="flex items-center gap-1 flex-1 min-w-0">
+                      <MapPin size={13} className="text-vinotinto/70 shrink-0" />
+                      <span className="truncate">{prop.location}</span>
+                    </div>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.location + ', Venezuela')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      title="Ver en Google Maps"
+                      className="ml-2 shrink-0 flex items-center gap-1 px-2 py-1 bg-blue-50/80 hover:bg-blue-100 text-blue-600 rounded-lg font-semibold transition-all active:scale-95 border border-blue-100"
+                    >
+                      <ExternalLink size={11} />
+                      <span className="text-[10px]">Maps</span>
+                    </a>
                   </div>
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prop.location + ', Venezuela')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={e => e.stopPropagation()}
-                    title="Ver en Google Maps"
-                    className="ml-2 shrink-0 flex items-center gap-1 px-2 py-1 bg-blue-50/80 hover:bg-blue-100 text-blue-600 rounded-lg font-semibold transition-all active:scale-95 border border-blue-100"
-                  >
-                    <ExternalLink size={11} />
-                    <span className="text-[10px]">Maps</span>
-                  </a>
-                </div>
 
-                <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                  <div className="flex gap-4 text-xs sm:text-sm text-gray-600 font-semibold">
-                    <div className="flex items-center gap-1.5">
-                      <Bed size={15} className="text-gray-400" />
-                      <span>{prop.beds}</span>
+                  <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+                    <div className="flex gap-4 text-xs sm:text-sm text-gray-600 font-semibold">
+                      <div className="flex items-center gap-1.5">
+                        <Bed size={15} className="text-gray-400" />
+                        <span>{prop.beds}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Bath size={15} className="text-gray-400" />
+                        <span>{prop.baths}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Maximize size={15} className="text-gray-400" />
+                        <span>{prop.sqm}m²</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Bath size={15} className="text-gray-400" />
-                      <span>{prop.baths}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Maximize size={15} className="text-gray-400" />
-                      <span>{prop.sqm}m²</span>
+                    <div className="flex items-center gap-2">
+                      {prop.codigo && (
+                        <span className="px-2 py-0.5 text-[10px] font-bold tracking-wider text-vinotinto bg-vinotinto/10 border border-vinotinto/20 rounded-md">
+                          {prop.codigo}
+                        </span>
+                      )}
+                      <ChevronRight size={18} className="text-gray-300 group-hover:text-vinotinto group-hover:translate-x-1 transition-all" />
                     </div>
                   </div>
-                  <ChevronRight size={18} className="text-gray-300 group-hover:text-vinotinto group-hover:translate-x-1 transition-all" />
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))}
           </AnimatePresence>
         )}
       </motion.div>
@@ -1010,11 +1007,10 @@ export default function Inventario() {
                   <button
                     type="button"
                     onClick={() => setExportMode('custom')}
-                    className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition ${
-                      exportMode === 'custom'
+                    className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition ${exportMode === 'custom'
                         ? 'bg-white text-vinotinto shadow-sm'
                         : 'text-white/80 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <SlidersHorizontal size={13} />
                     Filtros Específicos
@@ -1022,11 +1018,10 @@ export default function Inventario() {
                   <button
                     type="button"
                     onClick={() => setExportMode('view')}
-                    className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition ${
-                      exportMode === 'view'
+                    className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition ${exportMode === 'view'
                         ? 'bg-white text-vinotinto shadow-sm'
                         : 'text-white/80 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <Layers size={13} />
                     Vista Actual ({filteredProperties.length})

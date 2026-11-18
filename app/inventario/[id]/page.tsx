@@ -303,7 +303,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
         {/* Overlay gradiente */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
 
-        {/* Botón atrás y Logo corporativo con contenedor estilizado de lujo (frosted glass) */}
+        {/* Botón atrás y Logo corporativo ajustado al tamaño exacto del logo */}
         <div className="absolute top-4 left-4 flex items-center gap-2 z-10">
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -313,8 +313,8 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
           >
             <ArrowLeft size={20} />
           </motion.button>
-          <div className="bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/60 shadow-md flex items-center justify-center">
-            <BrandLogo size="xs" variant="auto" />
+          <div className="h-10 px-2.5 bg-white/95 backdrop-blur-md rounded-xl border border-white/80 shadow-md inline-flex items-center justify-center">
+            <BrandLogo size="custom" className="h-7 w-auto" variant="auto" />
           </div>
         </div>
 
@@ -399,24 +399,26 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
         className="px-4 sm:px-6 pt-5 pb-28 space-y-4 relative z-10"
       >
 
-        {/* Tarjeta de Título, Código y precio */}
+        {/* Tarjeta de Título, Estado, Precio y Código (Simetría en 4 esquinas) */}
         <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-gray-100 shadow-xs hover:border-dorado/30 transition-all">
-          <div className="flex justify-between items-start gap-2 mb-2">
-            <div className="flex-1">
-              {property.codigo && (
-                <span className="inline-block px-2.5 py-0.5 mb-1.5 text-[11px] font-bold tracking-wider text-vinotinto bg-vinotinto/10 border border-vinotinto/20 rounded-md">
-                  {property.codigo}
-                </span>
-              )}
-              <h1 className="text-2xl font-extrabold text-gray-900 leading-tight tracking-tight">{property.title}</h1>
-            </div>
-            <span className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 mt-1 border shadow-xs ${STATUS_STYLE[property.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+          <div className="flex justify-between items-start gap-3 mb-2.5">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 leading-tight tracking-tight flex-1">
+              {property.title}
+            </h1>
+            <span className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 border shadow-xs ${STATUS_STYLE[property.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
               {property.status}
             </span>
           </div>
-          <p className="text-3xl font-black text-vinotinto tracking-tight">
-            {formatPrice(property.price)} <span className="text-base font-bold text-gray-400">USD</span>
-          </p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-3xl font-black text-vinotinto tracking-tight leading-none">
+              {formatPrice(property.price)} <span className="text-base font-bold text-gray-400">USD</span>
+            </p>
+            {property.codigo && (
+              <span className="inline-flex items-center px-2.5 py-1 text-[11px] font-bold tracking-wider text-vinotinto bg-vinotinto/10 border border-vinotinto/20 rounded-lg shrink-0">
+                {property.codigo}
+              </span>
+            )}
+          </div>
         </motion.div>
 
         {/* Ubicación */}
