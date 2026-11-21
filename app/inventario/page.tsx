@@ -347,6 +347,10 @@ async function exportToPDF(properties: Property[], filterDescription?: string) {
       pdf.setFillColor(222, 247, 236);
       pdf.rect(badgeX, badgeY, badgeW, badgeH, 'F');
       pdf.setTextColor(3, 84, 63);
+    } else if (status === 'Reservada') {
+      pdf.setFillColor(219, 234, 254);
+      pdf.rect(badgeX, badgeY, badgeW, badgeH, 'F');
+      pdf.setTextColor(30, 64, 175);
     } else if (status === 'Vendida') {
       pdf.setFillColor(254, 240, 138);
       pdf.rect(badgeX, badgeY, badgeW, badgeH, 'F');
@@ -361,13 +365,17 @@ async function exportToPDF(properties: Property[], filterDescription?: string) {
     pdf.text(status, colX + columns[7].width / 2, currentY + 4.6, { align: 'center' });
     colX += columns[7].width;
 
-    // 9. Captador
+    // 9. Captador / Vendido o Reservado por
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(7.5);
+    pdf.setFontSize(7);
     pdf.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
-    const safeCaptador = (prop.captador || 'Sin asignar').length > 15
-      ? (prop.captador || '').slice(0, 13) + '...'
-      : prop.captador || 'Sin asignar';
+    const txNote =
+      status === 'Vendida' && prop.vendidoPor
+        ? `${prop.captador || '-'} (V: ${prop.vendidoPor.split(' ')[0]})`
+        : status === 'Reservada' && prop.reservadoPor
+        ? `${prop.captador || '-'} (R: ${prop.reservadoPor.split(' ')[0]})`
+        : prop.captador || 'Sin asignar';
+    const safeCaptador = txNote.length > 17 ? txNote.slice(0, 15) + '..' : txNote;
     pdf.text(safeCaptador, colX + 2, currentY + 4.8);
 
     currentY += rowHeight;
@@ -414,7 +422,7 @@ async function fetchAIFilters(query: string): Promise<AIFilters | null> {
   }
 }
 
-const STATUS_FILTERS = ['Todas', 'Activa', 'Vendida', 'Suspendida'];
+const STATUS_FILTERS = ['Todas', 'Activa', 'Reservada', 'Vendida', 'Suspendida'];
 
 // Cuántas palabras mínimas para activar IA (consultas cortas usan solo fuzzy)
 const AI_MIN_WORDS = 2;
@@ -877,9 +885,11 @@ export default function Inventario() {
                   {/* BADGE ESTADO */}
                   <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-md shadow-xs border ${prop.status === 'Activa'
                       ? 'bg-emerald-600/90 text-white border-emerald-400/30'
-                      : prop.status === 'Vendida'
-                        ? 'bg-gray-800/90 text-white border-gray-600/30'
-                        : 'bg-amber-500/90 text-white border-amber-300/30'
+                      : prop.status === 'Reservada'
+                        ? 'bg-blue-600/90 text-white border-blue-400/30'
+                        : prop.status === 'Vendida'
+                          ? 'bg-gray-800/90 text-white border-gray-600/30'
+                          : 'bg-amber-500/90 text-white border-amber-300/30'
                     }`}>
                     {prop.status}
                   </span>
@@ -953,6 +963,25 @@ export default function Inventario() {
                       <ChevronRight size={18} className="text-gray-300 group-hover:text-vinotinto group-hover:translate-x-1 transition-all" />
                     </div>
                   </div>
+
+                  {/* Trazabilidad visible en tarjeta cuando está Reservada o Vendida */}
+                  {(prop.status === 'Vendida' || prop.status === 'Reservada' || prop.vendidoPor || prop.reservadoPor) && (
+                    <div className="mt-2.5 pt-2 border-t border-dashed border-gray-100 flex flex-wrap items-center gap-2 text-[11px]">
+                      <span className="text-gray-500">
+                        Captó: <strong className="text-gray-700">{prop.captador}</strong>
+                      </span>
+                      {(prop.status === 'Reservada' || prop.reservadoPor) && (
+                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-bold">
+                          Reservó: {prop.reservadoPor || prop.captador}
+                        </span>
+                      )}
+                      {(prop.status === 'Vendida' || prop.vendidoPor) && (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-50 text-vinotinto border border-dorado/40 font-bold">
+                          Vendió: {prop.vendidoPor || prop.captador}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -1166,7 +1195,8 @@ export default function Inventario() {
                           className="w-full text-xs sm:text-sm font-medium border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto"
                         >
                           <option value="Activa">Solo Activas (Disponibles)</option>
-                          <option value="Todas">Todas (Activas, Vendidas, etc.)</option>
+                          <option value="Todas">Todas (Activas, Reservadas, Vendidas, etc.)</option>
+                          <option value="Reservada">Solo Reservadas</option>
                           <option value="Vendida">Solo Vendidas</option>
                           <option value="Suspendida">Solo Suspendidas</option>
                         </select>

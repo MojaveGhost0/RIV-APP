@@ -6,7 +6,7 @@ import {
   ArrowLeft, MapPin, Bed, Bath, Maximize, User, ChevronLeft, ChevronRight,
   Share2, Trash2, ShieldAlert, Download, CheckCircle, Phone, MessageCircle,
   CircleDollarSign, CreditCard, Edit3, X, Save, AlertTriangle, Camera,
-  UploadCloud, Loader2, Star, ImagePlus, ExternalLink, Map,
+  UploadCloud, Loader2, Star, ImagePlus, ExternalLink, Map, Award, BookmarkCheck,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useData } from '../../context/DataContext';
@@ -19,10 +19,11 @@ import { uploadToCloudinary } from '../../lib/cloudinary';
 import BrandLogo from '../../components/BrandLogo';
 import { formatPrice } from '../../lib/currency';
 
-const STATUS_OPTIONS = ['Activa', 'Suspendida', 'Vendida'];
+const STATUS_OPTIONS = ['Activa', 'Reservada', 'Suspendida', 'Vendida'];
 
 const STATUS_STYLE: Record<string, string> = {
   'Activa':     'bg-green-100 text-green-700 border-green-200',
+  'Reservada':  'bg-blue-100 text-blue-700 border-blue-200',
   'Vendida':    'bg-gray-100 text-gray-600 border-gray-200',
   'Suspendida': 'bg-amber-100 text-amber-700 border-amber-200',
 };
@@ -32,7 +33,8 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
   const router = useRouter();
   const { properties, deleteProperty, updatePropertyStatus, updateProperty, crmLogs, updateCrmLog } = useData();
   const { showToast, confirm } = useToast();
-  const { user, isAdmin, getAdvisorPhone } = useAuth();
+  const { user, isAdmin, getAdvisorPhone, getAllUsers } = useAuth();
+  const allUsers = getAllUsers();
 
   const property = properties.find(p => p.id === id);
   const captadorPhone = property?.captador ? getAdvisorPhone(property.captador) : undefined;
@@ -40,6 +42,8 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [imgError, setImgError] = useState<Record<number, boolean>>({});
   const [statusChanged, setStatusChanged] = useState(false);
+  const [selectedVendedor, setSelectedVendedor] = useState<string>('');
+  const [selectedReservador, setSelectedReservador] = useState<string>('');
 
   // Control de permisos: Admin puede editar todo; usuario normal solo si es el captador
   const myNombre = normalize(user?.nombre ?? '');
@@ -109,9 +113,36 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
   };
 
   const handleStatusChange = (newStatus: string) => {
-    updatePropertyStatus(property.id, newStatus);
+    const defaultAdvisor = user?.nombre || property.captador || allUsers[0]?.nombre || 'Asesor RIV';
+    const nextVendidoPor = newStatus === 'Vendida'
+      ? (selectedVendedor || property.vendidoPor || defaultAdvisor)
+      : property.vendidoPor;
+    const nextReservadoPor = newStatus === 'Reservada'
+      ? (selectedReservador || property.reservadoPor || defaultAdvisor)
+      : property.reservadoPor;
+
+    if (newStatus === 'Vendida' && !selectedVendedor) setSelectedVendedor(nextVendidoPor || defaultAdvisor);
+    if (newStatus === 'Reservada' && !selectedReservador) setSelectedReservador(nextReservadoPor || defaultAdvisor);
+
+    updatePropertyStatus(property.id, newStatus, {
+      vendidoPor: newStatus === 'Vendida' ? nextVendidoPor : newStatus === 'Activa' ? undefined : property.vendidoPor,
+      reservadoPor: newStatus === 'Reservada' ? nextReservadoPor : newStatus === 'Activa' ? undefined : property.reservadoPor,
+      fechaVenta: (newStatus === 'Vendida' || newStatus === 'Reservada') ? new Date().toISOString() : property.fechaVenta,
+    });
     setStatusChanged(true);
     setTimeout(() => setStatusChanged(false), 2000);
+  };
+
+  const handleAssignTxAdvisor = (role: 'vendidoPor' | 'reservadoPor', advisorName: string) => {
+    if (role === 'vendidoPor') {
+      setSelectedVendedor(advisorName);
+      updateProperty(property.id, { vendidoPor: advisorName, fechaVenta: property.fechaVenta || new Date().toISOString() });
+      showToast(`Venta asignada a ${advisorName}.`);
+    } else {
+      setSelectedReservador(advisorName);
+      updateProperty(property.id, { reservadoPor: advisorName, fechaVenta: property.fechaVenta || new Date().toISOString() });
+      showToast(`Reserva asignada a ${advisorName}.`);
+    }
   };
 
   const handleOpenEditModal = () => {
@@ -478,40 +509,75 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
           </motion.div>
         )}
 
-        {/* Captador */}
-        <motion.div variants={itemVariants} className="bg-vinotinto/5 border border-vinotinto/10 rounded-2xl p-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-vinotinto flex items-center justify-center shrink-0 shadow-sm">
-              <User size={20} className="text-white" />
+        {/* Captador + Trazabilidad de Quién Reservó / Quién Vendió */}
+        <motion.div variants={itemVariants} className="space-y-2.5">
+          <div className="bg-vinotinto/5 border border-vinotinto/10 rounded-2xl p-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-vinotinto flex items-center justify-center shrink-0 shadow-sm">
+                <User size={20} className="text-white" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Asesor Captador</p>
+                <p className="font-bold text-gray-800">{property.captador}</p>
+                {captadorPhone && (
+                  <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5 font-medium font-mono">
+                    <Phone size={11} className="text-vinotinto" /> {captadorPhone}
+                  </p>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-gray-500 font-medium">Asesor Captador</p>
-              <p className="font-bold text-gray-800">{property.captador}</p>
-              {captadorPhone && (
-                <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5 font-medium font-mono">
-                  <Phone size={11} className="text-vinotinto" /> {captadorPhone}
-                </p>
-              )}
-            </div>
+            {captadorPhone && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <a
+                  href={`https://wa.me/${captadorPhone.replace(/\D/g, '').startsWith('0') ? '58' + captadorPhone.replace(/\D/g, '').slice(1) : captadorPhone.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1 active:scale-95"
+                  title="Contactar asesor por WhatsApp"
+                >
+                  <MessageCircle size={13} /> WhatsApp
+                </a>
+                <a
+                  href={`tel:${captadorPhone}`}
+                  className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition active:scale-95"
+                  title="Llamar al asesor"
+                >
+                  <Phone size={14} />
+                </a>
+              </div>
+            )}
           </div>
-          {captadorPhone && (
-            <div className="flex items-center gap-1.5 shrink-0">
-              <a
-                href={`https://wa.me/${captadorPhone.replace(/\D/g, '').startsWith('0') ? '58' + captadorPhone.replace(/\D/g, '').slice(1) : captadorPhone.replace(/\D/g, '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-2.5 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1 active:scale-95"
-                title="Contactar asesor por WhatsApp"
-              >
-                <MessageCircle size={13} /> WhatsApp
-              </a>
-              <a
-                href={`tel:${captadorPhone}`}
-                className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition active:scale-95"
-                title="Llamar al asesor"
-              >
-                <Phone size={14} />
-              </a>
+
+          {/* Tarjeta de Trazabilidad: Quién Reservó y Quién Vendió */}
+          {(property.status === 'Reservada' || property.reservadoPor || property.status === 'Vendida' || property.vendidoPor) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {(property.status === 'Reservada' || property.reservadoPor) && (
+                <div className="bg-blue-50/90 border border-blue-200/80 rounded-2xl p-3.5 flex items-center gap-3 shadow-xs">
+                  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <BookmarkCheck size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Reservado por</p>
+                    <p className="text-sm font-extrabold text-gray-900 truncate">
+                      {property.reservadoPor || property.captador}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {(property.status === 'Vendida' || property.vendidoPor) && (
+                <div className="bg-gradient-to-r from-amber-50 via-yellow-50/90 to-amber-50 border border-dorado/40 rounded-2xl p-3.5 flex items-center gap-3 shadow-xs">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-vinotinto to-vinotinto-light text-dorado-light flex items-center justify-center shrink-0 shadow-xs">
+                    <Award size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-vinotinto">Vendido por</p>
+                    <p className="text-sm font-extrabold text-gray-900 truncate">
+                      {property.vendidoPor || property.captador}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </motion.div>
@@ -597,14 +663,15 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
             </div>
 
             {/* CAMBIAR ESTADO */}
-            <div>
-              <p className="text-xs font-semibold text-gray-600 mb-2">Cambiar Estado del Inmueble</p>
-              <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-2.5">
+              <p className="text-xs font-semibold text-gray-600">Cambiar Estado del Inmueble</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {STATUS_OPTIONS.map(s => (
                   <button
                     key={s}
+                    type="button"
                     onClick={() => handleStatusChange(s)}
-                    className={`py-2 rounded-xl text-xs font-bold border transition-all ${
+                    className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                       property.status === s
                         ? STATUS_STYLE[s] + ' shadow-sm'
                         : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
@@ -614,6 +681,47 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                   </button>
                 ))}
               </div>
+
+              {/* Selector de quién reservó cuando el estado es Reservada */}
+              {property.status === 'Reservada' && (
+                <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3 space-y-1.5">
+                  <label className="block text-[11px] font-bold text-blue-800">
+                    ¿Qué asesor realizó la reserva?
+                  </label>
+                  <select
+                    value={property.reservadoPor || selectedReservador || property.captador || ''}
+                    onChange={e => handleAssignTxAdvisor('reservadoPor', e.target.value)}
+                    className="w-full p-2 bg-white border border-blue-200 rounded-lg text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+                  >
+                    {allUsers.map(u => (
+                      <option key={u.id} value={u.nombre}>
+                        {u.nombre} ({u.rol})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Selector de quién vendió cuando el estado es Vendida */}
+              {property.status === 'Vendida' && (
+                <div className="bg-amber-50/80 border border-dorado/40 rounded-xl p-3 space-y-1.5">
+                  <label className="block text-[11px] font-bold text-vinotinto">
+                    ¿Qué asesor concretó la venta?
+                  </label>
+                  <select
+                    value={property.vendidoPor || selectedVendedor || property.captador || ''}
+                    onChange={e => handleAssignTxAdvisor('vendidoPor', e.target.value)}
+                    className="w-full p-2 bg-white border border-dorado/50 rounded-lg text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-vinotinto/30 cursor-pointer"
+                  >
+                    {allUsers.map(u => (
+                      <option key={u.id} value={u.nombre}>
+                        {u.nombre} ({u.rol})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {statusChanged && (
                 <div className="flex items-center gap-1.5 mt-2 text-green-600 text-xs font-semibold">
                   <CheckCircle size={13} /> Estado actualizado correctamente

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, CheckCircle, ArrowRight, Calendar, Home, Users, Settings, CalendarPlus, Clock, Sparkles } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Search, CheckCircle, ArrowRight, Calendar, Home, Users, Settings, CalendarPlus, Clock, Sparkles, Trophy, Award } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 
@@ -11,6 +11,7 @@ import { containerVariants, itemVariants } from './lib/motion';
 import { normalize } from './lib/searchEngine';
 import { getCitaTime, isCitaPasada, useNow } from './lib/citas';
 import BrandLogo from './components/BrandLogo';
+import { formatPrice } from './lib/currency';
 
 /** Convierte "2026-07-16" → "16 Jul 2026" en español */
 function formatFecha(iso: string): string {
@@ -36,6 +37,47 @@ export default function Dashboard() {
   }).length;
 
   const totalPropiedades = properties.length;
+
+  // Cálculo del Captador / Asesor que más ha vendido en el mes (con fallback inteligente a líder histórico de cartera)
+  const topSellerBanner = useMemo(() => {
+    const nowDate = new Date();
+    const curYear = nowDate.getFullYear();
+    const curMonth = nowDate.getMonth();
+    const monthLabel = nowDate.toLocaleDateString('es-VE', { month: 'long', year: 'numeric' });
+    const capMonthLabel = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
+
+    const soldProperties = properties.filter(p => p.status === 'Vendida');
+    const isThisMonth = (dateStr?: string) => {
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      return !isNaN(d.getTime()) && d.getFullYear() === curYear && d.getMonth() === curMonth;
+    };
+
+    const soldThisMonth = soldProperties.filter(p => isThisMonth(p.fechaVenta || p.createdAt || p.created_at));
+    const pool = soldThisMonth.length > 0 ? soldThisMonth : soldProperties;
+    const isMonthlyStrict = soldThisMonth.length > 0;
+
+    const tally: Record<string, { nombre: string; ventas: number; volumen: number; captadasVendidas: number }> = {};
+    pool.forEach(p => {
+      const seller = (p.vendidoPor || p.captador || 'Asesor RIV').trim();
+      const key = normalize(seller);
+      if (!tally[key]) {
+        tally[key] = { nombre: seller, ventas: 0, volumen: 0, captadasVendidas: 0 };
+      }
+      tally[key].ventas += 1;
+      tally[key].volumen += p.price || 0;
+      if (normalize(p.captador || '') === key) {
+        tally[key].captadasVendidas += 1;
+      }
+    });
+
+    const ranked = Object.values(tally).sort((a, b) => b.ventas - a.ventas || b.volumen - a.volumen);
+    return {
+      leader: ranked[0] || null,
+      monthName: capMonthLabel,
+      isMonthlyStrict,
+    };
+  }, [properties]);
 
   // LOG-03: Comparación con normalize() para proximaCita
   const now = useNow();
@@ -111,6 +153,42 @@ export default function Dashboard() {
           </motion.button>
         </div>
       </motion.form>
+
+      {/* BANNER VIP: CAPTADOR LÍDER EN VENTAS DEL MES */}
+      {topSellerBanner.leader && (
+        <motion.div variants={itemVariants} className="mb-7 z-10 relative">
+          <div className="bg-gradient-to-r from-[#4A0012] via-[#800020] to-[#590016] rounded-2xl p-4 sm:p-5 text-white shadow-xl shadow-vinotinto/20 border border-dorado/40 relative overflow-hidden">
+            <div className="absolute -top-12 -right-12 w-40 h-40 bg-dorado/20 rounded-full blur-2xl pointer-events-none" />
+            <div className="flex items-center justify-between gap-3 relative z-10 flex-wrap">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-dorado via-amber-300 to-dorado-dark text-gray-950 flex items-center justify-center shrink-0 shadow-lg shadow-dorado/30 border border-white/40">
+                  <Trophy size={24} className="text-gray-900" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-dorado text-gray-950 shadow-xs">
+                      <Award size={11} /> Captador Top Ventas · {topSellerBanner.monthName}
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black text-white tracking-tight truncate mt-1">
+                    {topSellerBanner.leader.nombre}
+                  </h3>
+                  <p className="text-xs text-white/80 font-medium">
+                    {topSellerBanner.leader.ventas} {topSellerBanner.leader.ventas === 1 ? 'inmueble vendido' : 'inmuebles vendidos'} · Volumen: <strong className="text-dorado-light">{formatPrice(topSellerBanner.leader.volumen, { suffix: ' USD' })}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push('/inventario')}
+                className="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-dorado/40 text-xs font-bold backdrop-blur-md transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                Ver ventas <ArrowRight size={13} className="text-dorado-light" />
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* RESUMEN DEL DÍA (KPIs) */}
       <motion.div variants={itemVariants} className="mb-2 z-10 relative">

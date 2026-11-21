@@ -166,25 +166,31 @@ function exportClientPDF(
 
       pdf.setFontSize(8.5);
       pdf.setTextColor(COLOR_GOLD[0], COLOR_GOLD[1], COLOR_GOLD[2]);
-      pdf.text('EXPEDIENTE INTEGRAL DE CLIENTE · CRM', marginX, 24);
+      pdf.text('EXPEDIENTE INTEGRAL DE CLIENTE · CRM', marginX, 23.5);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
+      pdf.text('RIF: J-11055496-2  |  Isla de Margarita, Venezuela', marginX, 27.5);
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
       const dateStr = `Fecha: ${new Date().toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' })}`;
       pdf.text(dateStr, pageWidth - marginX, 19, { align: 'right' });
-      pdf.text('Gestión Comercial Inmobiliaria', pageWidth - marginX, 24, { align: 'right' });
+      pdf.text('Gestión Comercial Inmobiliaria', pageWidth - marginX, 23.5, { align: 'right' });
+      pdf.text('RIF: J-11055496-2', pageWidth - marginX, 27.5, { align: 'right' });
 
       pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
       pdf.setLineWidth(0.3);
-      pdf.line(marginX, 28, marginX + contentWidth, 28);
+      pdf.line(marginX, 30.5, marginX + contentWidth, 30.5);
 
-      currentY = 32;
+      currentY = 34.5;
     } else {
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(9);
       pdf.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-      pdf.text(`RIV MARGARITA PREMIER · Expediente: ${client.name}`, marginX, 18);
+      pdf.text(`RIV MARGARITA PREMIER · RIF: J-11055496-2 · Expediente: ${client.name}`, marginX, 18);
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7.5);
@@ -385,7 +391,7 @@ function exportClientPDF(
     pdf.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
     pdf.setLineWidth(0.2);
     pdf.line(marginX, pageHeight - 10, marginX + contentWidth, pageHeight - 10);
-    pdf.text('RIV Margarita Premier · Documento confidencial de seguimiento comercial', marginX, pageHeight - 6);
+    pdf.text('RIV Margarita Premier · RIF: J-11055496-2 · Isla de Margarita · Documento confidencial de seguimiento comercial', marginX, pageHeight - 6);
     pdf.text(`Página ${i} de ${totalPages}`, pageWidth - marginX, pageHeight - 6, { align: 'right' });
   }
 

@@ -149,6 +149,12 @@ export interface Property {
   metodosPago?: string;
   /** URL personalizada de Google Maps para la ubicación exacta del inmueble */
   mapsUrl?: string;
+  /** Asesor que concretó la venta del inmueble (cuando status === 'Vendida') */
+  vendidoPor?: string;
+  /** Asesor que reservó el inmueble (cuando status === 'Reservada') */
+  reservadoPor?: string;
+  /** Fecha ISO de la venta o reserva para métricas mensuales */
+  fechaVenta?: string;
   /** ISO date string — se asigna automáticamente al registrar */
   createdAt?: string;
   created_at?: string;
@@ -185,7 +191,7 @@ interface DataContextType {
   addProperty: (property: Omit<Property, 'id' | 'createdAt' | 'created_at'>) => Promise<string>;
   updateProperty: (id: string, updates: Partial<Omit<Property, 'id' | 'createdAt' | 'created_at'>>) => Promise<void>;
   deleteProperty: (id: string) => Promise<void>;
-  updatePropertyStatus: (id: string, status: string) => Promise<void>;
+  updatePropertyStatus: (id: string, status: string, txMeta?: { vendidoPor?: string; reservadoPor?: string; fechaVenta?: string }) => Promise<void>;
   addAppointment: (appointment: Omit<Appointment, 'id' | 'estado'>) => Promise<void>;
   updateAppointment: (id: string, updates: Partial<Omit<Appointment, 'id'>>) => Promise<void>;
   deleteAppointment: (id: string) => Promise<void>;
@@ -318,6 +324,8 @@ const DEFAULT_PROPERTIES: Property[] = [
     images: ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80"],
     status: "Vendida",
     captador: "Juan Garcia",
+    vendidoPor: "Juan Garcia",
+    fechaVenta: new Date().toISOString(),
     amenities: ["Jacuzzi", "Terraza Privada", "Vista 360", "Ascensor Privado"],
     createdAt: "2026-05-10T08:00:00.000Z",
   },
@@ -351,6 +359,40 @@ const DEFAULT_CITAS: Appointment[] = [
 ];
 
 // =============================================================================
+// HELPER — Persistencia local complementaria de Quién Vendió y Quién Reservó
+// Garantiza que vendidoPor, reservadoPor y fechaVenta se mantengan aunque la
+// tabla de Supabase aún no tenga esas columnas migradas.
+// =============================================================================
+const TX_META_STORAGE_KEY = 'riv_property_tx_meta_v1';
+
+interface PropertyTxMeta {
+  vendidoPor?: string;
+  reservadoPor?: string;
+  fechaVenta?: string;
+}
+
+function loadTxMetaMap(): Record<string, PropertyTxMeta> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(TX_META_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveTxMetaForProperty(id: string, meta: PropertyTxMeta) {
+  if (typeof window === 'undefined') return;
+  try {
+    const map = loadTxMetaMap();
+    map[id] = { ...map[id], ...meta };
+    window.localStorage.setItem(TX_META_STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
+// =============================================================================
 // CONTEXT CREATION
 // =============================================================================
 const DataContext = createContext<DataContextType | null>(null);
@@ -364,6 +406,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Cargar datos de Supabase al montar — con distinción de error real vs lista vacía (LOG-05)
   useEffect(() => {
     const fetchData = async () => {
+      const txMetaMap = loadTxMetaMap();
       try {
         const [propsRes, appsRes, crmRes] = await Promise.all([
           supabase.from('properties').select('*').order('created_at', { ascending: false }),
@@ -377,17 +420,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
           console.warn('Error al cargar datos desde Supabase (LOG-05):', errMsg);
           setDataError(errMsg);
           // Modo fallback de demostración si hubo error
-          setProperties(DEFAULT_PROPERTIES);
+          setProperties(DEFAULT_PROPERTIES.map(p => ({ ...p, ...(txMetaMap[p.id] || {}) })));
           setAppointments(DEFAULT_CITAS);
           return;
         }
 
         setDataError(null);
-        const propsData = (propsRes.data as any[] | null)?.map(p => ({
-          ...p,
-          createdAt: p.createdAt || p.created_at,
-          created_at: p.created_at || p.createdAt,
-        })) as Property[] | null;
+        const propsData = (propsRes.data as any[] | null)?.map(p => {
+          const localTx = txMetaMap[p.id] || {};
+          return {
+            ...p,
+            createdAt: p.createdAt || p.created_at,
+            created_at: p.created_at || p.createdAt,
+            vendidoPor: p.vendidoPor || p.vendido_por || localTx.vendidoPor || (p.status === 'Vendida' ? p.captador : undefined),
+            reservadoPor: p.reservadoPor || p.reservado_por || localTx.reservadoPor || (p.status === 'Reservada' ? p.captador : undefined),
+            fechaVenta: p.fechaVenta || p.fecha_venta || localTx.fechaVenta,
+          };
+        }) as Property[] | null;
         setProperties(propsData ?? []);
 
         if (appsRes.data) setAppointments(appsRes.data as Appointment[]);
@@ -396,7 +445,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const errMsg = err?.message || 'Error de red o conexión a Supabase';
         console.error('Excepción al conectar con Supabase:', err);
         setDataError(errMsg);
-        setProperties(DEFAULT_PROPERTIES);
+        setProperties(DEFAULT_PROPERTIES.map(p => ({ ...p, ...(txMetaMap[p.id] || {}) })));
         setAppointments(DEFAULT_CITAS);
       }
     };
@@ -493,17 +542,64 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Update Property Status con Rollback (LOG-02)
-  const updatePropertyStatus = useCallback(async (id: string, status: string) => {
+  // Update Property Status con Rollback (LOG-02) y soporte de vendidoPor / reservadoPor
+  const updatePropertyStatus = useCallback(async (
+    id: string,
+    status: string,
+    txMeta?: { vendidoPor?: string; reservadoPor?: string; fechaVenta?: string }
+  ) => {
     let previousState: Property[] = [];
+    const nowIso = new Date().toISOString();
+
     setProperties(prev => {
       previousState = prev;
-      return prev.map(p => p.id === id ? { ...p, status } : p);
+      return prev.map(p => {
+        if (p.id !== id) return p;
+        const nextVendidoPor =
+          status === 'Vendida'
+            ? (txMeta?.vendidoPor ?? p.vendidoPor ?? p.captador)
+            : status === 'Activa'
+            ? undefined
+            : p.vendidoPor;
+        const nextReservadoPor =
+          status === 'Reservada'
+            ? (txMeta?.reservadoPor ?? p.reservadoPor ?? p.captador)
+            : status === 'Activa'
+            ? undefined
+            : p.reservadoPor;
+        const nextFechaVenta =
+          status === 'Vendida' || status === 'Reservada'
+            ? (txMeta?.fechaVenta ?? p.fechaVenta ?? nowIso)
+            : p.fechaVenta;
+
+        saveTxMetaForProperty(id, {
+          vendidoPor: nextVendidoPor,
+          reservadoPor: nextReservadoPor,
+          fechaVenta: nextFechaVenta,
+        });
+
+        return {
+          ...p,
+          status,
+          vendidoPor: nextVendidoPor,
+          reservadoPor: nextReservadoPor,
+          fechaVenta: nextFechaVenta,
+        };
+      });
     });
 
     try {
-      const { error } = await supabase.from('properties').update({ status }).eq('id', id);
-      if (error) throw error;
+      const payload: Record<string, any> = { status };
+      if (txMeta?.vendidoPor !== undefined) payload.vendidoPor = txMeta.vendidoPor;
+      if (txMeta?.reservadoPor !== undefined) payload.reservadoPor = txMeta.reservadoPor;
+      if (txMeta?.fechaVenta !== undefined) payload.fechaVenta = txMeta.fechaVenta;
+
+      const { error } = await supabase.from('properties').update(payload).eq('id', id);
+      if (error) {
+        // Fallback si las columnas vendidoPor / reservadoPor no existen aún en Supabase
+        const retry = await supabase.from('properties').update({ status }).eq('id', id);
+        if (retry.error) throw retry.error;
+      }
     } catch (err) {
       console.error('Error al actualizar status de propiedad. Revirtiendo estado local (LOG-02):', err);
       setProperties(previousState);
@@ -514,6 +610,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Update Property completo con Rollback
   const updateProperty = useCallback(async (id: string, updates: Partial<Omit<Property, 'id' | 'createdAt' | 'created_at'>>) => {
     let previousState: Property[] = [];
+    if (
+      updates.vendidoPor !== undefined ||
+      updates.reservadoPor !== undefined ||
+      updates.fechaVenta !== undefined
+    ) {
+      saveTxMetaForProperty(id, {
+        vendidoPor: updates.vendidoPor,
+        reservadoPor: updates.reservadoPor,
+        fechaVenta: updates.fechaVenta,
+      });
+    }
     setProperties(prev => {
       previousState = prev;
       return prev.map(p => p.id === id ? { ...p, ...updates } : p);
@@ -523,10 +630,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.from('properties').update(updates).eq('id', id);
       if (error) {
         // Fallback defensivo si alguna columna aún no existe en Supabase (ej. schema cache o 42703)
-        const { codigo: _, ...withoutCodigo } = updates as any;
-        const retry1 = await supabase.from('properties').update(withoutCodigo).eq('id', id);
+        const { codigo: _, vendidoPor: _v, reservadoPor: _r, fechaVenta: _f, ...withoutCustom } = updates as any;
+        const retry1 = await supabase.from('properties').update(withoutCustom).eq('id', id);
         if (retry1.error) {
-          const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, ...coreUpdates } = withoutCodigo;
+          const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, ...coreUpdates } = withoutCustom;
           const retry2 = await supabase.from('properties').update(coreUpdates).eq('id', id);
           if (retry2.error) throw retry2.error;
         }

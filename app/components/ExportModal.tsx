@@ -2724,8 +2724,8 @@ function RenderExportTemplate({
                 <span style={{ fontFamily: EXPORT_FONT, fontSize: '12px', color: '#111827', fontWeight: 800, lineHeight: 1.1 }}>
                   Ficha en Línea
                 </span>
-                <span style={{ fontFamily: EXPORT_FONT, fontSize: '10px', color: '#6B7280', fontWeight: 600, lineHeight: 1 }}>
-                  RIV Margarita Premier
+                <span style={{ fontFamily: EXPORT_FONT, fontSize: '10px', color: '#6B7280', fontWeight: 700, lineHeight: 1 }}>
+                  RIF: J-11055496-2
                 </span>
               </div>
               <img
@@ -2796,16 +2796,21 @@ function RenderExportTemplate({
             }}
           >
             <ExportLogoBadge logoSrc={logoSrc} height={60} imgHeight={44} paddingX={22} borderRadius={16} borderColor="#D4AF37" />
-            <ExportTypePill
-              label="PREMIUM COLLECTION"
-              height={36}
-              paddingX={18}
-              fontSize={11}
-              iconSize={13}
-              bg="#D4AF37"
-              color="#000000"
-              borderColor="#FFFFFF"
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+              <ExportTypePill
+                label="PREMIUM COLLECTION"
+                height={34}
+                paddingX={16}
+                fontSize={11}
+                iconSize={13}
+                bg="#D4AF37"
+                color="#000000"
+                borderColor="#FFFFFF"
+              />
+              <span style={{ fontFamily: EXPORT_FONT, fontSize: '10px', fontWeight: 800, color: '#D4AF37', letterSpacing: '1px', lineHeight: 1 }}>
+                RIF: J-11055496-2 · ISLA DE MARGARITA
+              </span>
+            </div>
           </div>
 
           {/* Título y Ubicación Centrados sobre el Hero */}

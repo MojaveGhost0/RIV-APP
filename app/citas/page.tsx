@@ -205,6 +205,12 @@ export default function GestorCitas() {
   };
 
   const handleComplete = async (id: string) => {
+    const targetCita = appointments.find(c => c.id === id);
+    const hoyStr = todayISO(now);
+    if (targetCita && targetCita.fecha !== hoyStr) {
+      showToast('Solo puedes marcar una cita como completada el mismo día programado de la cita.', 'error');
+      return;
+    }
     try {
       await updateAppointmentStatus(id, 'Completada');
       showToast('Cita marcada como completada.');
@@ -735,15 +741,28 @@ export default function GestorCitas() {
                   {/* Acciones */}
                   <div className="flex items-center gap-1.5 shrink-0">
                     {cita.estado === 'Pendiente' && (
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => handleComplete(cita.id)}
-                        className="flex items-center gap-1 text-xs text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-xl transition"
-                      >
-                        <CheckCheck size={12} />
-                        Completar
-                      </motion.button>
+                      cita.fecha === minFecha ? (
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleComplete(cita.id)}
+                          className="flex items-center gap-1 text-xs text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-xl transition cursor-pointer"
+                          title="Marcar cita de hoy como completada"
+                        >
+                          <CheckCheck size={12} />
+                          Completar
+                        </motion.button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleComplete(cita.id)}
+                          className="flex items-center gap-1 text-xs text-gray-400 font-semibold bg-gray-100/80 border border-gray-200 px-2.5 py-1 rounded-xl transition cursor-not-allowed"
+                          title="Solo se puede marcar como completada el mismo día de la cita"
+                        >
+                          <CheckCheck size={12} />
+                          Completar (Solo el día)
+                        </button>
+                      )
                     )}
                     {(isAdmin || cita.asesores.some(a => normalize(a) === myNombre)) && (
                       <>

@@ -14,7 +14,7 @@ import {
   BarChart2, Megaphone, Target, Star, Download,
   FileText, X, Check, Filter, Briefcase,
   Calendar, ChevronLeft, ChevronRight, RotateCcw,
-  Eye, Clock, ArrowRight, ExternalLink,
+  Eye, Clock, ArrowRight, ExternalLink, Trophy, Award, BookmarkCheck,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { Property } from '../context/DataContext';
@@ -211,12 +211,17 @@ function generateKPIsPDF({
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(14);
       pdf.setTextColor(...COLOR_PRIMARY);
-      pdf.text('RED INMOBILIARIA DE VENEZUELA', marginX, 20);
+      pdf.text('RIV MARGARITA PREMIER · RED INMOBILIARIA DE VENEZUELA', marginX, 19.5);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.setTextColor(...COLOR_GOLD);
+      pdf.text('SISTEMA INTEGRAL DE GESTIÓN · REPORTE EJECUTIVO DE KPIS Y MERCADO', marginX, 24);
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
-      pdf.setTextColor(...COLOR_MUTED);
-      pdf.text('SISTEMA INTEGRAL DE GESTIÓN · REPORTE EJECUTIVO DE KPIS Y MERCADO', marginX, 24.5);
+      pdf.setTextColor(...COLOR_DARK);
+      pdf.text('RIF: J-11055496-2  |  Isla de Margarita, Venezuela', marginX, 28);
 
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8);
@@ -230,17 +235,17 @@ function generateKPIsPDF({
         day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
       });
       pdf.text(`Generado: ${fechaStr}`, pageWidth - marginX, 23.5, { align: 'right' });
-      pdf.text('Nivel: Confidencial / Dirección', pageWidth - marginX, 27.5, { align: 'right' });
+      pdf.text('RIF: J-11055496-2 · Confidencial / Dirección', pageWidth - marginX, 27.5, { align: 'right' });
 
       pdf.setDrawColor(...COLOR_BORDER);
       pdf.setLineWidth(0.4);
-      pdf.line(marginX, 30, pageWidth - marginX, 30);
-      return 35;
+      pdf.line(marginX, 30.5, pageWidth - marginX, 30.5);
+      return 35.5;
     } else {
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8);
       pdf.setTextColor(...COLOR_PRIMARY);
-      pdf.text('RED INMOBILIARIA DE VENEZUELA  |  INFORME DE KPIS Y RENDIMIENTO', marginX, 17);
+      pdf.text('RIV MARGARITA PREMIER  |  RIF: J-11055496-2  |  INFORME DE KPIS Y RENDIMIENTO', marginX, 17);
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7.5);
@@ -284,11 +289,16 @@ function generateKPIsPDF({
     currentY += 10;
   };
 
-  // Desglose de asesores
+  // Desglose de asesores (contabiliza quién vendió o captó la propiedad vendida y quién reservó)
   const advisorStats = allUsers.map(u => {
     const userProps = properties.filter(p => normalize(p.captador) === normalize(u.nombre));
     const userPropsMes = userProps.filter(p => isCurrentMonth(p.createdAt || p.created_at));
-    const userVentas = properties.filter(p => p.status === 'Vendida' && normalize(p.captador) === normalize(u.nombre));
+    const userVentas = properties.filter(
+      p => p.status === 'Vendida' && normalize(p.vendidoPor || p.captador) === normalize(u.nombre)
+    );
+    const userReservas = properties.filter(
+      p => (p.status === 'Reservada' || Boolean(p.reservadoPor)) && normalize(p.reservadoPor || p.captador) === normalize(u.nombre)
+    );
     const userCitas = appointments.filter(a => a.asesores && a.asesores.some((ase: string) => normalize(ase) === normalize(u.nombre)));
     const userCitasMes = userCitas.filter(a => isCurrentMonth(a.fecha));
     const userCitasConcretadas = userCitasMes.filter(a => a.estado === 'Completada');
@@ -302,6 +312,8 @@ function generateKPIsPDF({
       captacionesMes: userPropsMes.length,
       captacionesTotal: userProps.length,
       ventas: userVentas.length,
+      reservas: userReservas.length,
+      volumenVentas: userVentas.reduce((s, p) => s + (p.price || 0), 0),
       citasTotal: userCitasMes.length,
       citasHistoricas: userCitas.length,
       citasConcretadas: userCitasConcretadas.length,
@@ -344,6 +356,30 @@ function generateKPIsPDF({
     );
 
     currentY += 16;
+
+    // Banner VIP en PDF: Captador Líder en Ventas del Mes
+    const topSellerForPdf = [...advisorStats].sort((a, b) => b.ventas - a.ventas || b.volumenVentas - a.volumenVentas)[0];
+    if (topSellerForPdf && topSellerForPdf.ventas > 0) {
+      pdf.setFillColor(254, 249, 231); // Fondo dorado suave
+      pdf.roundedRect(marginX, currentY, contentWidth, 11, 1.5, 1.5, 'F');
+      pdf.setFillColor(...COLOR_GOLD);
+      pdf.rect(marginX, currentY, 3, 11, 'F');
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.setTextColor(...COLOR_PRIMARY);
+      pdf.text(`CAPTADOR LÍDER EN VENTAS DEL PERÍODO: ${topSellerForPdf.nombre.toUpperCase()}`, marginX + 6, currentY + 4.8);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(...COLOR_DARK);
+      pdf.text(
+        `Ventas concretadas: ${topSellerForPdf.ventas} inmueble(s)  |  Volumen vendido: $${fmt(topSellerForPdf.volumenVentas)} USD  |  Reservas activas: ${topSellerForPdf.reservas}`,
+        marginX + 6,
+        currentY + 8.8
+      );
+      currentY += 14;
+    }
 
     // Matriz de Indicadores Clave (Grid 3x2)
     drawSectionTitle('Métricas Clave del Mes', 'Indicadores de Cartera y Desempeño');
@@ -1056,7 +1092,7 @@ function generateKPIsPDF({
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7.5);
     pdf.setTextColor(156, 163, 175);
-    pdf.text('Red Inmobiliaria de Venezuela · Documento de Control Interno y Gestión Estratégica', marginX, pageHeight - 7.5);
+    pdf.text('RIV Margarita Premier · RIF: J-11055496-2 · Isla de Margarita · Documento de Control Interno y Gestión Estratégica', marginX, pageHeight - 7.5);
     pdf.text(`Página ${i} de ${totalPages}`, pageWidth - marginX, pageHeight - 7.5, { align: 'right' });
   }
 
@@ -1194,12 +1230,41 @@ export default function Estadisticas() {
 
   // 1. Estado del inventario según el alcance
   const activos     = propiedadesBase.filter(p => p.status === 'Activa').length;
+  const reservados  = propiedadesBase.filter(p => p.status === 'Reservada').length;
   const vendidos    = propiedadesBase.filter(p => p.status === 'Vendida').length;
   const suspendidos = propiedadesBase.filter(p => p.status === 'Suspendida').length;
   const totalInmuebles = propiedadesBase.length;
 
+  // Cálculo del Captador / Asesor Líder en Ventas del Mes (o período seleccionado)
+  const topSellerStats = (() => {
+    const soldInPeriod = properties.filter(
+      p => p.status === 'Vendida' && isSelectedPeriod(p.fechaVenta || p.createdAt || p.created_at)
+    );
+    const allSold = properties.filter(p => p.status === 'Vendida');
+    const pool = soldInPeriod.length > 0 ? soldInPeriod : allSold;
+    const isStrictPeriod = soldInPeriod.length > 0;
+
+    const tally: Record<string, { nombre: string; ventas: number; volumen: number }> = {};
+    pool.forEach(p => {
+      const seller = (p.vendidoPor || p.captador || 'Asesor RIV').trim();
+      const key = normalize(seller);
+      if (!tally[key]) {
+        tally[key] = { nombre: seller, ventas: 0, volumen: 0 };
+      }
+      tally[key].ventas += 1;
+      tally[key].volumen += p.price || 0;
+    });
+
+    const ranked = Object.values(tally).sort((a, b) => b.ventas - a.ventas || b.volumen - a.volumen);
+    return {
+      leader: ranked[0] || null,
+      isStrictPeriod,
+    };
+  })();
+
   const STATUS_DATA = [
     { name: 'Activos',     value: activos,      color: '#800020' },
+    ...(reservados > 0 ? [{ name: 'Reservados', value: reservados, color: '#2563EB' }] : []),
     { name: 'Vendidos',    value: vendidos,     color: '#D4AF37' },
     { name: 'Suspendidos', value: suspendidos,  color: '#9CA3AF' },
   ];
@@ -1235,7 +1300,7 @@ export default function Estadisticas() {
     : 0;
   
   const ventasAsesor = asesorSeleccionado
-    ? propiedadesBase.filter(p => p.status === 'Vendida' && normalize(p.captador) === normalize(asesorSeleccionado.nombre)).length
+    ? propiedadesBase.filter(p => p.status === 'Vendida' && normalize(p.vendidoPor || p.captador) === normalize(asesorSeleccionado.nombre)).length
     : 0;
 
   const captacionesAsesor = asesorSeleccionado
@@ -1589,6 +1654,35 @@ export default function Estadisticas() {
             >
               Solo {mesCapitalizado}
             </button>
+          </div>
+        )}
+
+        {/* ── BANNER VIP: CAPTADOR QUE MÁS HA VENDIDO EN EL MES ───────────── */}
+        {topSellerStats.leader && (
+          <div className="bg-gradient-to-r from-[#4A0012] via-[#800020] to-[#590016] rounded-2xl p-4 sm:p-5 text-white shadow-xl shadow-vinotinto/20 border border-dorado/40 relative overflow-hidden">
+            <div className="absolute -top-12 -right-12 w-40 h-40 bg-dorado/20 rounded-full blur-2xl pointer-events-none" />
+            <div className="flex items-center justify-between gap-3 relative z-10 flex-wrap">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-dorado via-amber-300 to-dorado-dark text-gray-950 flex items-center justify-center shrink-0 shadow-lg shadow-dorado/30 border border-white/40">
+                  <Trophy size={24} className="text-gray-900" />
+                </div>
+                <div className="min-w-0">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-dorado text-gray-950 shadow-xs">
+                    <Award size={11} /> Captador Líder en Ventas · {mesCapitalizado}
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-black text-white tracking-tight truncate mt-1">
+                    {topSellerStats.leader.nombre}
+                  </h3>
+                  <p className="text-xs text-white/85 font-medium">
+                    {topSellerStats.leader.ventas} {topSellerStats.leader.ventas === 1 ? 'propiedad vendida' : 'propiedades vendidas'} · Volumen cerrado: <strong className="text-dorado-light">${fmt(topSellerStats.leader.volumen)} USD</strong>
+                  </p>
+                </div>
+              </div>
+              <div className="bg-black/25 border border-dorado/30 rounded-xl px-3.5 py-2 text-right shrink-0">
+                <p className="text-[10px] uppercase tracking-wider text-dorado-light font-bold">Top Ventas</p>
+                <p className="text-xl font-black text-white leading-tight">{topSellerStats.leader.ventas}</p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1980,13 +2074,25 @@ export default function Estadisticas() {
                         <MapPin size={11} className="text-vinotinto/60 shrink-0" />
                         {p.location}
                       </p>
-                      <div className="flex items-center justify-between mt-1 text-[11px]">
+                      <div className="flex flex-wrap items-center justify-between gap-1 mt-1 text-[11px]">
                         <span className="font-extrabold text-vinotinto">
                           ${fmt(p.price)} USD
                         </span>
-                        <span className="text-[10px] text-gray-400">
-                          Captador: <strong className="text-gray-600">{p.captador || 'Sin captador'}</strong>
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-400">
+                          <span>
+                            Captó: <strong className="text-gray-600">{p.captador || 'Sin captador'}</strong>
+                          </span>
+                          {(p.status === 'Reservada' || p.reservadoPor) && (
+                            <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-200">
+                              Reservó: {p.reservadoPor || p.captador}
+                            </span>
+                          )}
+                          {(p.status === 'Vendida' || p.vendidoPor) && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-50 text-vinotinto font-bold border border-dorado/40">
+                              Vendió: {p.vendidoPor || p.captador}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="hidden sm:flex items-center text-gray-300 group-hover:text-vinotinto transition shrink-0 pl-1">
