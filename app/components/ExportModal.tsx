@@ -8,8 +8,6 @@ import {
   Loader2, Copy, Share2, ExternalLink, Eye
 } from 'lucide-react';
 import { toCanvas } from 'html-to-image';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Property } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -660,6 +658,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
         });
       } catch (err) {
         console.warn('html-to-image fallback a html2canvas:', err);
+        const { default: html2canvas } = await import('html2canvas');
         uiCanvas = await html2canvas(rootEl, {
           scale: SCALE,
           useCORS: true,
@@ -748,6 +747,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
         const imgData = canvas.toDataURL('image/jpeg', 0.96);
         setGeneratedPreviewUrl(imgData);
         // Clean standard A4 portrait (210mm x 297mm — exact 794x1123 aspect ratio 1:1.4143)
+        const { default: jsPDF } = await import('jspdf');
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
         const filename = `${property.title.replace(/\s+/g, '_')}_Ficha_RIV.pdf`;
@@ -1710,8 +1710,9 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
 
       {/*
         ─── LIENZOS DE EXPORTACIÓN NATIVOS (PARA HTML-TO-IMAGE) ────────────────
-        Renderizados con la misma arquitectura compartida que la vista previa en vivo.
+        Renderizados únicamente cuando el modal está abierto (isOpen) para cero consumo de DOM en reposo.
       */}
+      {isOpen && (
       <div
         aria-hidden="true"
         style={{
@@ -1808,6 +1809,7 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
           />
         </div>
       </div>
+      )}
     </>
   );
 }

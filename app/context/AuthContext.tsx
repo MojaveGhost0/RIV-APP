@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { normalize } from '../lib/searchEngine';
 import { setCustomBrandLogo, getActiveBrandLogo } from '../lib/brandConfig';
@@ -377,9 +377,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     safeRemoveStorage(SESSION_KEY);
   };
 
-  const getAllUsers = (): AuthUser[] => {
+  const getAllUsers = useCallback((): AuthUser[] => {
     return allUsers;
-  };
+  }, [allUsers]);
 
   const updateUserPhone = async (phone: string): Promise<void> => {
     if (!user) return;
@@ -417,7 +417,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAllUsers(prev => prev.map(u => ({ ...u, agencyLogo: cleanLogo || undefined })));
   };
 
-  const getAdvisorPhone = (name: string): string | undefined => {
+  const getAdvisorPhone = useCallback((name: string): string | undefined => {
     if (!name) return undefined;
     const norm = normalize(name);
     const found = allUsers.find(u => normalize(u.nombre) === norm || normalize(u.username) === norm);
@@ -427,7 +427,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return safeGetStorage(`riv_user_phone_${defaultUser.id}`) || defaultUser.telefono || DEFAULT_PHONES[defaultUser.id];
     }
     return undefined;
-  };
+  }, [allUsers]);
 
   const addUser = async (userData: Omit<AuthUser, 'id'> & { password?: string }) => {
     try {
@@ -522,22 +522,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const authValue = useMemo(() => ({
+    user,
+    isAdmin: user?.rol === 'ADMIN',
+    isAsesor: user?.rol === 'ASESOR',
+    isLoading,
+    login,
+    logout,
+    getAllUsers,
+    updateUserPhone,
+    updateAgencyLogo,
+    getAdvisorPhone,
+    addUser,
+    updateUser,
+    deleteUser,
+  }), [user, isLoading, allUsers, getAllUsers, getAdvisorPhone]);
+
   return (
-    <AuthContext.Provider value={{
-      user,
-      isAdmin: user?.rol === 'ADMIN',
-      isAsesor: user?.rol === 'ASESOR',
-      isLoading,
-      login,
-      logout,
-      getAllUsers,
-      updateUserPhone,
-      updateAgencyLogo,
-      getAdvisorPhone,
-      addUser,
-      updateUser,
-      deleteUser,
-    }}>
+    <AuthContext.Provider value={authValue}>
       {children}
     </AuthContext.Provider>
   );

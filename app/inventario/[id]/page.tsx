@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import {
   ArrowLeft, MapPin, Bed, Bath, Maximize, User, ChevronLeft, ChevronRight,
   Share2, Trash2, ShieldAlert, Download, CheckCircle, Phone, MessageCircle,
@@ -11,8 +12,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useData } from '../../context/DataContext';
 import { useToast } from '../../context/ToastContext';
-import ExportModal from '../../components/ExportModal';
 import { useAuth } from '../../context/AuthContext';
+
+const ExportModal = dynamic(() => import('../../components/ExportModal'), { ssr: false });
 import { containerVariants, itemVariants } from '../../lib/motion';
 import { normalize } from '../../lib/searchEngine';
 import { uploadToCloudinary } from '../../lib/cloudinary';
@@ -1068,11 +1070,13 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
         )}
       </AnimatePresence>
 
-      <ExportModal
-        property={property}
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
-      />
+      {isExportModalOpen && (
+        <ExportModal
+          property={property}
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

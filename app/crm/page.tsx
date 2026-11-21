@@ -11,7 +11,6 @@ import {
   ExternalLink, CircleDollarSign, CreditCard, MapPin, Edit2, Trash2, Loader2, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import jsPDF from 'jspdf';
 import { normalize } from '../lib/searchEngine';
 import Combobox, { type ComboboxOption } from '../components/Combobox';
 import BrandLogo from '../components/BrandLogo';
@@ -29,7 +28,7 @@ function sanitizeText(str: string): string {
 function extractPhone(text: string): string | null {
   if (!text) return null;
   const match = text.match(/(?:Teléfono(?:\s*Propietario)?:\s*)([+0-9\s\-]{7,20})/i) ||
-                text.match(/(\+?58\s*4\d{2}[\s\-]?\d{7}|04\d{2}[\s\-]?\d{7})/);
+    text.match(/(\+?58\s*4\d{2}[\s\-]?\d{7}|04\d{2}[\s\-]?\d{7})/);
   if (!match) return null;
   const raw = match[1].replace(/[^\d+]/g, '');
   return raw.length >= 7 ? raw : null;
@@ -127,12 +126,13 @@ function getClientProperties(clientName: string, clientHistory: any[], allProper
   return result;
 }
 
-// Genera el expediente completo de un cliente específico en PDF
-function exportClientPDF(
+// Genera el expediente completo de un cliente específico en PDF (carga jsPDF bajo demanda)
+async function exportClientPDF(
   client: { name: string; history: any[]; lastInteraction: string },
   clientProps: OwnerPropertyItem[],
   clientPhone: string | null
 ) {
+  const { default: jsPDF } = await import('jspdf');
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -412,7 +412,7 @@ export default function CRMPage() {
     tipo_interaccion: 'Llamada',
     notas: ''
   });
-  
+
   // Estado para exportación individual a PDF
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [selectedClientForExport, setSelectedClientForExport] = useState<string>('');
@@ -443,7 +443,7 @@ export default function CRMPage() {
         if (!clientName) return;
 
         if (!clientsMap.has(clientName)) clientsMap.set(clientName, []);
-        
+
         // LOG-07: Asegurar timezone explícita (-04:00 Margarita / Venezuela) para consistencia entre navegadores
         const horaIso = app.hora.length === 5 ? `${app.hora}:00` : app.hora;
         const fechaIso = new Date(`${app.fecha}T${horaIso}-04:00`).toISOString();
@@ -503,7 +503,7 @@ export default function CRMPage() {
     e.preventDefault();
     // ROB-01: Validar tanto cliente como notas en la lógica JS antes de enviar
     if (!formData.cliente.trim() || !formData.notas.trim()) return;
-    
+
     try {
       await addCrmLog({
         cliente: formData.cliente.trim(),
@@ -700,7 +700,7 @@ export default function CRMPage() {
                           className="border-t border-gray-100 bg-gray-50/50"
                         >
                           <div className="p-4 space-y-4">
-                            
+
                             {/* 1. DATOS DEL CLIENTE / PROPIETARIO */}
                             <div className="bg-white rounded-xl border border-gray-200/80 p-3.5 shadow-sm space-y-2.5">
                               <div className="flex items-center justify-between">
@@ -818,11 +818,10 @@ export default function CRMPage() {
                                           </span>
                                         )}
                                         {prop.status && (
-                                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-0.5 border ${
-                                            prop.status === 'Activa' ? 'bg-green-50 text-green-700 border-green-200'
-                                            : prop.status === 'Vendida' ? 'bg-gray-100 text-gray-600 border-gray-200'
-                                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                                          }`}>
+                                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-0.5 border ${prop.status === 'Activa' ? 'bg-green-50 text-green-700 border-green-200'
+                                              : prop.status === 'Vendida' ? 'bg-gray-100 text-gray-600 border-gray-200'
+                                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                                            }`}>
                                             {prop.status}
                                           </span>
                                         )}
@@ -872,11 +871,10 @@ export default function CRMPage() {
                                     <div className={`absolute w-2.5 h-2.5 rounded-full -left-[5px] top-1 border-2 border-white ${isCaptacion ? 'bg-emerald-600' : 'bg-vinotinto'}`} />
                                     <div className="flex justify-between items-start mb-1 gap-2">
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className={`text-xs font-bold px-2 py-0.5 rounded shadow-sm border inline-flex items-center gap-1 ${
-                                          isCaptacion
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded shadow-sm border inline-flex items-center gap-1 ${isCaptacion
                                             ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                             : 'bg-white text-gray-800 border-gray-100'
-                                        }`}>
+                                          }`}>
                                           {isCaptacion && <Home size={12} className="text-emerald-700" />}
                                           {hist.tipo}
                                         </span>
@@ -919,7 +917,7 @@ export default function CRMPage() {
                                         )}
                                       </div>
                                     </div>
-                                    
+
                                     {cleanedNotes && (
                                       <div className="mt-2 bg-white p-2.5 rounded-xl border border-gray-100">
                                         <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-line break-words">
@@ -948,8 +946,8 @@ export default function CRMPage() {
                   </div>
                 );
               })}
-          </div>
-        )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -969,297 +967,297 @@ export default function CRMPage() {
 
       {/* MODAL */}
       <AnimatePresence>
-      {isModalOpen && (
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-        >
-          <motion.div 
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="modal-container bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl overflow-y-auto"
+        {isModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm"
           >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-800">Nuevo Registro CRM</h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition">
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="modal-form-content space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Cliente</label>
-                <input type="text" name="cliente" value={formData.cliente} onChange={e => setFormData({...formData, cliente: e.target.value})} required
-                  placeholder="Ej: María López"
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none" />
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="modal-container bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-800">Nuevo Registro CRM</h2>
+                <button onClick={() => setIsModalOpen(false)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition">
+                  <X size={20} />
+                </button>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Interacción</label>
-                <select name="tipo_interaccion" value={formData.tipo_interaccion} onChange={e => setFormData({...formData, tipo_interaccion: e.target.value})}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none font-medium text-gray-800">
-                  <option value="Llamada">📞 Llamada</option>
-                  <option value="Captación de Inmueble">🏠 Captación de Inmueble</option>
-                  <option value="Mensaje (WhatsApp)">💬 Mensaje (WhatsApp)</option>
-                  <option value="Reunión Presencial">🤝 Reunión Presencial</option>
-                  <option value="Visita a Inmueble">🏠 Visita a Inmueble</option>
-                  <option value="Oferta Recibida">📝 Oferta Recibida</option>
-                  <option value="Cierre / Venta">✅ Cierre / Venta</option>
-                  <option value="Otro">📌 Otro</option>
-                </select>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700">Notas / Detalles</label>
-                  <span className={`text-[11px] ${formData.notas.length > 900 ? 'text-amber-600 font-bold' : 'text-gray-400'}`}>
-                    {formData.notas.length} / 1000
-                  </span>
+              <form onSubmit={handleSubmit} className="modal-form-content space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Cliente</label>
+                  <input type="text" name="cliente" value={formData.cliente} onChange={e => setFormData({ ...formData, cliente: e.target.value })} required
+                    placeholder="Ej: María López"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none" />
                 </div>
-                <textarea
-                  name="notas"
-                  value={formData.notas}
-                  onChange={e => setFormData({...formData, notas: e.target.value.slice(0, 1000)})}
-                  required
-                  maxLength={1000}
-                  placeholder="Detalles de la conversación o avances (máx. 1000 caracteres)..."
-                  rows={4}
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none resize-none"
-                />
-              </div>
 
-              <motion.button 
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                type="submit"
-                className="w-full py-4 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all"
-              >
-                Guardar Registro
-              </motion.button>
-            </form>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Interacción</label>
+                  <select name="tipo_interaccion" value={formData.tipo_interaccion} onChange={e => setFormData({ ...formData, tipo_interaccion: e.target.value })}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none font-medium text-gray-800">
+                    <option value="Llamada">📞 Llamada</option>
+                    <option value="Captación de Inmueble">🏠 Captación de Inmueble</option>
+                    <option value="Mensaje (WhatsApp)">💬 Mensaje (WhatsApp)</option>
+                    <option value="Reunión Presencial">🤝 Reunión Presencial</option>
+                    <option value="Visita a Inmueble">🏠 Visita a Inmueble</option>
+                    <option value="Oferta Recibida">📝 Oferta Recibida</option>
+                    <option value="Cierre / Venta">✅ Cierre / Venta</option>
+                    <option value="Otro">📌 Otro</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Notas / Detalles</label>
+                    <span className={`text-[11px] ${formData.notas.length > 900 ? 'text-amber-600 font-bold' : 'text-gray-400'}`}>
+                      {formData.notas.length} / 1000
+                    </span>
+                  </div>
+                  <textarea
+                    name="notas"
+                    value={formData.notas}
+                    onChange={e => setFormData({ ...formData, notas: e.target.value.slice(0, 1000) })}
+                    required
+                    maxLength={1000}
+                    placeholder="Detalles de la conversación o avances (máx. 1000 caracteres)..."
+                    rows={4}
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none resize-none"
+                  />
+                </div>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="submit"
+                  className="w-full py-4 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all"
+                >
+                  Guardar Registro
+                </motion.button>
+              </form>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
+        )}
       </AnimatePresence>
 
       {/* MODAL EDICIÓN REGISTRO CRM */}
       <AnimatePresence>
-      {editingLog && (
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-        >
-          <motion.div 
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="modal-container bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl overflow-y-auto"
+        {editingLog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm"
           >
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-gray-800">Editar Registro CRM</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Modifica los detalles del registro</p>
-              </div>
-              <button 
-                type="button" 
-                onClick={() => setEditingLog(null)} 
-                className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEditLog} className="modal-form-content space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Cliente</label>
-                <input 
-                  type="text" 
-                  value={editingLog.cliente} 
-                  onChange={e => setEditingLog({ ...editingLog, cliente: e.target.value })} 
-                  required
-                  placeholder="Ej: María López"
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm" 
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Interacción</label>
-                <select 
-                  value={editingLog.tipo_interaccion} 
-                  onChange={e => setEditingLog({ ...editingLog, tipo_interaccion: e.target.value })}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none font-medium text-gray-800 text-sm"
-                >
-                  <option value="Llamada">📞 Llamada</option>
-                  <option value="Captación de Inmueble">🏠 Captación de Inmueble</option>
-                  <option value="Mensaje (WhatsApp)">💬 Mensaje (WhatsApp)</option>
-                  <option value="Reunión Presencial">🤝 Reunión Presencial</option>
-                  <option value="Visita a Inmueble">🏠 Visita a Inmueble</option>
-                  <option value="Oferta Recibida">📝 Oferta Recibida</option>
-                  <option value="Cierre / Venta">✅ Cierre / Venta</option>
-                  <option value="Otro">📌 Otro</option>
-                </select>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700">Notas / Detalles</label>
-                  <span className={`text-[11px] ${editingLog.notas.length > 900 ? 'text-amber-600 font-bold' : 'text-gray-400'}`}>
-                    {editingLog.notas.length} / 1000
-                  </span>
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="modal-container bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800">Editar Registro CRM</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Modifica los detalles del registro</p>
                 </div>
-                <textarea 
-                  value={editingLog.notas} 
-                  onChange={e => setEditingLog({ ...editingLog, notas: e.target.value.slice(0, 1000) })} 
-                  required
-                  maxLength={1000}
-                  placeholder="Detalles de la conversación o avances (máx. 1000 caracteres)..."
-                  rows={4}
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none resize-none text-sm" 
-                />
-              </div>
-
-              <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-3 pt-2 pb-1">
                 <button
                   type="button"
                   onClick={() => setEditingLog(null)}
-                  className="w-full sm:w-1/2 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition text-sm text-center"
+                  className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition"
                 >
-                  Cancelar
+                  <X size={20} />
                 </button>
-                <motion.button 
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  type="submit"
-                  disabled={isSubmittingEdit}
-                  className="w-full sm:w-1/2 py-3 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all text-sm disabled:opacity-50 text-center"
-                >
-                  {isSubmittingEdit ? 'Guardando...' : 'Guardar Cambios'}
-                </motion.button>
               </div>
-            </form>
+
+              <form onSubmit={handleSaveEditLog} className="modal-form-content space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Cliente</label>
+                  <input
+                    type="text"
+                    value={editingLog.cliente}
+                    onChange={e => setEditingLog({ ...editingLog, cliente: e.target.value })}
+                    required
+                    placeholder="Ej: María López"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Interacción</label>
+                  <select
+                    value={editingLog.tipo_interaccion}
+                    onChange={e => setEditingLog({ ...editingLog, tipo_interaccion: e.target.value })}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none font-medium text-gray-800 text-sm"
+                  >
+                    <option value="Llamada">📞 Llamada</option>
+                    <option value="Captación de Inmueble">🏠 Captación de Inmueble</option>
+                    <option value="Mensaje (WhatsApp)">💬 Mensaje (WhatsApp)</option>
+                    <option value="Reunión Presencial">🤝 Reunión Presencial</option>
+                    <option value="Visita a Inmueble">🏠 Visita a Inmueble</option>
+                    <option value="Oferta Recibida">📝 Oferta Recibida</option>
+                    <option value="Cierre / Venta">✅ Cierre / Venta</option>
+                    <option value="Otro">📌 Otro</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Notas / Detalles</label>
+                    <span className={`text-[11px] ${editingLog.notas.length > 900 ? 'text-amber-600 font-bold' : 'text-gray-400'}`}>
+                      {editingLog.notas.length} / 1000
+                    </span>
+                  </div>
+                  <textarea
+                    value={editingLog.notas}
+                    onChange={e => setEditingLog({ ...editingLog, notas: e.target.value.slice(0, 1000) })}
+                    required
+                    maxLength={1000}
+                    placeholder="Detalles de la conversación o avances (máx. 1000 caracteres)..."
+                    rows={4}
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none resize-none text-sm"
+                  />
+                </div>
+
+                <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-3 pt-2 pb-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingLog(null)}
+                    className="w-full sm:w-1/2 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition text-sm text-center"
+                  >
+                    Cancelar
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    disabled={isSubmittingEdit}
+                    className="w-full sm:w-1/2 py-3 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all text-sm disabled:opacity-50 text-center"
+                  >
+                    {isSubmittingEdit ? 'Guardando...' : 'Guardar Cambios'}
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
+        )}
       </AnimatePresence>
 
       {/* MODAL SELECCIÓN DE CLIENTE PARA EXPORTAR PDF (CON COMBOBOX CON BÚSQUEDA) */}
       <AnimatePresence>
-      {isExportModalOpen && (
-        <div className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="modal-container bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl overflow-visible"
-          >
-            <div className="flex justify-between items-center mb-5">
-              <div className="flex items-center gap-2">
-                <FileText size={20} className="text-vinotinto" />
-                <div>
-                  <h2 className="text-lg font-bold text-gray-800">Exportar Expediente PDF</h2>
-                  <p className="text-xs text-gray-400">Selecciona el cliente a exportar</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsExportModalOpen(false)}
-                className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <Combobox
-                  label="Cliente a Exportar"
-                  value={selectedClientForExport}
-                  onChange={val => setSelectedClientForExport(val)}
-                  placeholder="Selecciona o busca un cliente..."
-                  searchPlaceholder="Buscar por nombre de cliente..."
-                  options={clientData.map(c => ({
-                    value: c.name,
-                    label: c.name,
-                    description: `${c.history.length} interacción(es) registradas`,
-                    badge: `${c.history.length}`
-                  }))}
-                />
-              </div>
-
-              {/* Vista previa del cliente seleccionado */}
-              {(() => {
-                const targetClient = clientData.find(c => c.name === selectedClientForExport) || clientData[0];
-                if (!targetClient) return null;
-                const targetProps = getClientProperties(targetClient.name, targetClient.history, properties);
-                const targetPhone = targetClient.history.map(h => extractPhone(h.notas || '')).find(Boolean) || null;
-
-                return (
-                  <div className="p-4 bg-vinotinto/5 border border-vinotinto/10 rounded-2xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="font-bold text-gray-800 text-sm">{targetClient.name}</p>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-vinotinto/10 text-vinotinto">
-                        {targetProps.length > 0 ? 'Propietario' : 'Prospecto'}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 pt-1">
-                      <div>
-                        <span className="text-gray-400 block text-[10px]">Teléfono:</span>
-                        <span className="font-medium">{targetPhone || 'Sin registrar'}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400 block text-[10px]">Última actividad:</span>
-                        <span className="font-medium">{new Date(targetClient.lastInteraction).toLocaleDateString('es-VE')}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400 block text-[10px]">Inmuebles:</span>
-                        <span className="font-medium">{targetProps.length} inmueble(s)</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400 block text-[10px]">Interacciones:</span>
-                        <span className="font-medium">{targetClient.history.length} registro(s)</span>
-                      </div>
-                    </div>
+        {isExportModalOpen && (
+          <div className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="modal-container bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl overflow-visible"
+            >
+              <div className="flex justify-between items-center mb-5">
+                <div className="flex items-center gap-2">
+                  <FileText size={20} className="text-vinotinto" />
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800">Exportar Expediente PDF</h2>
+                    <p className="text-xs text-gray-400">Selecciona el cliente a exportar</p>
                   </div>
-                );
-              })()}
-
-              <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-3 pt-2">
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsExportModalOpen(false)}
-                  className="w-full sm:w-1/2 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition text-sm text-center"
+                  className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition"
                 >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const targetClient = clientData.find(c => c.name === selectedClientForExport) || clientData[0];
-                    if (targetClient) {
-                      const targetProps = getClientProperties(targetClient.name, targetClient.history, properties);
-                      const targetPhone = targetClient.history.map(h => extractPhone(h.notas || '')).find(Boolean) || null;
-                      exportClientPDF(targetClient, targetProps, targetPhone);
-                      setIsExportModalOpen(false);
-                    }
-                  }}
-                  className="w-full sm:w-1/2 py-3 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all text-sm flex items-center justify-center gap-1.5 hover:opacity-95 active:scale-95 text-center"
-                >
-                  <Download size={14} />
-                  Descargar PDF
+                  <X size={18} />
                 </button>
               </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
+
+              <div className="space-y-4">
+                <div>
+                  <Combobox
+                    label="Cliente a Exportar"
+                    value={selectedClientForExport}
+                    onChange={val => setSelectedClientForExport(val)}
+                    placeholder="Selecciona o busca un cliente..."
+                    searchPlaceholder="Buscar por nombre de cliente..."
+                    options={clientData.map(c => ({
+                      value: c.name,
+                      label: c.name,
+                      description: `${c.history.length} interacción(es) registradas`,
+                      badge: `${c.history.length}`
+                    }))}
+                  />
+                </div>
+
+                {/* Vista previa del cliente seleccionado */}
+                {(() => {
+                  const targetClient = clientData.find(c => c.name === selectedClientForExport) || clientData[0];
+                  if (!targetClient) return null;
+                  const targetProps = getClientProperties(targetClient.name, targetClient.history, properties);
+                  const targetPhone = targetClient.history.map(h => extractPhone(h.notas || '')).find(Boolean) || null;
+
+                  return (
+                    <div className="p-4 bg-vinotinto/5 border border-vinotinto/10 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-gray-800 text-sm">{targetClient.name}</p>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-vinotinto/10 text-vinotinto">
+                          {targetProps.length > 0 ? 'Propietario' : 'Prospecto'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 pt-1">
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">Teléfono:</span>
+                          <span className="font-medium">{targetPhone || 'Sin registrar'}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">Última actividad:</span>
+                          <span className="font-medium">{new Date(targetClient.lastInteraction).toLocaleDateString('es-VE')}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">Inmuebles:</span>
+                          <span className="font-medium">{targetProps.length} inmueble(s)</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">Interacciones:</span>
+                          <span className="font-medium">{targetClient.history.length} registro(s)</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsExportModalOpen(false)}
+                    className="w-full sm:w-1/2 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition text-sm text-center"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const targetClient = clientData.find(c => c.name === selectedClientForExport) || clientData[0];
+                      if (targetClient) {
+                        const targetProps = getClientProperties(targetClient.name, targetClient.history, properties);
+                        const targetPhone = targetClient.history.map(h => extractPhone(h.notas || '')).find(Boolean) || null;
+                        await exportClientPDF(targetClient, targetProps, targetPhone);
+                        setIsExportModalOpen(false);
+                      }
+                    }}
+                    className="w-full sm:w-1/2 py-3 bg-gradient-to-r from-vinotinto to-vinotinto-light text-white rounded-xl font-bold shadow-lg shadow-vinotinto/20 transition-all text-sm flex items-center justify-center gap-1.5 hover:opacity-95 active:scale-95 text-center"
+                  >
+                    <Download size={14} />
+                    Descargar PDF
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
     </div>
   );

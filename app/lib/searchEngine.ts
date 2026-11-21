@@ -7,14 +7,22 @@ import type { Property } from '../context/DataContext';
 // y como fallback si la API de Gemini no está disponible.
 // =============================================================================
 
-// ─── Normalización de texto ──────────────────────────────────────────────────
+// ─── Normalización de texto con caché LRU ligera ────────────────────────────
+const NORMALIZE_CACHE = new Map<string, string>();
+
 /** Quita tildes, convierte a minúsculas y elimina espacios extremos */
 export function normalize(str: string): string {
-  return str
+  if (!str) return '';
+  const cached = NORMALIZE_CACHE.get(str);
+  if (cached !== undefined) return cached;
+  const res = str
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
+  if (NORMALIZE_CACHE.size > 2000) NORMALIZE_CACHE.clear();
+  NORMALIZE_CACHE.set(str, res);
+  return res;
 }
 
 // ─── Diccionario de sinónimos inmobiliarios ───────────────────────────────────

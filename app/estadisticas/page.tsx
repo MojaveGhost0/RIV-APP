@@ -19,7 +19,7 @@ import {
 import { useData } from '../context/DataContext';
 import type { Property } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
-import jsPDF from 'jspdf';
+import type jsPDF from 'jspdf';
 import { motion, AnimatePresence } from 'framer-motion';
 import { normalize } from '../lib/searchEngine';
 import BrandLogo from '../components/BrandLogo';
@@ -145,7 +145,7 @@ interface GenerateKPIsPDFOptions {
   isCurrentMonth: (dateStr?: string) => boolean;
 }
 
-function generateKPIsPDF({
+async function generateKPIsPDF({
   scope,
   selectedAdvisorName,
   includeAdvisorTable = true,
@@ -173,7 +173,8 @@ function generateKPIsPDF({
   recomendaciones,
   isCurrentMonth,
 }: GenerateKPIsPDFOptions) {
-  const pdf = new jsPDF({
+  const { default: jsPDFConstructor } = await import('jspdf');
+  const pdf = new jsPDFConstructor({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
@@ -1446,8 +1447,7 @@ export default function Estadisticas() {
   const handleRunExport = async () => {
     setIsExporting(true);
     try {
-      await new Promise(r => setTimeout(r, 80));
-      generateKPIsPDF({
+      await generateKPIsPDF({
         scope: exportScope,
         selectedAdvisorName: exportSelectedAdvisor || (allUsers[0]?.nombre ?? ''),
         includeAdvisorTable,

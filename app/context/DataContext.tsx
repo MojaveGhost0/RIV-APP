@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 
 // =============================================================================
@@ -785,24 +785,42 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const contextValue = useMemo(() => ({
+    properties,
+    appointments,
+    crmLogs,
+    dataError,
+    addProperty,
+    updateProperty,
+    deleteProperty,
+    updatePropertyStatus,
+    addAppointment,
+    updateAppointment,
+    deleteAppointment,
+    updateAppointmentStatus,
+    addCrmLog,
+    updateCrmLog,
+    deleteCrmLog,
+  }), [
+    properties,
+    appointments,
+    crmLogs,
+    dataError,
+    addProperty,
+    updateProperty,
+    deleteProperty,
+    updatePropertyStatus,
+    addAppointment,
+    updateAppointment,
+    deleteAppointment,
+    updateAppointmentStatus,
+    addCrmLog,
+    updateCrmLog,
+    deleteCrmLog,
+  ]);
+
   return (
-    <DataContext.Provider value={{
-      properties,
-      appointments,
-      crmLogs,
-      dataError,
-      addProperty,
-      updateProperty,
-      deleteProperty,
-      updatePropertyStatus,
-      addAppointment,
-      updateAppointment,
-      deleteAppointment,
-      updateAppointmentStatus,
-      addCrmLog,
-      updateCrmLog,
-      deleteCrmLog,
-    }}>
+    <DataContext.Provider value={contextValue}>
       {children}
     </DataContext.Provider>
   );

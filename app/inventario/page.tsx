@@ -7,7 +7,6 @@ import {
   Wand2, Loader2, AlertCircle, Home, Building2, Store, Layers, Maximize2, TreePine, Briefcase, FileText,
   SlidersHorizontal, Filter, Check, RotateCcw, ExternalLink,
 } from 'lucide-react';
-import jsPDF from 'jspdf';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useData, PROPERTY_TYPES } from '../context/DataContext';
@@ -89,8 +88,11 @@ async function exportToPDF(properties: Property[], filterDescription?: string) {
     return;
   }
 
-  // Pre-cargar el logotipo corporativo oficial en formato Base64 para jsPDF
-  const logoBase64 = await loadLogoBase64(getActiveBrandLogo());
+  // Pre-cargar el logotipo corporativo oficial en formato Base64 y jsPDF bajo demanda
+  const [logoBase64, { default: jsPDF }] = await Promise.all([
+    loadLogoBase64(getActiveBrandLogo()),
+    import('jspdf'),
+  ]);
 
   const pdf = new jsPDF({
     orientation: 'landscape',
@@ -880,6 +882,8 @@ export default function Inventario() {
                   <img
                     src={prop.image}
                     alt={prop.title}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   {/* BADGE ESTADO */}
