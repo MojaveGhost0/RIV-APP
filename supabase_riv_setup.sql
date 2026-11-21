@@ -84,6 +84,10 @@ ALTER TABLE properties ADD COLUMN IF NOT EXISTS "propietarioNombre" TEXT;
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS "propietarioTelefono" TEXT;
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS "formasNegociacion" TEXT;
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS "metodosPago" TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS "mapsUrl" TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS "vendidoPor" TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS "reservadoPor" TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS "fechaVenta" TIMESTAMPTZ;
 
 -- Generar códigos automáticos RIV-XXX para inmuebles existentes sin código
 WITH numbered AS (
@@ -110,8 +114,11 @@ CREATE TABLE IF NOT EXISTS appointments (
   hora TIME NOT NULL,
   asesores TEXT[] DEFAULT '{}',
   estado TEXT NOT NULL DEFAULT 'Pendiente',
+  reminder_sent BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN NOT NULL DEFAULT false;
 
 -- =============================================================================
 -- TABLA: crm_logs (Registro de CRM)

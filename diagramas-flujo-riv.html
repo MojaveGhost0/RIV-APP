@@ -151,7 +151,7 @@
         </div>
       </div>
       <div class="btn-group">
-        <button class="btn-primary" onclick="downloadAllPNG()">⬇ Descargar los 4 en PNG (HD)</button>
+        <button class="btn-primary" onclick="downloadAllPNG()">⬇ Descargar los 5 en PNG (HD)</button>
         <button class="btn-secondary" onclick="window.print()">🖨 Guardar todos en PDF</button>
       </div>
     </header>
@@ -328,6 +328,91 @@ flowchart TD
         </pre>
       </div>
     </div>
+
+    <!-- DIAGRAMA 5: ENTIDAD RELACIÓN (BASE DE DATOS) -->
+    <div class="card" id="card-5">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">5. Diagrama de Entidad-Relación (DER) de la Base de Datos</h2>
+          <p class="card-sub">Esquema relacional PostgreSQL (Supabase): Tablas USERS, PROPERTIES, APPOINTMENTS y CRM_LOGS con PK, UK y FK</p>
+        </div>
+        <div class="btn-group">
+          <button class="btn-primary" onclick="exportDiagram('diag-5', '5_Diagrama_Entidad_Relacion_BD', 'png')">⬇ Descargar PNG</button>
+          <button class="btn-secondary" onclick="exportDiagram('diag-5', '5_Diagrama_Entidad_Relacion_BD', 'svg')">⬇ Descargar SVG</button>
+        </div>
+      </div>
+      <div class="diagram-box" id="diag-5">
+        <pre class="mermaid">
+erDiagram
+    USERS {
+        TEXT id PK "Identificador unico (usr-001)"
+        TEXT username UK "Usuario de acceso unico"
+        TEXT password "Hash bcrypt (pgcrypto)"
+        TEXT nombre "Nombre completo del asesor o admin"
+        TEXT email "Correo electronico para alertas"
+        TEXT rol "CHECK (ADMIN, ASESOR)"
+        TEXT telefono "Telefono oficial de contacto"
+        BOOLEAN is_active "Estado activo o suspendido"
+        TIMESTAMPTZ created_at "Fecha de registro"
+    }
+
+    PROPERTIES {
+        UUID id PK "gen_random_uuid()"
+        TEXT codigo UK "Codigo correlativo unico (RIV-001)"
+        TEXT title "Titulo comercial del inmueble"
+        NUMERIC price "Precio en USD (CHECK >= 0)"
+        TEXT location "Ubicacion y Municipio en Margarita"
+        INTEGER beds "Habitaciones"
+        INTEGER baths "Banos"
+        NUMERIC sqm "Area total en m2"
+        TEXT description "Descripcion comercial"
+        TEXT image "URL foto portada (Cloudinary)"
+        TEXT_ARRAY images "Galeria de fotos (Cloudinary)"
+        TEXT status "Activa, Reservada, Vendida, Suspendida"
+        TEXT captador FK "Asesor que capto (USERS.nombre)"
+        TEXT reservadoPor FK "Asesor que reservo (USERS.nombre)"
+        TEXT vendidoPor FK "Asesor que vendio (USERS.nombre)"
+        TIMESTAMPTZ fechaVenta "Fecha de reserva o cierre de venta"
+        TEXT_ARRAY amenities "Comodidades del inmueble"
+        TEXT propertyType "Apto, Casa, Townhouse, Terreno, etc."
+        TEXT propietarioNombre "Nombre del propietario (CRM)"
+        TEXT propietarioTelefono "Telefono del propietario"
+        TEXT formasNegociacion "Condiciones de negociacion"
+        TEXT metodosPago "Metodos de pago aceptados"
+        TEXT mapsUrl "URL ubicacion exacta Google Maps"
+        TIMESTAMPTZ created_at "Fecha de captacion"
+    }
+
+    APPOINTMENTS {
+        UUID id PK "gen_random_uuid()"
+        TEXT tipo "Mostrar Propiedad, Captar, Firma, Oficina"
+        TEXT titulo "Asunto o inmueble de la cita"
+        TEXT cliente "Nombre del cliente"
+        DATE fecha "Fecha programada (Validacion mismo dia)"
+        TIME hora "Hora programada (HH:MM)"
+        TEXT_ARRAY asesores FK "Asesores asignados (USERS.nombre[])"
+        TEXT estado "Pendiente, Completada, Cancelada"
+        BOOLEAN reminder_sent "Control de recordatorio email (Cron)"
+        TIMESTAMPTZ created_at "Fecha de creacion"
+    }
+
+    CRM_LOGS {
+        UUID id PK "gen_random_uuid()"
+        TEXT cliente "Nombre del cliente o propietario"
+        TEXT asesor FK "Asesor responsable (USERS.nombre)"
+        TEXT tipo_interaccion "Llamada, WhatsApp, Visita, Captacion"
+        TEXT notas "Detalle e historial de seguimiento"
+        TIMESTAMPTZ created_at "Fecha de la interaccion"
+    }
+
+    USERS ||--o{ PROPERTIES : "capta / reserva / vende"
+    USERS }o--o{ APPOINTMENTS : "asignado a (asesores[])"
+    USERS ||--o{ CRM_LOGS : "registra seguimiento"
+    PROPERTIES ||--o{ CRM_LOGS : "genera expediente propietario"
+    PROPERTIES ||--o{ APPOINTMENTS : "asociado a visitas y firmas"
+        </pre>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -424,7 +509,8 @@ flowchart TD
         ['diag-1', '1_Proceso_Captacion_Inmueble'],
         ['diag-2', '2_Busqueda_Semantica_IA'],
         ['diag-3', '3_Exportacion_Marketing_Multicanal'],
-        ['diag-4', '4_Control_Gerencial_KPIs_Admin']
+        ['diag-4', '4_Control_Gerencial_KPIs_Admin'],
+        ['diag-5', '5_Diagrama_Entidad_Relacion_BD']
       ];
       items.forEach(([id, name], idx) => {
         setTimeout(() => exportDiagram(id, name, 'png'), idx * 450);
