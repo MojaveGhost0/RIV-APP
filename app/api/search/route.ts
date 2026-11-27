@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  EMBEDDING_DIMENSIONS,
+  generateSemanticEmbedding1536,
+} from '../../lib/searchEngine';
 
 // =============================================================================
 // API ROUTE — /api/search
-// Parser semántico determinístico para búsqueda inmobiliaria.
-// Sin dependencias de API externas — 0 costo, 0ms de latencia de red.
+// Motor Híbrido de Búsqueda Semántica y Vectorización en 1536 Dimensiones:
+// 1. Convierte la consulta en lenguaje natural en un vector de 1536 dimensiones
+//    (vía OpenAI text-embedding-3-small si OPENAI_API_KEY está configurada, o
+//    mediante el motor de proyección vectorial determinística de 1536 dimensiones).
+// 2. Extrae restricciones estructuradas (precio, habitaciones, baños, m², zonas).
 // =============================================================================
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
@@ -19,6 +26,48 @@ interface SearchFilters {
   amenities: string[];
   status: string | null;
   interpretacion: string;
+  embedding: number[];
+  embedding_dimensions: number;
+  embedding_model: string;
+}
+
+/**
+ * Obtiene el vector de 1536 dimensiones de la consulta:
+ * - Si existe OPENAI_API_KEY, consulta `text-embedding-3-small` (1536 dims).
+ * - Si no está configurada o hay modo offline, genera el vector normalizado L2
+ *   de 1536 dimensiones con `generateSemanticEmbedding1536()`.
+ */
+async function computeQueryEmbedding1536(query: string): Promise<{ vector: number[]; model: string }> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (apiKey) {
+    try {
+      const res = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-3-small',
+          input: query,
+          dimensions: EMBEDDING_DIMENSIONS,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const emb = json?.data?.[0]?.embedding;
+        if (Array.isArray(emb) && emb.length === EMBEDDING_DIMENSIONS) {
+          return { vector: emb, model: 'text-embedding-3-small (1536d)' };
+        }
+      }
+    } catch {
+      // Fallback silencioso al motor vectorial local de 1536 dimensiones
+    }
+  }
+  return {
+    vector: generateSemanticEmbedding1536(query),
+    model: 'riv-semantic-vectorizer-1536d (L2-normalized)',
+  };
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -61,6 +110,9 @@ function parseQuery(raw: string): SearchFilters {
     amenities: [],
     status: null,
     interpretacion: '',
+    embedding: [],
+    embedding_dimensions: EMBEDDING_DIMENSIONS,
+    embedding_model: 'riv-semantic-vectorizer-1536d',
   };
 
   const interp: string[] = [];
@@ -279,7 +331,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Query demasiado corta' }, { status: 400 });
     }
 
-    const filters = parseQuery(query);
+    const [filters, embeddingResult] = await Promise.all([
+      Promise.resolve(parseQuery(query)),
+      computeQueryEmbedding1536(query),
+    ]);
+
+    filters.embedding = embeddingResult.vector;
+    filters.embedding_dimensions = EMBEDDING_DIMENSIONS;
+    filters.embedding_model = embeddingResult.model;
+
     return NextResponse.json(filters);
 
   } catch (err) {

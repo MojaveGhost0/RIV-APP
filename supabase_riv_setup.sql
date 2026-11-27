@@ -4,6 +4,7 @@
 -- =============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- =============================================================================
 -- TABLA: users (Usuarios y Roles)
@@ -91,6 +92,46 @@ ALTER TABLE properties ADD COLUMN IF NOT EXISTS "alquiladoPor" TEXT;
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS "operacion" TEXT DEFAULT 'Venta';
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS "plazoAlquiler" TEXT;
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS "fechaVenta" TIMESTAMPTZ;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS embedding VECTOR(1536);
+
+-- =============================================================================
+-- FUNCIÓN RPC: match_properties (Búsqueda Vectorial Semántica en 1536 Dimensiones)
+-- Empareja el vector de 1536 dimensiones de la consulta del usuario contra la
+-- columna `embedding VECTOR(1536)` de `properties` usando distancia coseno (<=>).
+-- =============================================================================
+CREATE OR REPLACE FUNCTION match_properties(
+  query_embedding VECTOR(1536),
+  match_threshold FLOAT DEFAULT 0.15,
+  match_count INT DEFAULT 20
+)
+RETURNS TABLE (
+  id UUID,
+  codigo TEXT,
+  title TEXT,
+  price NUMERIC,
+  location TEXT,
+  status TEXT,
+  similarity FLOAT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    p.id,
+    p.codigo,
+    p.title,
+    p.price,
+    p.location,
+    p.status,
+    1 - (p.embedding <=> query_embedding) AS similarity
+  FROM properties p
+  WHERE p.embedding IS NOT NULL
+    AND 1 - (p.embedding <=> query_embedding) > match_threshold
+  ORDER BY p.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$;
 
 -- Generar códigos automáticos RIV-XXX para inmuebles existentes sin código
 WITH numbered AS (

@@ -203,8 +203,8 @@ flowchart TD
     <div class="card" id="card-2">
       <div class="card-header">
         <div>
-          <h2 class="card-title">2. Diagrama de Flujo: Búsqueda Semántica y Emparejamiento por IA</h2>
-          <p class="card-sub">Motor híbrido de búsqueda difusa + parser semántico (/api/search) + exportación de inventario y CRM con RIF</p>
+          <h2 class="card-title">2. Diagrama de Flujo: Búsqueda Semántica y Emparejamiento Vectorial por IA (1536 Dimensiones)</h2>
+          <p class="card-sub">Vectorización de consulta en 1536 dimensiones (Embeddings L2) + Similitud Coseno (pgvector) + Filtros estructurados</p>
         </div>
         <div class="btn-group">
           <button class="btn-primary" onclick="exportDiagram('diag-2', '2_Busqueda_Semantica_IA', 'png')">⬇ Descargar PNG</button>
@@ -214,28 +214,23 @@ flowchart TD
       <div class="diagram-box" id="diag-2">
         <pre class="mermaid">
 flowchart TD
-    A(["Inicio: Usuario escribe consulta en Buscador"]) --> B["Filtro previo por pestaña de Estado (Todas, Activa, Reservada, Vendida, Suspendida)"]
-    B --> C["Normalización de texto: minúsculas, sin tildes (NFD) y tokenización"]
-    C --> D["Ejecución instantánea (0 ms) de Búsqueda Difusa Local (fuzzySearch)"]
+    A(["Inicio: Usuario escribe consulta en Buscador"]) --> B["Filtro previo por pestaña de Estado (Todas, Activa, Alquiler, Alquilada, Reservada, Vendida)"]
+    B --> C["Normalización de texto: minúsculas, sin tildes (NFD) y expansión de sinónimos inmobiliarios"]
+    C --> D["Ejecución instantánea (0 ms) de Búsqueda Híbrida Local (fuzzySearch + cosineSimilarity1536)"]
     D --> E{"¿La consulta es lenguaje natural complejo? (shouldUseAI: >= 2 palabras)"}
-    E -- "No (Consulta corta o Código RIV-XXX)" --> F["Emparejar por Código, Título, Ubicación, Tipo y Comodidades en memoria"]
+    E -- "No (Consulta corta o Código fijo RIV-XXX)" --> F["Emparejar por Código, Título, Ubicación y Similitud Vectorial en memoria"]
     E -- "Sí (Ej: 3 hab cerca del mar con piscina menos de 80k)" --> G["Activar Debounce (800 ms) e indicador visual IA"]
     G --> H["POST /api/search con la consulta en lenguaje natural"]
-    H --> I["Parser Semántico Determinístico extrae entidades estructuradas"]
-    I --> I1["1. Rango de Precio (precio_min, precio_max, k, mil, económico, lujo)"]
-    I --> I2["2. Atributos Físicos (beds_min, baths_min, sqm_min, sqm_max)"]
-    I --> I3["3. Tipo de Inmueble y Estado (Apto, Casa, Townhouse, Penthouse, Terreno)"]
-    I --> I4["4. Comodidades y Zonas de Margarita (Piscina, Vista al Mar, Maneiro, Jorge Coll, etc.)"]
-    I1 & I2 & I3 & I4 --> J["Retornar JSON SearchFilters + cadena de interpretación legible"]
-    J --> K["Aplicar applyAIFilters() sobre el catálogo activo"]
-    K --> L{"¿Existen propiedades que cumplan todos los filtros IA?"}
-    L -- "Sí" --> M["Renderizar resultados emparejados + Banner de Interpretación IA"]
-    L -- "No (Fallback inteligente)" --> N["Degradación suave a resultados de Búsqueda Difusa Local (fuzzySearch)"]
-    F & M & N --> O["Mostrar tarjetas con Estado, Código RIV y etiquetas de Quién Captó / Reservó / Vendió"]
-    O --> P{"¿Usuario solicita Exportar Catálogo / CRM a PDF?"}
-    P -- "Sí" --> Q["Generar PDF con Membrete Oficial, RIF: J-11055496-2 en cabecera y pie de página, y trazabilidad de asesores"]
-    P -- "No" --> R(["Fin: Exploración interactiva del inventario"])
-    Q --> R
+    H --> I["Vectorizador Semántico (computeQueryEmbedding1536) + Parser de Entidades"]
+    I --> I1["1. Generar Vector de Consulta en 1536 Dimensiones (Float32Array[1536] Normalizado L2 = 1.0)"]
+    I --> I2["2. Extraer Rango de Precio, Habitaciones, Baños y Metraje (m²)"]
+    I --> I3["3. Extraer Tipo de Inmueble, Modalidad (Venta / Alquiler Fijo), Zonas y Comodidades"]
+    I1 & I2 & I3 --> J["Retornar JSON SearchFilters + Vector embedding[1536] + Interpretación IA"]
+    J --> K["Aplicar applyAIFilters() y calcular Similitud Coseno cos(θ) = (A·B)/(||A||·||B||) en 1536 dimensiones"]
+    K --> L{"¿Existen propiedades que superen el umbral y filtros IA?"}
+    L -- "Sí" --> M["Ordenar resultados de mayor a menor Similitud Coseno (1 - distancia <=>) + Chip IA"]
+    L -- "No (Fallback inteligente)" --> N["Degradación suave a resultados de Búsqueda Híbrida Local"]
+    F & M & N --> O(["Fin: Mostrar tarjetas de inmuebles ordenadas por relevancia semántica vectorial"])
         </pre>
       </div>
     </div>
@@ -380,6 +375,10 @@ erDiagram
         TEXT formasNegociacion "Condiciones de negociacion"
         TEXT metodosPago "Metodos de pago aceptados"
         TEXT mapsUrl "URL ubicacion exacta Google Maps"
+        TEXT operacion "Modalidad: Venta o Alquiler Fijo"
+        TEXT plazoAlquiler "Plazo alquiler: 3 meses, 6 meses, 1 ano"
+        TEXT alquiladoPor FK "Asesor que alquilo (USERS.nombre)"
+        VECTOR_1536 embedding "Vector semantico de 1536 dimensiones (pgvector)"
         TIMESTAMPTZ created_at "Fecha de captacion"
     }
 

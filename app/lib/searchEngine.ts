@@ -269,9 +269,16 @@ export function fuzzySearch(properties: Property[], query: string): Property[] {
   const bedsMin  = parseBeds(normalized);
   const bathsMin = parseBaths(normalized);  // Paso 7 — nuevo
   const propertyType = parsePropertyType(normalized);
+  const queryEmbedding = generateSemanticEmbedding1536(normalized);
 
   const scored = properties
-    .map(p => scoreProperty(p, tokenArray, priceRange, sqmRange, bedsMin, bathsMin, propertyType))
+    .map(p => {
+      const lexical = scoreProperty(p, tokenArray, priceRange, sqmRange, bedsMin, bathsMin, propertyType);
+      if (lexical.score <= 0) return lexical;
+      // Fusión híbrida: Score Léxico + Similitud Coseno en 1536 dimensiones (peso semántico)
+      const cosSim = cosineSimilarity1536(queryEmbedding, getPropertyEmbedding1536(p));
+      return { property: p, score: lexical.score + Math.max(0, cosSim) * 8 };
+    })
     .filter(r => r.score > 0);
 
   scored.sort((a, b) => b.score - a.score);
@@ -279,7 +286,135 @@ export function fuzzySearch(properties: Property[], query: string): Property[] {
   return scored.map(r => r.property);
 }
 
-// ─── Aplicar filtros estructurados de IA ────────────────────────────────────
+// =============================================================================
+// VECTORIZACIÓN SEMÁNTICA DE 1536 DIMENSIONES (EMBEDDINGS & COSINE SIMILARITY)
+// Implementación compatible con pgvector (VECTOR(1536)) y modelos de embedding.
+// Convierte tanto la consulta en lenguaje natural como cada inmueble del catálogo
+// en un vector normalizado L2 de 1536 dimensiones (Float32Array(1536)) y calcula
+// la Similitud Coseno: cos(θ) = (A · B) / (||A|| * ||B||).
+// =============================================================================
+
+export const EMBEDDING_DIMENSIONS = 1536;
+
+/** Hash FNV-1a de 32 bits para proyectar características semánticas en el espacio de 1536 dimensiones */
+function fnv1aHash(str: string, seed = 2166136261): number {
+  let h = seed >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+
+/**
+ * Genera un vector de embedding denso y normalizado (L2 = 1.0) de exactamente 1536 dimensiones.
+ * Proyecta tokens léxicos, grupos de sinónimos inmobiliarios, bigramas y trigramas de caracteres
+ * (Feature Hashing / Random Projection en R^1536) para capturar similitud semántica y morfológica.
+ */
+export function generateSemanticEmbedding1536(text: string): number[] {
+  const vec = new Float32Array(EMBEDDING_DIMENSIONS);
+  const norm = normalize(text);
+  if (!norm) return Array.from(vec);
+
+  const rawTokens = norm.split(/[\s,.;:/\-]+/).filter(t => t.length > 1);
+  const expanded = Array.from(expandTokens(rawTokens));
+
+  // 1. Proyección de tokens y sinónimos expandidos en múltiples sub-espacios de las 1536 dimensiones
+  for (const token of expanded) {
+    const isPrimary = rawTokens.includes(token);
+    const baseWeight = isPrimary ? 2.4 : 1.15;
+
+    for (let proj = 0; proj < 4; proj++) {
+      const h = fnv1aHash(`${token}#p${proj}`, 2166136261 + proj * 104729);
+      const dim = h % EMBEDDING_DIMENSIONS;
+      const sign = (h & 1) === 0 ? 1 : -1;
+      vec[dim] += sign * baseWeight;
+    }
+
+    // 2. N-gramas de caracteres (trigramas) para tolerancia morfológica y semántica
+    const padded = `^${token}$`;
+    for (let i = 0; i <= padded.length - 3; i++) {
+      const trigram = padded.slice(i, i + 3);
+      const hTri = fnv1aHash(trigram, 1469598103);
+      const dimTri = hTri % EMBEDDING_DIMENSIONS;
+      const signTri = (hTri & 1) === 0 ? 1 : -1;
+      vec[dimTri] += signTri * (baseWeight * 0.35);
+    }
+  }
+
+  // 3. Bigramas contextuales (pares de palabras consecutivas, ej: "vista mar", "costa azul")
+  for (let i = 0; i < rawTokens.length - 1; i++) {
+    const bigram = `${rawTokens[i]}_${rawTokens[i + 1]}`;
+    const hBi = fnv1aHash(bigram, 314159265);
+    const dimBi = hBi % EMBEDDING_DIMENSIONS;
+    const signBi = (hBi & 1) === 0 ? 1 : -1;
+    vec[dimBi] += signBi * 3.0;
+  }
+
+  // 4. Normalización L2 unitaria: ||V||_2 = 1 para que el producto punto sea igual a la Similitud Coseno
+  let sumSq = 0;
+  for (let i = 0; i < EMBEDDING_DIMENSIONS; i++) {
+    sumSq += vec[i] * vec[i];
+  }
+  const normL2 = Math.sqrt(sumSq);
+  if (normL2 > 0) {
+    for (let i = 0; i < EMBEDDING_DIMENSIONS; i++) {
+      vec[i] = Number((vec[i] / normL2).toFixed(6));
+    }
+  }
+
+  return Array.from(vec);
+}
+
+/** Construye el documento semántico enriquecido de un inmueble y genera su vector de 1536 dimensiones */
+const PROPERTY_EMBEDDING_CACHE = new Map<string, number[]>();
+
+export function getPropertyEmbedding1536(property: Property): number[] {
+  const cacheKey = `${property.id}:${property.title}:${property.price}:${property.status}:${property.operacion || 'Venta'}`;
+  const cached = PROPERTY_EMBEDDING_CACHE.get(cacheKey);
+  if (cached) return cached;
+
+  const semanticCorpus = [
+    property.codigo || '',
+    property.title,
+    property.propertyType || 'Inmueble',
+    property.operacion === 'Alquiler' ? 'alquiler fijo canon mensual arrendamiento' : 'venta compra inversion',
+    property.location,
+    `${property.beds} habitaciones cuartos dormitorios`,
+    `${property.baths} banos`,
+    `${property.sqm} metros cuadrados m2`,
+    (property.amenities || []).join(' '),
+    property.description || '',
+    property.price <= 50000 ? 'economico barato oportunidad accesible' : property.price >= 120000 ? 'lujo exclusivo premium' : 'precio medio',
+  ].join(' ');
+
+  const embedding = generateSemanticEmbedding1536(semanticCorpus);
+  if (PROPERTY_EMBEDDING_CACHE.size > 500) PROPERTY_EMBEDDING_CACHE.clear();
+  PROPERTY_EMBEDDING_CACHE.set(cacheKey, embedding);
+  return embedding;
+}
+
+/**
+ * Calcula la Similitud Coseno entre dos vectores de 1536 dimensiones:
+ * cos(θ) = Σ(A_i * B_i) / (||A|| * ||B||)
+ */
+export function cosineSimilarity1536(vecA: number[], vecB: number[]): number {
+  if (vecA.length !== EMBEDDING_DIMENSIONS || vecB.length !== EMBEDDING_DIMENSIONS) return 0;
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < EMBEDDING_DIMENSIONS; i++) {
+    const a = vecA[i];
+    const b = vecB[i];
+    dot += a * b;
+    normA += a * a;
+    normB += b * b;
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom > 0 ? dot / denom : 0;
+}
+
+// ─── Aplicar filtros estructurados de IA + Ranking Vectorial (1536 dims) ─────
 export interface AIFilters {
   precio_min?:     number | null;
   precio_max?:     number | null;
@@ -292,14 +427,33 @@ export interface AIFilters {
   amenities?:      string[];
   status?:         string | null;
   interpretacion?: string;
+  /** Vector de 1536 dimensiones generado para la consulta del usuario */
+  embedding?:      number[];
+  /** Dimensiones del espacio vectorial (1536) */
+  embedding_dimensions?: number;
+  /** Modelo o motor vectorial utilizado */
+  embedding_model?: string;
 }
 
 /**
- * Aplica los filtros estructurados que devuelve Gemini.
- * Cada filtro es opcional — si es null, no se aplica.
+ * Aplica los filtros estructurados extraídos de la consulta y ordena los inmuebles
+ * por Similitud Coseno entre el vector de 1536 dimensiones de la consulta y el
+ * vector de 1536 dimensiones de cada propiedad.
  */
 export function applyAIFilters(properties: Property[], filters: AIFilters): Property[] {
-  return properties.filter(p => {
+  const queryVector =
+    filters.embedding && filters.embedding.length === EMBEDDING_DIMENSIONS
+      ? filters.embedding
+      : generateSemanticEmbedding1536(
+          [
+            filters.property_type || '',
+            ...(filters.keywords || []),
+            ...(filters.amenities || []),
+            filters.interpretacion || '',
+          ].join(' ')
+        );
+
+  const candidates = properties.filter(p => {
     // Filtros numéricos duros
     if (filters.precio_min != null && p.price < filters.precio_min) return false;
     if (filters.precio_max != null && p.price > filters.precio_max) return false;
@@ -340,4 +494,13 @@ export function applyAIFilters(properties: Property[], filters: AIFilters): Prop
 
     return true;
   });
+
+  // Ordenamiento Semántico por Similitud Coseno en el espacio de 1536 dimensiones
+  return candidates
+    .map(p => ({
+      property: p,
+      similarity: cosineSimilarity1536(queryVector, getPropertyEmbedding1536(p)),
+    }))
+    .sort((a, b) => b.similarity - a.similarity)
+    .map(item => item.property);
 }
