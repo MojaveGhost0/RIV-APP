@@ -16,11 +16,38 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false);
   const [verifyingSession, setVerifyingSession] = useState(true);
   const [sessionValid, setSessionValid] = useState(false);
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [tokenEmail, setTokenEmail] = useState<string>('');
+  const [tokenUserId, setTokenUserId] = useState<string>('');
 
   useEffect(() => {
-    // Escuchar el evento de recuperación de contraseña de Supabase o validar sesión
+    // 1. Verificar si viene con token firmado por nuestro endpoint Gmail (/reset-password?token=...)
     const checkRecoverySession = async () => {
       try {
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const urlToken = params.get('token');
+          if (urlToken) {
+            const res = await fetch('/api/auth/reset-password', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'verify', token: urlToken }),
+            });
+            const data = await res.json();
+            if (res.ok && data.valid) {
+              setResetToken(urlToken);
+              setTokenEmail(data.email || '');
+              setTokenUserId(data.userId || '');
+              setSessionValid(true);
+              setVerifyingSession(false);
+              return;
+            } else {
+              setError(data.error || 'El enlace de recuperación ha expirado o es inválido.');
+            }
+          }
+        }
+
+        // 2. Respaldo: sesión de recuperación de Supabase Auth
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           setSessionValid(true);
@@ -63,7 +90,40 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      // 1. Actualizar contraseña en Supabase Auth
+      // Caso A: Viene desde el enlace enviado por Gmail (/api/auth/reset-password)
+      if (resetToken) {
+        const res = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'confirm',
+            token: resetToken,
+            newPassword: password.trim(),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          throw new Error(data.error || 'No se pudo actualizar la contraseña.');
+        }
+
+        // Guardar también en localStorage como respaldo inmediato por si la política RLS de users restringe UPDATE anónimo
+        if (typeof window !== 'undefined') {
+          try {
+            const rawOverrides = window.localStorage.getItem('riv_password_overrides_v1');
+            const map = rawOverrides ? JSON.parse(rawOverrides) : {};
+            if (data.userId) map[data.userId] = password.trim();
+            if (data.email) map[data.email.toLowerCase()] = password.trim();
+            window.localStorage.setItem('riv_password_overrides_v1', JSON.stringify(map));
+          } catch {
+            // ignore
+          }
+        }
+
+        setSuccess(true);
+        return;
+      }
+
+      // Caso B: Respaldo por Supabase Auth
       const { data, error: updateError } = await supabase.auth.updateUser({
         password: password.trim(),
       });
@@ -72,7 +132,6 @@ export default function ResetPasswordPage() {
         throw updateError;
       }
 
-      // 2. Sincronizar en la tabla 'users' de la agencia para mantener consistencia de login
       if (data?.user?.email) {
         try {
           await supabase

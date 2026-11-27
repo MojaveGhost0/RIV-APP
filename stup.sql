@@ -54,6 +54,20 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- =============================================================================
+-- FUNCION RPC: reset_user_password
+-- Actualiza de forma segura la contraseña de un usuario tras validar su token
+-- de recuperación enviado por correo Gmail.
+-- =============================================================================
+CREATE OR REPLACE FUNCTION reset_user_password(p_user_id TEXT, p_new_password TEXT)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE users
+  SET password = p_new_password
+  WHERE id = p_user_id OR lower(email) = lower(p_user_id);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================================================
 -- TABLA: properties (Inventario de Inmuebles)
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS properties (

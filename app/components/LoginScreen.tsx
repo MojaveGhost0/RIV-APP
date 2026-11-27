@@ -54,28 +54,22 @@ export default function LoginScreen() {
     setResetLoading(true);
 
     try {
-      const redirectUrl = typeof window !== 'undefined'
-        ? `${window.location.origin}/reset-password`
-        : 'http://localhost:3000/reset-password';
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
 
-      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: redirectUrl,
+      // Enviar correo real de recuperación a través de nuestro endpoint con Nodemailer (Gmail SMTP)
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'request',
+          email: cleanEmail,
+          origin,
+        }),
       });
 
-      if (error) {
-        // Si hay error en Supabase Auth, aún podemos verificar si el correo existe en la tabla users
-        const { data: userMatch } = await supabase
-          .from('users')
-          .select('id, email')
-          .ilike('email', cleanEmail)
-          .maybeSingle();
-
-        if (userMatch) {
-          // Si el usuario existe en users, mostramos éxito al usuario por seguridad
-          setResetSent(true);
-        } else {
-          setResetError(error.message || 'No se pudo enviar el correo de recuperación.');
-        }
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setResetError(data.error || 'No se pudo enviar el correo de recuperación.');
       } else {
         setResetSent(true);
       }

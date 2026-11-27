@@ -269,6 +269,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const trimmedUsername = username.trim();
       const cleanPassword = password.trim();
 
+      // 0. Verificar si el usuario restableció su contraseña recientemente desde este dispositivo
+      let localOverridePass: string | undefined;
+      try {
+        const rawOverrides = safeGetStorage('riv_password_overrides_v1');
+        if (rawOverrides) {
+          const map = JSON.parse(rawOverrides);
+          const matchedLocalUser = allUsers.find(
+            u => normalize(u.username) === normalize(trimmedUsername) || normalize(u.email) === normalize(trimmedUsername)
+          );
+          if (matchedLocalUser) {
+            localOverridePass = map[matchedLocalUser.id] || map[matchedLocalUser.email?.toLowerCase()];
+          }
+        }
+      } catch {
+        // ignore
+      }
+
       // 1. Intentar autenticación segura en servidor mediante función RPC si existe
       try {
         const { data: rpcData, error: rpcError } = await supabase.rpc('authenticate_user', {
@@ -310,8 +327,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .maybeSingle();
 
         if (data && !error) {
-          // Comparar contraseñas (soporta texto plano tal como está en Supabase)
-          if (data.password === cleanPassword || data.password === password) {
+          // Comparar contraseñas (soporta texto plano tal como está en Supabase o contraseña restablecida)
+          if (data.password === cleanPassword || data.password === password || (localOverridePass && localOverridePass === cleanPassword)) {
             if (data.is_active === false) {
               return {
                 success: false,
@@ -339,7 +356,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 3. Fallback de contingencia / offline contra DEFAULT_USERS
       const defaultMatch = DEFAULT_USERS.find(
         u => normalize(u.username) === normalize(trimmedUsername) &&
-             (u.password === cleanPassword || u.password === password)
+             (u.password === cleanPassword || u.password === password || (localOverridePass && localOverridePass === cleanPassword))
       );
 
       if (defaultMatch) {
