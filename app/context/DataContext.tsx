@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { getPropertyEmbedding1536 } from '../lib/searchEngine';
 
 // =============================================================================
 // UBICACIONES DE MARGARITA
@@ -165,6 +166,8 @@ export interface Property {
   reservadoPor?: string;
   /** Fecha ISO de la venta, reserva o alquiler para métricas mensuales */
   fechaVenta?: string;
+  /** Vector semántico de 1536 dimensiones para búsqueda vectorial (pgvector) */
+  embedding?: number[];
   /** ISO date string — se asigna automáticamente al registrar */
   createdAt?: string;
   created_at?: string;
@@ -465,7 +468,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             p.operacion ||
             localTx.operacion ||
             (p.status === 'Alquilada' || p.status === 'Alquilado' ? 'Alquiler' : 'Venta');
-          return {
+          const hydratedProp: Property = {
             ...p,
             createdAt: p.createdAt || p.created_at,
             created_at: p.created_at || p.createdAt,
@@ -476,8 +479,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
             reservadoPor: p.reservadoPor || p.reservado_por || localTx.reservadoPor || (p.status === 'Reservada' ? p.captador : undefined),
             fechaVenta: p.fechaVenta || p.fecha_venta || localTx.fechaVenta,
           };
+          hydratedProp.embedding = p.embedding || getPropertyEmbedding1536(hydratedProp);
+          return hydratedProp;
         }) as Property[] | null;
         setProperties(propsData ?? []);
+
+        // Auto-poblar en segundo plano el vector de 1536 dimensiones en Supabase para propiedades que aún tengan embedding = NULL
+        if (propsRes.data && propsRes.data.length > 0) {
+          const missingEmbeddings = (propsRes.data as any[]).filter(p => !p.embedding);
+          if (missingEmbeddings.length > 0) {
+            Promise.allSettled(
+              missingEmbeddings.map(p => {
+                const vec = getPropertyEmbedding1536(p as Property);
+                return supabase.from('properties').update({ embedding: vec }).eq('id', p.id);
+              })
+            ).catch(() => {});
+          }
+        }
 
         if (appsRes.data) setAppointments(appsRes.data as Appointment[]);
         if (crmRes.data) setCrmLogs(crmRes.data as CrmLog[]);
@@ -493,13 +511,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     fetchData();
   }, []);
 
-  // Add Property con código único estricto autogenerado, campos de propietario y fallback preventivo
+  // Add Property con código único estricto autogenerado, vector de 1536 dimensiones y fallback preventivo
   const addProperty = useCallback(async (newProp: Omit<Property, 'id' | 'createdAt' | 'created_at'>): Promise<string> => {
     let dataId: string;
     let dataCreatedAt: string | undefined;
     // Validación estricta: el código siempre es autogenerado por el sistema y único
     const finalCodigo = generateNextCodigo(properties);
-    const propPayload = { ...newProp, codigo: finalCodigo };
+    const computedEmbedding = getPropertyEmbedding1536({ ...newProp, id: 'temp', codigo: finalCodigo } as Property);
+    const propPayload = { ...newProp, codigo: finalCodigo, embedding: computedEmbedding };
 
     try {
       const { data, error } = await supabase
@@ -512,20 +531,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dataId = data.id;
       dataCreatedAt = data.created_at;
     } catch (err: any) {
-      // Si las columnas personalizadas (codigo, propietarioNombre, etc.) aún no han sido migradas en la BD de Supabase, reintentar sin ellas
+      // Si las columnas personalizadas (codigo, embedding, propietarioNombre, etc.) aún no han sido migradas en la BD de Supabase, reintentar sin ellas
       const isColError =
         err?.code === '42703' ||
         err?.code === 'PGRST204' ||
         err?.message?.toLowerCase().includes('does not exist') ||
         err?.message?.toLowerCase().includes('schema cache') ||
         err?.message?.toLowerCase().includes('column') ||
+        err?.message?.toLowerCase().includes('embedding') ||
         err?.message?.toLowerCase().includes('codigo');
 
       if (isColError) {
-        console.warn('Supabase: Columna codigo o campos adicionales no detectados en BD / cache. Reintentando...', err?.message);
+        console.warn('Supabase: Columna codigo/embedding o campos adicionales no detectados en BD / cache. Reintentando...', err?.message);
         
-        // 1. Intentar omitir solo 'codigo' y campos de alquiler si las demás existen
-        const { codigo: _, operacion: _op, plazoAlquiler: _pl, alquiladoPor: _alq, ...withoutCodigo } = propPayload as any;
+        // 1. Intentar omitir solo 'codigo', 'embedding' y campos de alquiler si las demás existen
+        const { codigo: _, embedding: _emb, operacion: _op, plazoAlquiler: _pl, alquiladoPor: _alq, ...withoutCodigo } = propPayload as any;
         const retry1 = await supabase
           .from('properties')
           .insert([withoutCodigo])
@@ -705,7 +725,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
     setProperties(prev => {
       previousState = prev;
-      return prev.map(p => p.id === id ? { ...p, ...safeUpdates, codigo: p.codigo } : p);
+      return prev.map(p => {
+        if (p.id !== id) return p;
+        const nextProp = { ...p, ...safeUpdates, codigo: p.codigo };
+        nextProp.embedding = getPropertyEmbedding1536(nextProp);
+        safeUpdates.embedding = nextProp.embedding;
+        return nextProp;
+      });
     });
 
     try {
@@ -713,6 +739,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (error) {
         // Fallback defensivo si alguna columna aún no existe en Supabase (ej. schema cache o 42703)
         const {
+          embedding: _emb,
           vendidoPor: _v,
           reservadoPor: _r,
           alquiladoPor: _a,
