@@ -62,6 +62,9 @@ const SYNONYM_GROUPS: string[][] = [
   ['la restinga', 'restinga'],
   // Mar/playa/costa
   ['mar', 'playa', 'costa', 'litoral', 'oceano', 'frente al mar', 'vista al mar', 'cerca del mar'],
+  // Modalidades de operación (Alquiler vs Venta)
+  ['alquiler', 'alquileres', 'alquilar', 'alquilado', 'alquilada', 'arriendo', 'arrendamiento', 'renta', 'canon', 'mensual'],
+  ['venta', 'vender', 'compra', 'comprar', 'inversion'],
 ];
 
 /** Dado un token, devuelve todos los sinónimos del mismo grupo */
@@ -174,6 +177,18 @@ export function parseSqmRange(query: string): SqmRange {
   return result;
 }
 
+// ─── Parser de modalidad de operación (Alquiler vs Venta) ────────────────────
+export function parseOperationType(query: string): 'Alquiler' | 'Venta' | null {
+  const q = normalize(query);
+  if (/\b(?:alquiler(?:es)?|alquilar|alquilad[ao]s?|arriendo|arrendar|arrendamiento|renta|rentar|canon|mensual)\b/.test(q)) {
+    return 'Alquiler';
+  }
+  if (/\b(?:en\s*venta|a\s*la\s*venta|comprar|compra)\b/.test(q)) {
+    return 'Venta';
+  }
+  return null;
+}
+
 // ─── Parser de tipo de propiedad ─────────────────────────────────────────────
 export function parsePropertyType(query: string): string | null {
   const q = normalize(query);
@@ -223,6 +238,8 @@ function scoreProperty(
     { text: normalize(String(property.beds) + ' habitaciones'),         weight: 2 },
     { text: normalize(String(property.sqm) + ' metros'),                weight: 2 },
     { text: normalize(property.propertyType ?? ''),                     weight: 4 },
+    { text: normalize(property.operacion === 'Alquiler' || property.status === 'Alquilada' ? 'alquiler fijo canon mensual' : 'venta'), weight: 6 },
+    { text: normalize(property.status ?? ''),                           weight: 4 },
   ];
 
   let score = 0;
@@ -269,19 +286,54 @@ export function fuzzySearch(properties: Property[], query: string): Property[] {
   const bedsMin  = parseBeds(normalized);
   const bathsMin = parseBaths(normalized);  // Paso 7 — nuevo
   const propertyType = parsePropertyType(normalized);
+  const operationIntent = parseOperationType(normalized);
+  const isCheapIntent = /\b(?:barato|barata|economico|economica|accesible|bajo\s*precio|asequible|modico|modica)\b/.test(normalized);
   const queryEmbedding = generateSemanticEmbedding1536(normalized);
+
+  const isPropertyRental = (p: Property) =>
+    p.operacion === 'Alquiler' ||
+    p.status === 'Alquilada' ||
+    /\b(?:alquiler|arriendo|canon)\b/.test(normalize(`${p.title} ${p.description}`));
 
   const scored = properties
     .map(p => {
       const lexical = scoreProperty(p, tokenArray, priceRange, sqmRange, bedsMin, bathsMin, propertyType);
-      if (lexical.score <= 0) return lexical;
+      const isRent = isPropertyRental(p);
+      // Si la consulta pide explícitamente "alquiler", incluir siempre propiedades en alquiler aunque no tengan la palabra en el título
+      const baseLexical =
+        lexical.score <= 0 && operationIntent === 'Alquiler' && isRent && (!propertyType || !p.propertyType || p.propertyType === propertyType)
+          ? 10
+          : lexical.score;
+      if (baseLexical <= 0) return { property: p, score: -1 };
+
       // Fusión híbrida: Score Léxico + Similitud Coseno en 1536 dimensiones (peso semántico)
       const cosSim = cosineSimilarity1536(queryEmbedding, getPropertyEmbedding1536(p));
-      return { property: p, score: lexical.score + Math.max(0, cosSim) * 8 };
+      let totalScore = baseLexical + Math.max(0, cosSim) * 8;
+
+      // Prioridad estricta por modalidad solicitada (Alquiler primero cuando se busca alquiler)
+      if (operationIntent === 'Alquiler') {
+        totalScore += isRent ? 1000 : -200;
+      } else if (operationIntent === 'Venta') {
+        totalScore += !isRent ? 500 : -200;
+      }
+
+      return { property: p, score: totalScore };
     })
     .filter(r => r.score > 0);
 
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => {
+    // 1. Si busca alquiler, poner SIEMPRE primero las propiedades con modalidad/estatus de alquiler
+    if (operationIntent === 'Alquiler') {
+      const aRent = isPropertyRental(a.property) ? 1 : 0;
+      const bRent = isPropertyRental(b.property) ? 1 : 0;
+      if (aRent !== bRent) return bRent - aRent;
+    }
+    // 2. Si además pidió "barato / económico", desempatar o priorizar de menor a mayor precio dentro del grupo
+    if (isCheapIntent) {
+      if (a.property.price !== b.property.price) return a.property.price - b.property.price;
+    }
+    return b.score - a.score;
+  });
 
   return scored.map(r => r.property);
 }
@@ -423,6 +475,8 @@ export interface AIFilters {
   sqm_min?:        number | null;
   sqm_max?:        number | null;
   property_type?:  string | null;
+  operacion?:      'Alquiler' | 'Venta' | null;
+  sort_price?:     'asc' | 'desc' | null;
   keywords?:       string[];
   amenities?:      string[];
   status?:         string | null;
@@ -437,8 +491,8 @@ export interface AIFilters {
 
 /**
  * Aplica los filtros estructurados extraídos de la consulta y ordena los inmuebles
- * por Similitud Coseno entre el vector de 1536 dimensiones de la consulta y el
- * vector de 1536 dimensiones de cada propiedad.
+ * priorizando la modalidad solicitada (ej. Alquiler primero) y la Similitud Coseno
+ * entre el vector de 1536 dimensiones de la consulta y el de cada propiedad.
  */
 export function applyAIFilters(properties: Property[], filters: AIFilters): Property[] {
   const queryVector =
@@ -446,6 +500,7 @@ export function applyAIFilters(properties: Property[], filters: AIFilters): Prop
       ? filters.embedding
       : generateSemanticEmbedding1536(
           [
+            filters.operacion || '',
             filters.property_type || '',
             ...(filters.keywords || []),
             ...(filters.amenities || []),
@@ -453,7 +508,12 @@ export function applyAIFilters(properties: Property[], filters: AIFilters): Prop
           ].join(' ')
         );
 
-  const candidates = properties.filter(p => {
+  const isPropertyRental = (p: Property) =>
+    p.operacion === 'Alquiler' ||
+    p.status === 'Alquilada' ||
+    /\b(?:alquiler|arriendo|canon)\b/.test(normalize(`${p.title} ${p.description}`));
+
+  const filterFn = (p: Property, enforceKeywords: boolean) => {
     // Filtros numéricos duros
     if (filters.precio_min != null && p.price < filters.precio_min) return false;
     if (filters.precio_max != null && p.price > filters.precio_max) return false;
@@ -474,11 +534,11 @@ export function applyAIFilters(properties: Property[], filters: AIFilters): Prop
 
     // Texto de la propiedad para búsqueda
     const searchText = normalize(
-      `${p.codigo ?? ''} ${p.title} ${p.location} ${p.description} ${p.captador} ${(p.amenities ?? []).join(' ')} ${p.propertyType ?? ''}`
+      `${p.codigo ?? ''} ${p.title} ${p.location} ${p.description} ${p.captador} ${(p.amenities ?? []).join(' ')} ${p.propertyType ?? ''} ${p.operacion ?? ''} ${p.status ?? ''}`
     );
 
     // Keywords — debe coincidir al menos una (OR)
-    if (filters.keywords && filters.keywords.length > 0) {
+    if (enforceKeywords && filters.keywords && filters.keywords.length > 0) {
       const hit = filters.keywords.some(kw => searchText.includes(normalize(kw)));
       if (!hit) return false;
     }
@@ -493,14 +553,43 @@ export function applyAIFilters(properties: Property[], filters: AIFilters): Prop
     }
 
     return true;
-  });
+  };
 
-  // Ordenamiento Semántico por Similitud Coseno en el espacio de 1536 dimensiones
+  let candidates = properties.filter(p => filterFn(p, true));
+  // Si al buscar "alquiler" ninguna propiedad coincidía con keywords secundarias, relajar keywords manteniendo tipo/precio
+  if (candidates.length === 0 && filters.operacion === 'Alquiler') {
+    candidates = properties.filter(p => filterFn(p, false));
+  }
+
+  // Ordenamiento Semántico:
+  // 1° Propiedades con estatus/modalidad de Alquiler cuando la consulta pide Alquiler (o Venta cuando pide Venta)
+  // 2° Orden por precio ascendente si la consulta pidió "barato / económico"
+  // 3° Similitud Coseno en el espacio vectorial de 1536 dimensiones
   return candidates
     .map(p => ({
       property: p,
+      isRental: isPropertyRental(p),
       similarity: cosineSimilarity1536(queryVector, getPropertyEmbedding1536(p)),
     }))
-    .sort((a, b) => b.similarity - a.similarity)
+    .sort((a, b) => {
+      if (filters.operacion === 'Alquiler') {
+        if (a.isRental !== b.isRental) return a.isRental ? -1 : 1;
+        // Dentro de las propiedades en alquiler, poner primero las disponibles (Activa) y luego las Alquiladas
+        const aActiveRent = a.isRental && a.property.status === 'Activa' ? 1 : 0;
+        const bActiveRent = b.isRental && b.property.status === 'Activa' ? 1 : 0;
+        if (aActiveRent !== bActiveRent) return bActiveRent - aActiveRent;
+      } else if (filters.operacion === 'Venta') {
+        if (a.isRental !== b.isRental) return !a.isRental ? -1 : 1;
+      }
+
+      if (filters.sort_price === 'asc' && a.property.price !== b.property.price) {
+        return a.property.price - b.property.price;
+      }
+      if (filters.sort_price === 'desc' && a.property.price !== b.property.price) {
+        return b.property.price - a.property.price;
+      }
+
+      return b.similarity - a.similarity;
+    })
     .map(item => item.property);
 }

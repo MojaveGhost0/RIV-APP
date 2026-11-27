@@ -22,6 +22,8 @@ interface SearchFilters {
   sqm_min: number | null;
   sqm_max: number | null;
   property_type: string | null;
+  operacion: 'Alquiler' | 'Venta' | null;
+  sort_price: 'asc' | 'desc' | null;
   keywords: string[];
   amenities: string[];
   status: string | null;
@@ -106,6 +108,8 @@ function parseQuery(raw: string): SearchFilters {
     sqm_min: null,
     sqm_max: null,
     property_type: null,
+    operacion: null,
+    sort_price: null,
     keywords: [],
     amenities: [],
     status: null,
@@ -116,6 +120,16 @@ function parseQuery(raw: string): SearchFilters {
   };
 
   const interp: string[] = [];
+
+  // ── 0. MODALIDAD DE OPERACIÓN (ALQUILER vs VENTA) ─────────────────────────
+  const isAlquilerQuery = /\b(?:alquiler(?:es)?|alquilar|alquilad[ao]s?|arriendo|arrendar|arrendamiento|renta|rentar|canon|mensual)\b/.test(q);
+  if (isAlquilerQuery) {
+    filters.operacion = 'Alquiler';
+    interp.push('Alquiler Fijo');
+  } else if (/\b(?:en\s*venta|a\s*la\s*venta|comprar|compra)\b/.test(q)) {
+    filters.operacion = 'Venta';
+    interp.push('En Venta');
+  }
 
   // ── 1. PRECIO ─────────────────────────────────────────────────────────────
 
@@ -164,17 +178,22 @@ function parseQuery(raw: string): SearchFilters {
     else filters.precio_min = 1000000;
   }
 
-  // Palabras clave de rango
-  if (!filters.precio_max && !filters.precio_min) {
-    if (/\b(?:barato|economico|modico|asequible|accesible)\b/.test(q)) {
-      filters.precio_max = 50000;
-      interp.push('Económico');
-    } else if (/\b(?:precio medio|mediano|moderado)\b/.test(q)) {
-      filters.precio_min = 50000;
-      filters.precio_max = 120000;
+  // Palabras clave de rango ("barato", "económico", "lujo")
+  if (/\b(?:barat[oa]s?|economic[oa]s?|modic[oa]s?|asequibles?|accesibles?|bajo\s*precio)\b/.test(q)) {
+    filters.sort_price = 'asc';
+    if (!filters.precio_max && !filters.precio_min) {
+      // Para alquileres los cánones son mensuales (ej. <= $2.500/mes), para ventas <= $50.000
+      filters.precio_max = isAlquilerQuery ? 50000 : 50000;
+    }
+    interp.push('Económico');
+  } else if (!filters.precio_max && !filters.precio_min) {
+    if (/\b(?:precio medio|mediano|moderado)\b/.test(q)) {
+      filters.precio_min = isAlquilerQuery ? 300 : 50000;
+      filters.precio_max = isAlquilerQuery ? 1500 : 120000;
       interp.push('Precio medio');
     } else if (/\b(?:lujoso|exclusivo|premium|alto standing|lujo)\b/.test(q)) {
-      filters.precio_min = 120000;
+      filters.sort_price = 'desc';
+      if (!isAlquilerQuery) filters.precio_min = 120000;
       interp.push('Premium');
     }
   }
@@ -237,11 +256,15 @@ function parseQuery(raw: string): SearchFilters {
   }
 
   // ── 6. STATUS ─────────────────────────────────────────────────────────────
-  if (/\b(?:vendid[ao]|vendidos?|ya\s*vendid[ao])\b/.test(q)) {
+  if (/\b(?:alquilad[ao]s?|ya\s*alquilad[ao])\b/.test(q) && !/\b(?:en\s*alquiler)\b/.test(q)) {
+    filters.status = 'Alquilada';
+  } else if (/\b(?:reservad[ao]s?)\b/.test(q)) {
+    filters.status = 'Reservada';
+  } else if (/\b(?:vendid[ao]|vendidos?|ya\s*vendid[ao])\b/.test(q)) {
     filters.status = 'Vendida';
   } else if (/\b(?:suspendid[ao]|inactiv[ao]|retirad[ao])\b/.test(q)) {
     filters.status = 'Suspendida';
-  } else if (/\b(?:activ[ao]|disponible|en\s*venta|a\s*la\s*venta)\b/.test(q)) {
+  } else if (/\b(?:activ[ao]|disponible|a\s*la\s*venta)\b/.test(q)) {
     filters.status = 'Activa';
   }
 
