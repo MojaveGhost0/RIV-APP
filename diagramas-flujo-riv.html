@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diagramas de Flujo Actualizados — RIV Margarita Premier</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --vinotinto: #800020;
+      --dorado: #D4AF37;
+      --bg: #F3F4F6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: #111827;
+      padding: 32px 20px 60px;
+    }
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+    header {
+      background: #FFFFFF;
+      border-bottom: 4px solid var(--vinotinto);
+      border-radius: 20px;
+      padding: 24px 32px;
+      margin-bottom: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--vinotinto);
+    }
+    header p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: #6B7280;
+      font-weight: 600;
+    }
+    .badge-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #FFF1F4;
+      color: #800020;
+      border: 1px solid #FECDD3;
+    }
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-primary {
+      background: var(--vinotinto);
+      color: #FFFFFF;
+      box-shadow: 0 4px 12px rgba(128,0,32,0.25);
+    }
+    .btn-primary:hover { background: #a30029; }
+    .btn-secondary {
+      background: #F9FAFB;
+      color: #1F2937;
+      border: 1px solid #D1D5DB;
+    }
+    .btn-secondary:hover { background: #E5E7EB; }
+    .card {
+      background: #FFFFFF;
+      border-radius: 20px;
+      padding: 28px;
+      margin-bottom: 28px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+      border: 1px solid #E5E7EB;
+      page-break-inside: avoid;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 2px solid #F3F4F6;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 800;
+      color: #111827;
+    }
+    .card-sub {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: #6B7280;
+    }
+    .diagram-box {
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+      padding: 16px;
+      background: #FFFFFF;
+      border-radius: 14px;
+    }
+    @media print {
+      body { background: #FFFFFF; padding: 0; }
+      header .btn-group, .card-header .btn-group { display: none !important; }
+      .card { box-shadow: none; border: 1px solid #DDD; page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Diagramas de Flujo del Sistema — RIV Margarita Premier</h1>
+        <p>RIF: J-11055496-2 · Exportador interactivo a PNG de Alta Resolución (3x), SVG Vectorial y PDF</p>
+        <div class="badge-bar">
+          <span class="badge">✓ RIF J-11055496-2 en todos los PDFs</span>
+          <span class="badge">✓ Validación Cita Completada Solo el Mismo Día</span>
+          <span class="badge">✓ Banner Captador Top Ventas del Mes</span>
+          <span class="badge">✓ Trazabilidad: Quién Captó, Reservó y Vendió</span>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn-primary" onclick="downloadAllPNG()">⬇ Descargar los 5 en PNG (HD)</button>
+        <button class="btn-secondary" onclick="window.print()">🖨 Guardar todos en PDF</button>
+      </div>
+    </header>
+
+    <!-- DIAGRAMA 1 -->
+    <div class="card" id="card-1">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">1. Diagrama de Flujo: Proceso de Captación, Ciclo de Vida (Reserva/Venta) y Citas</h2>
+          <p class="card-sub">Registro multipaso, validación de citas solo el mismo día y trazabilidad de quién captó, reservó y vendió</p>
+        </div>
+        <div class="btn-group">
+          <button class="btn-primary" onclick="exportDiagram('diag-1', '1_Proceso_Captacion_Inmueble', 'png')">⬇ Descargar PNG</button>
+          <button class="btn-secondary" onclick="exportDiagram('diag-1', '1_Proceso_Captacion_Inmueble', 'svg')">⬇ Descargar SVG</button>
+        </div>
+      </div>
+      <div class="diagram-box" id="diag-1">
+        <pre class="mermaid">
+flowchart TD
+    A(["Inicio: Módulo Registrar Inmueble"]) --> B["Autogenerar Código Único (ej. RIV-012) vía generateNextCodigo()"]
+    B --> C["Paso 1: Selección de Tipo de Propiedad y Datos Básicos (TYPE_CONFIG)"]
+    C --> D["Ingreso de Título, Código, Precio (es-VE), Ubicación (Isla de Margarita) y URL Google Maps"]
+    D --> E{"¿Validación Paso 1 completa y Código único?"}
+    E -- "No" --> E1["Mostrar alerta de campos requeridos o código duplicado"] --> D
+    E -- "Sí" --> F["Paso 2: Compresión en cliente y subida paralela de fotografías a Cloudinary"]
+    F --> G{"¿Al menos 1 fotografía cargada con éxito?"}
+    G -- "No" --> G1["Solicitar fotografía principal obligatoria"] --> F
+    G -- "Sí" --> H["Paso 3: Configurar Habitaciones, Baños, Área (m²), Chips de Comodidades y Descripción"]
+    H --> I["Paso 4: Datos Confidenciales de Propietario, Formas de Negociación, Pagos y Asesor Captador"]
+    I --> J["Persistir en Supabase (addProperty) + Crear expediente automático en CRM (addCrmLog)"]
+
+    J --> K["Ciclo Comercial del Inmueble: Gestión de Citas y Estado"]
+    K --> L{"¿Asesor gestiona Cita en Agenda (/citas)?"}
+    L -- "Pulsa Completar Cita" --> L1{"¿Es hoy el mismo día programado? (cita.fecha === todayISO)"}
+    L1 -- "No (Fecha distinta)" --> L2["Bloquear acción y mostrar Toast: Solo se puede completar el mismo día de la cita"]
+    L1 -- "Sí (Mismo día)" --> L3["Actualizar estado de cita a Completada en Supabase"]
+
+    K --> M{"¿Cambio de Estado del Inmueble en Ficha Detalle?"}
+    M -- "Estado: Reservada" --> M1["Seleccionar y validar Asesor que Reservó (reservadoPor) + Fecha"]
+    M -- "Estado: Vendida" --> M2["Seleccionar y validar Asesor que Vendió (vendidoPor) + Fecha de Venta"]
+    M -- "Estado: Activa / Suspendida" --> M3["Actualizar disponibilidad en catálogo"]
+    M1 & M2 & M3 --> N["Persistir trazabilidad (Captador, Reservado por, Vendido por) en Supabase y caché local"]
+    L2 & L3 & N --> O(["Fin: Mostrar insignias de Captador, Reservado por y Vendido por en Ficha, Tarjetas y PDFs"])
+        </pre>
+      </div>
+    </div>
+
+    <!-- DIAGRAMA 2 -->
+    <div class="card" id="card-2">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">2. Diagrama de Flujo: Búsqueda Semántica y Emparejamiento Vectorial por IA (1536 Dimensiones)</h2>
+          <p class="card-sub">Vectorización de consulta en 1536 dimensiones (Embeddings L2) + Similitud Coseno (pgvector) + Filtros estructurados</p>
+        </div>
+        <div class="btn-group">
+          <button class="btn-primary" onclick="exportDiagram('diag-2', '2_Busqueda_Semantica_IA', 'png')">⬇ Descargar PNG</button>
+          <button class="btn-secondary" onclick="exportDiagram('diag-2', '2_Busqueda_Semantica_IA', 'svg')">⬇ Descargar SVG</button>
+        </div>
+      </div>
+      <div class="diagram-box" id="diag-2">
+        <pre class="mermaid">
+flowchart TD
+    A(["Inicio: Usuario escribe consulta en Buscador"]) --> B["Filtro previo por pestaña de Estado (Todas, Activa, Alquiler, Alquilada, Reservada, Vendida)"]
+    B --> C["Normalización de texto: minúsculas, sin tildes (NFD) y expansión de sinónimos inmobiliarios"]
+    C --> D["Ejecución instantánea (0 ms) de Búsqueda Híbrida Local (fuzzySearch + cosineSimilarity1536)"]
+    D --> E{"¿La consulta es lenguaje natural complejo? (shouldUseAI: >= 2 palabras)"}
+    E -- "No (Consulta corta o Código fijo RIV-XXX)" --> F["Emparejar por Código, Título, Ubicación y Similitud Vectorial en memoria"]
+    E -- "Sí (Ej: 3 hab cerca del mar con piscina menos de 80k)" --> G["Activar Debounce (800 ms) e indicador visual IA"]
+    G --> H["POST /api/search con la consulta en lenguaje natural"]
+    H --> I["Vectorizador Semántico (computeQueryEmbedding1536) + Parser de Entidades"]
+    I --> I1["1. Generar Vector de Consulta en 1536 Dimensiones (Float32Array[1536] Normalizado L2 = 1.0)"]
+    I --> I2["2. Extraer Rango de Precio, Habitaciones, Baños y Metraje (m²)"]
+    I --> I3["3. Extraer Tipo de Inmueble, Modalidad (Venta / Alquiler Fijo), Zonas y Comodidades"]
+    I1 & I2 & I3 --> J["Retornar JSON SearchFilters + Vector embedding[1536] + Interpretación IA"]
+    J --> K["Aplicar applyAIFilters() y calcular Similitud Coseno cos(θ) = (A·B)/(||A||·||B||) en 1536 dimensiones"]
+    K --> L{"¿Existen propiedades que superen el umbral y filtros IA?"}
+    L -- "Sí" --> M["Ordenar resultados de mayor a menor Similitud Coseno (1 - distancia <=>) + Chip IA"]
+    L -- "No (Fallback inteligente)" --> N["Degradación suave a resultados de Búsqueda Híbrida Local"]
+    F & M & N --> O(["Fin: Mostrar tarjetas de inmuebles ordenadas por relevancia semántica vectorial"])
+        </pre>
+      </div>
+    </div>
+
+    <!-- DIAGRAMA 3 -->
+    <div class="card" id="card-3">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">3. Diagrama de Flujo: Generación y Exportación de Marketing Multicanal</h2>
+          <p class="card-sub">ExportModal con vista previa en vivo, compositor híbrido de 3 capas, RIF J-11055496-2 en PDFs y Reel 9:16</p>
+        </div>
+        <div class="btn-group">
+          <button class="btn-primary" onclick="exportDiagram('diag-3', '3_Exportacion_Marketing_Multicanal', 'png')">⬇ Descargar PNG</button>
+          <button class="btn-secondary" onclick="exportDiagram('diag-3', '3_Exportacion_Marketing_Multicanal', 'svg')">⬇ Descargar SVG</button>
+        </div>
+      </div>
+      <div class="diagram-box" id="diag-3">
+        <pre class="mermaid">
+flowchart TD
+    A(["Inicio: Abrir ExportModal desde Ficha de Inmueble"]) --> B["Precarga paralela a Base64 DataURL (Foto propiedad, Logo RIV y Código QR)"]
+    B --> C{"¿CORS bloqueado en caché móvil iOS/Android?"}
+    C -- "Sí" --> C1["Respaldo automático vía proxy same-origin (/api/image-proxy) + FileReader"]
+    C -- "No" --> D["Decodificar HTMLImageElement en memoria (img.decode) y normalizar tríada de Specs (Hab, Baños, m²)"]
+    C1 --> D
+    D --> E["Paso 1: Selección de Canal de Marketing"]
+    E --> F{"¿Canal seleccionado?"}
+
+    F -- "PDF / Instagram 9:16 / WhatsApp 1:1" --> G["Paso 2: Selección de Plantilla A (Clásica) o B (Gold Edition) con Vista Previa Real Escalada"]
+    G --> H["Inyectar RIF: J-11055496-2 en Cabecera y Pie de Página de las Plantillas PDF A y B"]
+    H --> I["Paso 3: Confirmación con Vista Previa Exacta (y Copywriting + Deep Link si es WhatsApp)"]
+    I --> J["Pulsar Descargar: Cargar pesos 600-900 de fuente determinista Inter"]
+    J --> K["Compositor Híbrido de 3 Capas en Canvas 2D (2x Retina)"]
+    K --> K1["Capa 1 (Underlay): Pintar fotografía del inmueble con recorte cover nativo (drawCoverImageBox)"]
+    K1 --> K2["Capa 2 (UI Overlay): Capturar tarjetas, íconos Lucide, RIF corporativo y textos Inter centrados vía html-to-image"]
+    K2 --> K3["Capa 3 (Overlay): Pintar Logo RIV proporcional (4:3) y Código QR con ctx.drawImage nativo"]
+
+    K3 --> L{"¿Formato es Ficha PDF?"}
+    L -- "Sí" --> L1["Empaquetar imagen JPEG 2x en documento A4 exacto (210x297 mm) con RIF: J-11055496-2 vía jsPDF"]
+    L -- "No (PNG Redes)" --> L2["Convertir Canvas a File/Blob PNG y disparar Web Share API nativa (iOS/Android) o descarga directa"]
+
+    F -- "Video Slideshow 9:16 (Reels / TikTok)" --> M["Paso 3: Mostrar Vista Previa Animada Interactiva (LiveSlideshowPreview)"]
+    M --> N["Pulsar Generar Video: Inicializar Canvas 1080x1920 a 30 FPS y MediaRecorder (MP4 / WebM)"]
+    N --> O["Fase 1 (Diapositivas): Efecto Ken Burns alternado + Crossfade + Barras de progreso + Tarjeta simétrica"]
+    O --> P["Fase 2 (Outro Corporativo): Fondo radial Vinotinto/Oro + Logo + Precio + Tarjeta de Asesor con Teléfono, RIF y QR"]
+    P --> Q["Ensamblar Blob de video y abrir menú nativo Guardar en Fotos / Compartir"]
+
+    L1 & L2 & Q --> R(["Fin: Mostrar vista previa del archivo generado y acciones de compartición"])
+        </pre>
+      </div>
+    </div>
+
+    <!-- DIAGRAMA 4 -->
+    <div class="card" id="card-4">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">4. Diagrama de Flujo: Control Gerencial de KPIs, Banner Top Ventas del Mes y PDF (Admin)</h2>
+          <p class="card-sub">Banner VIP del Captador Líder en Ventas del Mes + Panel de Inteligencia de Negocios y PDF con RIF</p>
+        </div>
+        <div class="btn-group">
+          <button class="btn-primary" onclick="exportDiagram('diag-4', '4_Control_Gerencial_KPIs_Admin', 'png')">⬇ Descargar PNG</button>
+          <button class="btn-secondary" onclick="exportDiagram('diag-4', '4_Control_Gerencial_KPIs_Admin', 'svg')">⬇ Descargar SVG</button>
+        </div>
+      </div>
+      <div class="diagram-box" id="diag-4">
+        <pre class="mermaid">
+flowchart TD
+    A(["Inicio: Acceso a Dashboard (/) o Estadísticas (/estadisticas)"]) --> B["Evaluar propiedades con estado Vendida y fechaVenta en el mes/período activo"]
+    B --> C["Calcular ranking por asesor (vendidoPor || captador): Total Ventas y Volumen USD"]
+    C --> D["Renderizar Banner VIP Vinotinto & Dorado: Captador Líder en Ventas del Mes (Trofeo, Nombre, Ventas y Volumen USD)"]
+
+    D --> E{"¿Usuario accede al Panel Gerencial /estadisticas?"}
+    E -- "No (Rol Asesor en Dashboard)" --> E1["Mostrar Resumen del Día, Banner Top Ventas del Mes y Próxima Cita"]
+    E -- "Sí (Validar Rol ADMIN)" --> F{"¿Usuario autenticado tiene rol ADMIN?"}
+    F -- "No" --> F1["Bloquear vista y redirigir al Dashboard principal"]
+    F -- "Sí (Administrador)" --> G["Seleccionar Período (Mes/Año) y Alcance (Actividad del Mes vs. Cartera Acumulada)"]
+    G --> H["Motor Analítico calcula KPIs en tiempo real"]
+
+    H --> H1["Métricas de Cartera: Activos, Reservados, Vendidos, Suspendidos, Nuevas Captaciones y Citas Concretadas"]
+    H --> H2["Trazabilidad por Asesor: Captaciones, Cartera, Reservas (reservadoPor) y Ventas Cerradas (vendidoPor)"]
+    H --> H3["Análisis Financiero y Clasificación (clasificarPrecio): Sobre Precio (> +20%), Precio Justo y Oportunidad (< -20%)"]
+    H --> H4["Recomendaciones Estratégicas automáticas basadas en rotación y desviación de precios"]
+
+    H1 & H2 & H3 & H4 --> I["Renderizar Dashboard Gerencial Interactivo + Banner Captador Líder del Período"]
+    I --> J["Administrador pulsa Exportar Informe PDF"]
+    J --> K["Abrir Modal de Configuración del Reporte PDF (Global Agencia vs. Por Asesor)"]
+    K --> L["Ejecutar generateKPIsPDF() con jsPDF en formato A4"]
+    L --> M["Dibujar Membrete Oficial con RIF: J-11055496-2 en cabecera de todas las páginas y en el pie de página"]
+    M --> N["Incluir Banner del Captador Líder en Ventas del Período, Tarjetas de KPIs y Tablas Paginadas"]
+    N --> O(["Fin: Descarga de KPIs_Reporte_Ejecutivo_[Fecha].pdf con RIF oficial"])
+        </pre>
+      </div>
+    </div>
+
+    <!-- DIAGRAMA 5: ENTIDAD RELACIÓN (BASE DE DATOS) -->
+    <div class="card" id="card-5">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">5. Diagrama de Entidad-Relación (DER) de la Base de Datos</h2>
+          <p class="card-sub">Esquema relacional PostgreSQL (Supabase): Tablas USERS, PROPERTIES, APPOINTMENTS y CRM_LOGS con PK, UK y FK</p>
+        </div>
+        <div class="btn-group">
+          <button class="btn-primary" onclick="exportDiagram('diag-5', '5_Diagrama_Entidad_Relacion_BD', 'png')">⬇ Descargar PNG</button>
+          <button class="btn-secondary" onclick="exportDiagram('diag-5', '5_Diagrama_Entidad_Relacion_BD', 'svg')">⬇ Descargar SVG</button>
+        </div>
+      </div>
+      <div class="diagram-box" id="diag-5">
+        <pre class="mermaid">
+erDiagram
+    USERS {
+        TEXT id PK "Identificador unico (usr-001)"
+        TEXT username UK "Usuario de acceso unico"
+        TEXT password "Hash bcrypt (pgcrypto)"
+        TEXT nombre "Nombre completo del asesor o admin"
+        TEXT email "Correo electronico para alertas"
+        TEXT rol "CHECK (ADMIN, ASESOR)"
+        TEXT telefono "Telefono oficial de contacto"
+        BOOLEAN is_active "Estado activo o suspendido"
+        TIMESTAMPTZ created_at "Fecha de registro"
+    }
+
+    PROPERTIES {
+        UUID id PK "gen_random_uuid()"
+        TEXT codigo UK "Codigo correlativo unico (RIV-001)"
+        TEXT title "Titulo comercial del inmueble"
+        NUMERIC price "Precio en USD (CHECK >= 0)"
+        TEXT location "Ubicacion y Municipio en Margarita"
+        INTEGER beds "Habitaciones"
+        INTEGER baths "Banos"
+        NUMERIC sqm "Area total en m2"
+        TEXT description "Descripcion comercial"
+        TEXT image "URL foto portada (Cloudinary)"
+        TEXT_ARRAY images "Galeria de fotos (Cloudinary)"
+        TEXT status "Activa, Reservada, Vendida, Suspendida"
+        TEXT captador FK "Asesor que capto (USERS.nombre)"
+        TEXT reservadoPor FK "Asesor que reservo (USERS.nombre)"
+        TEXT vendidoPor FK "Asesor que vendio (USERS.nombre)"
+        TIMESTAMPTZ fechaVenta "Fecha de reserva o cierre de venta"
+        TEXT_ARRAY amenities "Comodidades del inmueble"
+        TEXT propertyType "Apto, Casa, Townhouse, Terreno, etc."
+        TEXT propietarioNombre "Nombre del propietario (CRM)"
+        TEXT propietarioTelefono "Telefono del propietario"
+        TEXT formasNegociacion "Condiciones de negociacion"
+        TEXT metodosPago "Metodos de pago aceptados"
+        TEXT mapsUrl "URL ubicacion exacta Google Maps"
+        TEXT operacion "Modalidad: Venta o Alquiler Fijo"
+        TEXT plazoAlquiler "Plazo alquiler: 3 meses, 6 meses, 1 ano"
+        TEXT alquiladoPor FK "Asesor que alquilo (USERS.nombre)"
+        VECTOR_1536 embedding "Vector semantico de 1536 dimensiones (pgvector)"
+        TIMESTAMPTZ created_at "Fecha de captacion"
+    }
+
+    APPOINTMENTS {
+        UUID id PK "gen_random_uuid()"
+        TEXT tipo "Mostrar Propiedad, Captar, Firma, Oficina"
+        TEXT titulo "Asunto o inmueble de la cita"
+        TEXT cliente "Nombre del cliente"
+        DATE fecha "Fecha programada (Validacion mismo dia)"
+        TIME hora "Hora programada (HH:MM)"
+        TEXT_ARRAY asesores FK "Asesores asignados (USERS.nombre[])"
+        TEXT estado "Pendiente, Completada, Cancelada"
+        BOOLEAN reminder_sent "Control de recordatorio email (Cron)"
+        TIMESTAMPTZ created_at "Fecha de creacion"
+    }
+
+    CRM_LOGS {
+        UUID id PK "gen_random_uuid()"
+        TEXT cliente "Nombre del cliente o propietario"
+        TEXT asesor FK "Asesor responsable (USERS.nombre)"
+        TEXT tipo_interaccion "Llamada, WhatsApp, Visita, Captacion"
+        TEXT notas "Detalle e historial de seguimiento"
+        TIMESTAMPTZ created_at "Fecha de la interaccion"
+    }
+
+    USERS ||--o{ PROPERTIES : "capta / reserva / vende"
+    USERS }o--o{ APPOINTMENTS : "asignado a (asesores[])"
+    USERS ||--o{ CRM_LOGS : "registra seguimiento"
+    PROPERTIES ||--o{ CRM_LOGS : "genera expediente propietario"
+    PROPERTIES ||--o{ APPOINTMENTS : "asociado a visitas y firmas"
+        </pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#FFF1F4',
+        primaryTextColor: '#111827',
+        primaryBorderColor: '#800020',
+        lineColor: '#800020',
+        secondaryColor: '#FEF9E7',
+        tertiaryColor: '#F9FAFB',
+        fontFamily: 'Segoe UI, Inter, system-ui, sans-serif',
+        fontSize: '14px'
+      },
+      flowchart: {
+        curve: 'basis',
+        padding: 16,
+        nodeSpacing: 35,
+        rankSpacing: 45,
+        htmlLabels: true
+      }
+    });
+
+    function exportDiagram(containerId, filename, format) {
+      const container = document.getElementById(containerId);
+      const svgEl = container ? container.querySelector('svg') : null;
+      if (!svgEl) {
+        alert('El diagrama aún se está renderizando. Espera un segundo e intenta de nuevo.');
+        return;
+      }
+
+      const clone = svgEl.cloneNode(true);
+      const bbox = svgEl.getBoundingClientRect();
+      const viewBox = svgEl.getAttribute('viewBox');
+      let width = Math.ceil(bbox.width) || 1000;
+      let height = Math.ceil(bbox.height) || 1200;
+      if (viewBox) {
+        const parts = viewBox.split(/[\s,]+/).map(Number);
+        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+          width = Math.ceil(parts[2]);
+          height = Math.ceil(parts[3]);
+        }
+      }
+
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      clone.setAttribute('width', width);
+      clone.setAttribute('height', height);
+      clone.style.background = '#FFFFFF';
+
+      const svgData = new XMLSerializer().serializeToString(clone);
+
+      if (format === 'svg') {
+        const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+        triggerDownload(URL.createObjectURL(blob), filename + '.svg');
+        return;
+      }
+
+      // PNG 3x Alta Resolución
+      const scale = 3;
+      const canvas = document.createElement('canvas');
+      canvas.width = (width + 48) * scale;
+      canvas.height = (height + 48) * scale;
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      const svgBase64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+
+      img.onload = function () {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 24 * scale, 24 * scale, width * scale, height * scale);
+        canvas.toBlob(function (blob) {
+          if (blob) {
+            triggerDownload(URL.createObjectURL(blob), filename + '.png');
+          }
+        }, 'image/png', 1.0);
+      };
+      img.src = svgBase64;
+    }
+
+    function triggerDownload(url, filename) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+
+    function downloadAllPNG() {
+      const items = [
+        ['diag-1', '1_Proceso_Captacion_Inmueble'],
+        ['diag-2', '2_Busqueda_Semantica_IA'],
+        ['diag-3', '3_Exportacion_Marketing_Multicanal'],
+        ['diag-4', '4_Control_Gerencial_KPIs_Admin'],
+        ['diag-5', '5_Diagrama_Entidad_Relacion_BD']
+      ];
+      items.forEach(([id, name], idx) => {
+        setTimeout(() => exportDiagram(id, name, 'png'), idx * 450);
+      });
+    }
+  </script>
+</body>
+</html>
