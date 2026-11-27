@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle, Loader2, Sparkles, KeyRound } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, CheckCircle2, AlertCircle, Loader2, Sparkles, KeyRound } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BrandLogo from '../components/BrandLogo';
 
 export default function ResetPasswordPage() {
+  const [usernameInput, setUsernameInput] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -28,6 +29,7 @@ export default function ResetPasswordPage() {
           const params = new URLSearchParams(window.location.search);
           const urlToken = params.get('token');
           if (urlToken) {
+            setResetToken(urlToken);
             const res = await fetch('/api/auth/reset-password', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -35,9 +37,11 @@ export default function ResetPasswordPage() {
             });
             const data = await res.json();
             if (res.ok && data.valid) {
-              setResetToken(urlToken);
               setTokenEmail(data.email || '');
               setTokenUserId(data.userId || '');
+              if (data.username) {
+                setUsernameInput(data.username);
+              }
               setSessionValid(true);
               setVerifyingSession(false);
               return;
@@ -77,6 +81,11 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError('');
 
+    if (!usernameInput.trim()) {
+      setError('Por favor ingresa tu nombre de usuario (ej. gerardo garcia, Juan Garcia, amado lovera).');
+      return;
+    }
+
     if (password.length < 6) {
       setError('La nueva contraseña debe tener al menos 6 caracteres.');
       return;
@@ -90,56 +99,34 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      // Caso A: Viene desde el enlace enviado por Gmail (/api/auth/reset-password)
-      if (resetToken) {
-        const res = await fetch('/api/auth/reset-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'confirm',
-            token: resetToken,
-            newPassword: password.trim(),
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok || data.error) {
-          throw new Error(data.error || 'No se pudo actualizar la contraseña.');
-        }
-
-        // Guardar también en localStorage como respaldo inmediato por si la política RLS de users restringe UPDATE anónimo
-        if (typeof window !== 'undefined') {
-          try {
-            const rawOverrides = window.localStorage.getItem('riv_password_overrides_v1');
-            const map = rawOverrides ? JSON.parse(rawOverrides) : {};
-            if (data.userId) map[data.userId] = password.trim();
-            if (data.email) map[data.email.toLowerCase()] = password.trim();
-            window.localStorage.setItem('riv_password_overrides_v1', JSON.stringify(map));
-          } catch {
-            // ignore
-          }
-        }
-
-        setSuccess(true);
-        return;
-      }
-
-      // Caso B: Respaldo por Supabase Auth
-      const { data, error: updateError } = await supabase.auth.updateUser({
-        password: password.trim(),
+      // Actualizar mediante nuestro endpoint /api/auth/reset-password
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'confirm',
+          token: resetToken || '',
+          username: usernameInput.trim(),
+          newPassword: password.trim(),
+        }),
       });
-
-      if (updateError) {
-        throw updateError;
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'No se pudo actualizar la contraseña.');
       }
 
-      if (data?.user?.email) {
+      // Guardar también en localStorage como respaldo inmediato
+      if (typeof window !== 'undefined') {
         try {
-          await supabase
-            .from('users')
-            .update({ password: password.trim() })
-            .ilike('email', data.user.email);
-        } catch (dbErr) {
-          console.warn('Aviso: Sincronización en tabla users:', dbErr);
+          const rawOverrides = window.localStorage.getItem('riv_password_overrides_v1');
+          const map = rawOverrides ? JSON.parse(rawOverrides) : {};
+          if (data.userId) map[data.userId] = password.trim();
+          if (data.username) map[data.username.toLowerCase()] = password.trim();
+          if (usernameInput.trim()) map[usernameInput.trim().toLowerCase()] = password.trim();
+          if (data.email) map[data.email.toLowerCase()] = password.trim();
+          window.localStorage.setItem('riv_password_overrides_v1', JSON.stringify(map));
+        } catch {
+          // ignore
         }
       }
 
@@ -220,6 +207,22 @@ export default function ResetPasswordPage() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Usuario a restablecer */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Usuario</label>
+                  <div className="relative group">
+                    <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-vinotinto transition-colors" />
+                    <input
+                      type="text"
+                      required
+                      value={usernameInput}
+                      onChange={e => { setUsernameInput(e.target.value); setError(''); }}
+                      placeholder="Ej. gerardo garcia o Juan Garcia"
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-vinotinto/20 focus:border-vinotinto transition-all shadow-xs"
+                    />
+                  </div>
+                </div>
+
                 {/* Nueva Contraseña */}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Nueva Contraseña</label>

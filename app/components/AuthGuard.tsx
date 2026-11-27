@@ -1,6 +1,7 @@
-﻿'use client';
+'use client';
 
 import { useAuth } from '../context/AuthContext';
+import { usePathname } from 'next/navigation';
 import LoginScreen from './LoginScreen';
 import BrandLogo from './BrandLogo';
 import { Loader2 } from 'lucide-react';
@@ -9,6 +10,12 @@ import { motion } from 'framer-motion';
 
 export default function AuthGuard({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
+  const pathname = usePathname();
+
+  // Permitir acceso público a la ruta de restablecimiento de contraseña (/reset-password)
+  if (pathname?.startsWith('/reset-password')) {
+    return <>{children}</>;
+  }
 
   // Mientras se carga la sesión guardada, mostrar splash oficial corporativo
   if (isLoading) {

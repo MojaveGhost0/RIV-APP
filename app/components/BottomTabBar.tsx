@@ -18,7 +18,11 @@ const profileTab = { href: '/perfil',     label: 'Perfil', Icon: User   } as con
 
 export default function BottomTabBar() {
   const pathname = usePathname();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
+
+  if (!user || pathname?.startsWith('/reset-password')) {
+    return null;
+  }
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/');

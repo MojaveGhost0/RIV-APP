@@ -279,7 +279,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             u => normalize(u.username) === normalize(trimmedUsername) || normalize(u.email) === normalize(trimmedUsername)
           );
           if (matchedLocalUser) {
-            localOverridePass = map[matchedLocalUser.id] || map[matchedLocalUser.email?.toLowerCase()];
+            localOverridePass =
+              map[matchedLocalUser.id] ||
+              map[matchedLocalUser.username?.toLowerCase()] ||
+              map[matchedLocalUser.email?.toLowerCase()] ||
+              map[trimmedUsername.toLowerCase()];
+          } else {
+            localOverridePass = map[trimmedUsername.toLowerCase()];
           }
         }
       } catch {

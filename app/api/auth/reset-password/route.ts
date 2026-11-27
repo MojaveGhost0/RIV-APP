@@ -11,6 +11,7 @@ const RESET_SECRET = process.env.CRON_SECRET || 'riv_margarita_reset_secret_2026
 
 interface ResetTokenPayload {
   userId: string;
+  username?: string;
   email: string;
   exp: number;
 }
@@ -64,28 +65,68 @@ export async function POST(req: NextRequest) {
       if (!payload) {
         return NextResponse.json({ valid: false, error: 'El enlace de recuperación es inválido o ha expirado.' }, { status: 400 });
       }
-      return NextResponse.json({ valid: true, email: payload.email, userId: payload.userId });
+      return NextResponse.json({
+        valid: true,
+        email: payload.email,
+        userId: payload.userId,
+        username: payload.username || '',
+      });
     }
 
     // ── ACCIÓN 3: CONFIRMAR Y GUARDAR NUEVA CONTRASEÑA ───────────────────────
     if (action === 'confirm') {
-      const { token, newPassword } = body;
+      const { token, newPassword, username } = body;
       if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length < 6) {
         return NextResponse.json({ error: 'La contraseña debe tener al menos 6 caracteres.' }, { status: 400 });
       }
 
       const payload = verifyResetToken(token || '');
-      if (!payload) {
+      if (!payload && !username) {
         return NextResponse.json({ error: 'El enlace de recuperación es inválido o ha expirado.' }, { status: 400 });
       }
 
       const cleanPass = newPassword.trim();
+      const cleanUser = typeof username === 'string' ? username.trim() : '';
+
+      // Buscar el usuario objetivo en `users` por el usuario ingresado o por el token
+      const { data: usersList } = await supabase
+        .from('users')
+        .select('id, username, nombre, email');
+      const pool = (usersList && usersList.length > 0) ? usersList : DEFAULT_FALLBACK_USERS;
+
+      let targetUser = null;
+      if (cleanUser) {
+        const lowerU = cleanUser.toLowerCase();
+        targetUser = pool.find(
+          u =>
+            (u.username && u.username.toLowerCase() === lowerU) ||
+            (u.nombre && u.nombre.toLowerCase() === lowerU) ||
+            (u.email && u.email.toLowerCase() === lowerU) ||
+            u.id === cleanUser
+        );
+        if (!targetUser) {
+          return NextResponse.json(
+            { error: `No se encontró el usuario "${cleanUser}". Verifica tu nombre de usuario (ej. gerardo garcia, Juan Garcia).` },
+            { status: 404 }
+          );
+        }
+      } else if (payload) {
+        targetUser = pool.find(
+          u =>
+            u.id === payload.userId ||
+            (u.email && u.email.toLowerCase() === payload.email.toLowerCase())
+        );
+      }
+
+      const finalUserId = targetUser?.id || payload?.userId || 'usr-001';
+      const finalUsername = targetUser?.username || payload?.username || cleanUser;
+      const finalEmail = targetUser?.email || payload?.email || '';
 
       // 1. Intentar actualizar vía RPC si existe, o directamente en tabla `users`
       let updated = false;
       try {
         const { error: rpcErr } = await supabase.rpc('reset_user_password', {
-          p_user_id: payload.userId,
+          p_user_id: finalUserId,
           p_new_password: cleanPass,
         });
         if (!rpcErr) updated = true;
@@ -97,21 +138,21 @@ export async function POST(req: NextRequest) {
         const { error: updateErr } = await supabase
           .from('users')
           .update({ password: cleanPass })
-          .eq('id', payload.userId);
+          .eq('id', finalUserId);
 
-        if (updateErr) {
-          // Intentar por email como respaldo
+        if (updateErr && finalUsername) {
           await supabase
             .from('users')
             .update({ password: cleanPass })
-            .ilike('email', payload.email);
+            .ilike('username', finalUsername);
         }
       }
 
       return NextResponse.json({
         success: true,
-        userId: payload.userId,
-        email: payload.email,
+        userId: finalUserId,
+        username: finalUsername,
+        email: finalEmail,
       });
     }
 
@@ -165,6 +206,7 @@ export async function POST(req: NextRequest) {
     // Generar token firmado con validez de 1 hora
     const token = signResetToken({
       userId: targetUserId,
+      username: matchedUser?.username || '',
       email: targetEmail,
       exp: Date.now() + 60 * 60 * 1000,
     });
