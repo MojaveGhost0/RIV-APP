@@ -309,11 +309,13 @@ async function exportToPDF(properties: Property[], filterDescription?: string) {
     pdf.text(safeTitle, colX + 2, currentY + 4.8);
     colX += columns[2].width;
 
-    // 4. Tipo
+    // 4. Tipo + Operación
     pdf.setFont('helvetica', 'normal');
-    const safeType = (prop.propertyType || '-').length > 15
-      ? (prop.propertyType || '').slice(0, 13) + '...'
-      : prop.propertyType || '-';
+    const opPrefix = prop.operacion === 'Alquiler' || prop.status === 'Alquilada' ? '[Alq] ' : '';
+    const fullType = `${opPrefix}${prop.propertyType || '-'}`;
+    const safeType = fullType.length > 15
+      ? fullType.slice(0, 13) + '...'
+      : fullType;
     pdf.text(safeType, colX + 2, currentY + 4.8);
     colX += columns[3].width;
 
@@ -353,6 +355,10 @@ async function exportToPDF(properties: Property[], filterDescription?: string) {
       pdf.setFillColor(219, 234, 254);
       pdf.rect(badgeX, badgeY, badgeW, badgeH, 'F');
       pdf.setTextColor(30, 64, 175);
+    } else if (status === 'Alquilada') {
+      pdf.setFillColor(243, 232, 255);
+      pdf.rect(badgeX, badgeY, badgeW, badgeH, 'F');
+      pdf.setTextColor(107, 33, 168);
     } else if (status === 'Vendida') {
       pdf.setFillColor(254, 240, 138);
       pdf.rect(badgeX, badgeY, badgeW, badgeH, 'F');
@@ -364,10 +370,11 @@ async function exportToPDF(properties: Property[], filterDescription?: string) {
     }
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(6.5);
-    pdf.text(status, colX + columns[7].width / 2, currentY + 4.6, { align: 'center' });
+    const statusLabel = status === 'Alquilada' ? 'Alquilado' : status;
+    pdf.text(statusLabel, colX + columns[7].width / 2, currentY + 4.6, { align: 'center' });
     colX += columns[7].width;
 
-    // 9. Captador / Vendido o Reservado por
+    // 9. Captador / Vendido, Reservado o Alquilado por
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7);
     pdf.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
@@ -376,6 +383,8 @@ async function exportToPDF(properties: Property[], filterDescription?: string) {
         ? `${prop.captador || '-'} (V: ${prop.vendidoPor.split(' ')[0]})`
         : status === 'Reservada' && prop.reservadoPor
         ? `${prop.captador || '-'} (R: ${prop.reservadoPor.split(' ')[0]})`
+        : status === 'Alquilada'
+        ? `${prop.captador || '-'} (${prop.plazoAlquiler || 'Alq'})`
         : prop.captador || 'Sin asignar';
     const safeCaptador = txNote.length > 17 ? txNote.slice(0, 15) + '..' : txNote;
     pdf.text(safeCaptador, colX + 2, currentY + 4.8);
@@ -424,7 +433,7 @@ async function fetchAIFilters(query: string): Promise<AIFilters | null> {
   }
 }
 
-const STATUS_FILTERS = ['Todas', 'Activa', 'Reservada', 'Vendida', 'Suspendida'];
+const STATUS_FILTERS = ['Todas', 'Activa', 'Alquiler', 'Alquilada', 'Reservada', 'Vendida', 'Suspendida'];
 
 // Cuántas palabras mínimas para activar IA (consultas cortas usan solo fuzzy)
 const AI_MIN_WORDS = 2;
@@ -537,9 +546,11 @@ export default function Inventario() {
 
   // ─── Motor de búsqueda combinado ──────────────────────────────────────────
   const filteredProperties = useMemo(() => {
-    // Aplicar filtro de estado primero
+    // Aplicar filtro de estado o modalidad primero
     const byStatus = activeFilter === 'Todas'
       ? properties
+      : activeFilter === 'Alquiler'
+      ? properties.filter(p => p.operacion === 'Alquiler' || p.status === 'Alquilada')
       : properties.filter(p => p.status === activeFilter);
 
     if (!searchQuery.trim()) return byStatus;
@@ -563,6 +574,8 @@ export default function Inventario() {
     }
     const byStatus = activeFilter === 'Todas'
       ? properties
+      : activeFilter === 'Alquiler'
+      ? properties.filter(p => p.operacion === 'Alquiler' || p.status === 'Alquilada')
       : properties.filter(p => p.status === activeFilter);
     const aiResults = applyAIFilters(byStatus, aiFilters);
     setIsAIResultSet(aiResults.length > 0);
@@ -891,20 +904,31 @@ export default function Inventario() {
                       ? 'bg-emerald-600/90 text-white border-emerald-400/30'
                       : prop.status === 'Reservada'
                         ? 'bg-blue-600/90 text-white border-blue-400/30'
-                        : prop.status === 'Vendida'
-                          ? 'bg-gray-800/90 text-white border-gray-600/30'
-                          : 'bg-amber-500/90 text-white border-amber-300/30'
+                        : prop.status === 'Alquilada'
+                          ? 'bg-purple-700/95 text-white border-purple-400/40'
+                          : prop.status === 'Vendida'
+                            ? 'bg-gray-800/90 text-white border-gray-600/30'
+                            : 'bg-amber-500/90 text-white border-amber-300/30'
                     }`}>
-                    {prop.status}
+                    {prop.status === 'Alquilada'
+                      ? `Alquilado${prop.plazoAlquiler ? ` · ${prop.plazoAlquiler}` : ''}`
+                      : prop.status}
                   </span>
 
-                  {/* BADGE TIPO DE PROPIEDAD */}
-                  {prop.propertyType && TYPE_BADGE[prop.propertyType] && (
-                    <span className="absolute bottom-3 left-3 flex items-center gap-1.5 px-2.5 py-1 bg-black/60 backdrop-blur-md text-white border border-white/20 rounded-xl text-[10px] font-bold shadow-xs">
-                      {TYPE_BADGE[prop.propertyType]!.icon}
-                      {TYPE_BADGE[prop.propertyType]!.label}
-                    </span>
-                  )}
+                  {/* BADGE TIPO DE PROPIEDAD + MODALIDAD (ALQUILER FIJO / VENTA) */}
+                  <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
+                    {prop.propertyType && TYPE_BADGE[prop.propertyType] && (
+                      <span className="flex items-center gap-1.5 px-2.5 py-1 bg-black/60 backdrop-blur-md text-white border border-white/20 rounded-xl text-[10px] font-bold shadow-xs">
+                        {TYPE_BADGE[prop.propertyType]!.icon}
+                        {TYPE_BADGE[prop.propertyType]!.label}
+                      </span>
+                    )}
+                    {(prop.operacion === 'Alquiler' || prop.status === 'Alquilada') && (
+                      <span className="px-2.5 py-1 bg-purple-700/90 backdrop-blur-md text-white border border-purple-300/30 rounded-xl text-[10px] font-extrabold shadow-xs">
+                        Alquiler Fijo
+                      </span>
+                    )}
+                  </div>
 
                   {/* BADGE IA */}
                   {isAIActive && (
@@ -922,6 +946,9 @@ export default function Inventario() {
                     </h3>
                     <span className="font-black text-lg text-vinotinto tracking-tight whitespace-nowrap">
                       {formatPrice(prop.price)}
+                      {(prop.operacion === 'Alquiler' || prop.status === 'Alquilada') && (
+                        <span className="text-[11px] font-bold text-gray-400">/mes</span>
+                      )}
                     </span>
                   </div>
 
@@ -968,8 +995,8 @@ export default function Inventario() {
                     </div>
                   </div>
 
-                  {/* Trazabilidad visible en tarjeta cuando está Reservada o Vendida */}
-                  {(prop.status === 'Vendida' || prop.status === 'Reservada' || prop.vendidoPor || prop.reservadoPor) && (
+                  {/* Trazabilidad visible en tarjeta cuando está Reservada, Vendida o Alquilada */}
+                  {(prop.status === 'Vendida' || prop.status === 'Reservada' || prop.status === 'Alquilada' || prop.vendidoPor || prop.reservadoPor || prop.alquiladoPor) && (
                     <div className="mt-2.5 pt-2 border-t border-dashed border-gray-100 flex flex-wrap items-center gap-2 text-[11px]">
                       <span className="text-gray-500">
                         Captó: <strong className="text-gray-700">{prop.captador}</strong>
@@ -982,6 +1009,11 @@ export default function Inventario() {
                       {(prop.status === 'Vendida' || prop.vendidoPor) && (
                         <span className="px-2 py-0.5 rounded-md bg-amber-50 text-vinotinto border border-dorado/40 font-bold">
                           Vendió: {prop.vendidoPor || prop.captador}
+                        </span>
+                      )}
+                      {(prop.status === 'Alquilada' || prop.alquiladoPor) && (
+                        <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 font-bold">
+                          Alquilado: {prop.plazoAlquiler || '1 año'} · {prop.alquiladoPor || prop.captador}
                         </span>
                       )}
                     </div>
@@ -1199,7 +1231,8 @@ export default function Inventario() {
                           className="w-full text-xs sm:text-sm font-medium border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto"
                         >
                           <option value="Activa">Solo Activas (Disponibles)</option>
-                          <option value="Todas">Todas (Activas, Reservadas, Vendidas, etc.)</option>
+                          <option value="Todas">Todas (Activas, Alquiladas, Vendidas, etc.)</option>
+                          <option value="Alquilada">Solo Alquiladas</option>
                           <option value="Reservada">Solo Reservadas</option>
                           <option value="Vendida">Solo Vendidas</option>
                           <option value="Suspendida">Solo Suspendidas</option>

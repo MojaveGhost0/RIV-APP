@@ -7,10 +7,10 @@ import {
   ArrowLeft, MapPin, Bed, Bath, Maximize, User, ChevronLeft, ChevronRight,
   Share2, Trash2, ShieldAlert, Download, CheckCircle, Phone, MessageCircle,
   CircleDollarSign, CreditCard, Edit3, X, Save, AlertTriangle, Camera,
-  UploadCloud, Loader2, Star, ImagePlus, ExternalLink, Map, Award, BookmarkCheck,
+  UploadCloud, Loader2, Star, ImagePlus, ExternalLink, Map, Award, BookmarkCheck, KeyRound, Calendar, ArrowRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useData } from '../../context/DataContext';
+import { useData, RENTAL_TERMS, type OperationType, type RentalTerm } from '../../context/DataContext';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -21,11 +21,13 @@ import { uploadToCloudinary } from '../../lib/cloudinary';
 import BrandLogo from '../../components/BrandLogo';
 import { formatPrice } from '../../lib/currency';
 
-const STATUS_OPTIONS = ['Activa', 'Reservada', 'Suspendida', 'Vendida'];
+const SALE_STATUS_OPTIONS = ['Activa', 'Reservada', 'Suspendida', 'Vendida'];
+const RENTAL_STATUS_OPTIONS = ['Activa', 'Alquilada'];
 
 const STATUS_STYLE: Record<string, string> = {
   'Activa':     'bg-green-100 text-green-700 border-green-200',
   'Reservada':  'bg-blue-100 text-blue-700 border-blue-200',
+  'Alquilada':  'bg-purple-100 text-purple-800 border-purple-200',
   'Vendida':    'bg-gray-100 text-gray-600 border-gray-200',
   'Suspendida': 'bg-amber-100 text-amber-700 border-amber-200',
 };
@@ -46,6 +48,8 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
   const [statusChanged, setStatusChanged] = useState(false);
   const [selectedVendedor, setSelectedVendedor] = useState<string>('');
   const [selectedReservador, setSelectedReservador] = useState<string>('');
+  const [selectedAlquilador, setSelectedAlquilador] = useState<string>('');
+  const [isRentalTermAlertOpen, setIsRentalTermAlertOpen] = useState(false);
 
   // Control de permisos: Admin puede editar todo; usuario normal solo si es el captador
   const myNombre = normalize(user?.nombre ?? '');
@@ -63,6 +67,7 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [editFormData, setEditFormData] = useState({
+    operacion: 'Venta' as OperationType,
     codigo: '',
     title: '',
     price: '',
@@ -114,7 +119,16 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
     }
   };
 
+  const isRental = property.operacion === 'Alquiler' || property.status === 'Alquilada';
+  const activeStatusOptions = isRental ? RENTAL_STATUS_OPTIONS : SALE_STATUS_OPTIONS;
+
   const handleStatusChange = (newStatus: string) => {
+    if (newStatus === 'Alquilada') {
+      // Abrir alerta obligatoria para escoger el plazo de alquiler (3 meses, 6 meses o 1 año)
+      setIsRentalTermAlertOpen(true);
+      return;
+    }
+
     const defaultAdvisor = user?.nombre || property.captador || allUsers[0]?.nombre || 'Asesor RIV';
     const nextVendidoPor = newStatus === 'Vendida'
       ? (selectedVendedor || property.vendidoPor || defaultAdvisor)
@@ -127,28 +141,53 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
     if (newStatus === 'Reservada' && !selectedReservador) setSelectedReservador(nextReservadoPor || defaultAdvisor);
 
     updatePropertyStatus(property.id, newStatus, {
+      operacion: property.operacion || (isRental ? 'Alquiler' : 'Venta'),
       vendidoPor: newStatus === 'Vendida' ? nextVendidoPor : newStatus === 'Activa' ? undefined : property.vendidoPor,
       reservadoPor: newStatus === 'Reservada' ? nextReservadoPor : newStatus === 'Activa' ? undefined : property.reservadoPor,
+      alquiladoPor: newStatus === 'Activa' ? undefined : property.alquiladoPor,
+      plazoAlquiler: newStatus === 'Activa' ? undefined : property.plazoAlquiler,
       fechaVenta: (newStatus === 'Vendida' || newStatus === 'Reservada') ? new Date().toISOString() : property.fechaVenta,
     });
     setStatusChanged(true);
     setTimeout(() => setStatusChanged(false), 2000);
   };
 
-  const handleAssignTxAdvisor = (role: 'vendidoPor' | 'reservadoPor', advisorName: string) => {
+  const handleConfirmRentalTerm = (term: RentalTerm) => {
+    const defaultAdvisor = user?.nombre || property.captador || allUsers[0]?.nombre || 'Asesor RIV';
+    const nextAlquiladoPor = selectedAlquilador || property.alquiladoPor || defaultAdvisor;
+    if (!selectedAlquilador) setSelectedAlquilador(nextAlquiladoPor);
+
+    updatePropertyStatus(property.id, 'Alquilada', {
+      operacion: 'Alquiler',
+      alquiladoPor: nextAlquiladoPor,
+      plazoAlquiler: term,
+      fechaVenta: new Date().toISOString(),
+    });
+    setIsRentalTermAlertOpen(false);
+    setStatusChanged(true);
+    showToast(`Propiedad marcada como Alquilado por un plazo de ${term}.`);
+    setTimeout(() => setStatusChanged(false), 2000);
+  };
+
+  const handleAssignTxAdvisor = (role: 'vendidoPor' | 'reservadoPor' | 'alquiladoPor', advisorName: string) => {
     if (role === 'vendidoPor') {
       setSelectedVendedor(advisorName);
       updateProperty(property.id, { vendidoPor: advisorName, fechaVenta: property.fechaVenta || new Date().toISOString() });
       showToast(`Venta asignada a ${advisorName}.`);
-    } else {
+    } else if (role === 'reservadoPor') {
       setSelectedReservador(advisorName);
       updateProperty(property.id, { reservadoPor: advisorName, fechaVenta: property.fechaVenta || new Date().toISOString() });
       showToast(`Reserva asignada a ${advisorName}.`);
+    } else {
+      setSelectedAlquilador(advisorName);
+      updateProperty(property.id, { alquiladoPor: advisorName, fechaVenta: property.fechaVenta || new Date().toISOString() });
+      showToast(`Alquiler asignado a ${advisorName}.`);
     }
   };
 
   const handleOpenEditModal = () => {
     setEditFormData({
+      operacion: property.operacion || (isRental ? 'Alquiler' : 'Venta'),
       codigo: property.codigo || '',
       title: property.title,
       price: String(property.price),
@@ -254,6 +293,13 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
       const oldTitle = property.title;
 
       await updateProperty(property.id, {
+        operacion: editFormData.operacion,
+        status:
+          editFormData.operacion === 'Alquiler' && (property.status === 'Vendida' || property.status === 'Reservada')
+            ? 'Activa'
+            : editFormData.operacion === 'Venta' && property.status === 'Alquilada'
+            ? 'Activa'
+            : property.status,
         codigo: editFormData.codigo.trim() || undefined,
         title: newTitle,
         price: Number(editFormData.price.replace(/\D/g, '')) || property.price,
@@ -435,16 +481,34 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
         {/* Tarjeta de Título, Estado, Precio y Código (Simetría en 4 esquinas) */}
         <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-gray-100 shadow-xs hover:border-dorado/30 transition-all">
           <div className="flex justify-between items-start gap-3 mb-2.5">
-            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 leading-tight tracking-tight flex-1">
-              {property.title}
-            </h1>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                  isRental
+                    ? 'bg-purple-50 text-purple-800 border-purple-200'
+                    : 'bg-vinotinto/10 text-vinotinto border-vinotinto/20'
+                }`}>
+                  {isRental ? '🔑 Alquiler Fijo' : '🏷 En Venta'}
+                </span>
+                {property.status === 'Alquilada' && property.plazoAlquiler && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-700 text-white shadow-xs">
+                    Plazo: {property.plazoAlquiler}
+                  </span>
+                )}
+              </div>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 leading-tight tracking-tight">
+                {property.title}
+              </h1>
+            </div>
             <span className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 border shadow-xs ${STATUS_STYLE[property.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-              {property.status}
+              {property.status === 'Alquilada'
+                ? `Alquilado${property.plazoAlquiler ? ` · ${property.plazoAlquiler}` : ''}`
+                : property.status}
             </span>
           </div>
           <div className="flex items-center justify-between gap-3">
             <p className="text-3xl font-black text-vinotinto tracking-tight leading-none">
-              {formatPrice(property.price)} <span className="text-base font-bold text-gray-400">USD</span>
+              {formatPrice(property.price)} <span className="text-base font-bold text-gray-400">{isRental ? 'USD/mes' : 'USD'}</span>
             </p>
             {property.codigo && (
               <span className="inline-flex items-center px-2.5 py-1 text-[11px] font-bold tracking-wider text-vinotinto bg-vinotinto/10 border border-vinotinto/20 rounded-lg shrink-0">
@@ -550,8 +614,8 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
             )}
           </div>
 
-          {/* Tarjeta de Trazabilidad: Quién Reservó y Quién Vendió */}
-          {(property.status === 'Reservada' || property.reservadoPor || property.status === 'Vendida' || property.vendidoPor) && (
+          {/* Tarjeta de Trazabilidad: Quién Reservó, Quién Vendió o Quién Alquiló */}
+          {(property.status === 'Reservada' || property.reservadoPor || property.status === 'Vendida' || property.vendidoPor || property.status === 'Alquilada' || property.alquiladoPor) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {(property.status === 'Reservada' || property.reservadoPor) && (
                 <div className="bg-blue-50/90 border border-blue-200/80 rounded-2xl p-3.5 flex items-center gap-3 shadow-xs">
@@ -578,6 +642,33 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                       {property.vendidoPor || property.captador}
                     </p>
                   </div>
+                </div>
+              )}
+
+              {(property.status === 'Alquilada' || property.alquiladoPor) && (
+                <div className="bg-purple-50/90 border border-purple-200/80 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-xs sm:col-span-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-purple-700 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <KeyRound size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-purple-700">
+                        Alquilado por · Plazo: {property.plazoAlquiler || '1 año'}
+                      </p>
+                      <p className="text-sm font-extrabold text-gray-900 truncate">
+                        {property.alquiladoPor || property.captador}
+                      </p>
+                    </div>
+                  </div>
+                  {canManageProperty && (
+                    <button
+                      type="button"
+                      onClick={() => setIsRentalTermAlertOpen(true)}
+                      className="px-2.5 py-1 rounded-lg bg-white border border-purple-200 text-purple-800 text-[11px] font-bold hover:bg-purple-100 transition shrink-0 cursor-pointer"
+                    >
+                      Cambiar plazo
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -666,23 +757,63 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
 
             {/* CAMBIAR ESTADO */}
             <div className="space-y-2.5">
-              <p className="text-xs font-semibold text-gray-600">Cambiar Estado del Inmueble</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {STATUS_OPTIONS.map(s => (
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-gray-600">
+                  Cambiar Estado ({isRental ? 'Modalidad: Alquiler Fijo' : 'Modalidad: Venta'})
+                </p>
+              </div>
+              <div className={`grid gap-2 ${isRental ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}>
+                {activeStatusOptions.map(s => (
                   <button
                     key={s}
                     type="button"
                     onClick={() => handleStatusChange(s)}
-                    className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    className={`py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                       property.status === s
                         ? STATUS_STYLE[s] + ' shadow-sm'
-                        : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    {s}
+                    {s === 'Alquilada'
+                      ? `🔑 Alquilado${property.status === 'Alquilada' && property.plazoAlquiler ? ` (${property.plazoAlquiler})` : ''}`
+                      : s}
                   </button>
                 ))}
               </div>
+
+              {/* Selector de quién alquiló y plazo cuando el estado es Alquilada */}
+              {property.status === 'Alquilada' && (
+                <div className="bg-purple-50/80 border border-purple-200 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-purple-900">
+                      Plazo del alquiler: <strong className="text-purple-700">{property.plazoAlquiler || '1 año'}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsRentalTermAlertOpen(true)}
+                      className="text-[11px] font-bold text-purple-700 underline cursor-pointer"
+                    >
+                      Cambiar plazo
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-purple-900 mb-1">
+                      ¿Qué asesor concretó el alquiler?
+                    </label>
+                    <select
+                      value={property.alquiladoPor || selectedAlquilador || property.captador || ''}
+                      onChange={e => handleAssignTxAdvisor('alquiladoPor', e.target.value)}
+                      className="w-full p-2 bg-white border border-purple-200 rounded-lg text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer"
+                    >
+                      {allUsers.map(u => (
+                        <option key={u.id} value={u.nombre}>
+                          {u.nombre} ({u.rol})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               {/* Selector de quién reservó cuando el estado es Reservada */}
               {property.status === 'Reservada' && (
@@ -870,6 +1001,31 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                       )}
                     </label>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setEditFormData({ ...editFormData, operacion: 'Venta' })}
+                    className={`py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      editFormData.operacion === 'Venta'
+                        ? 'bg-vinotinto text-white shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    🏷 En Venta
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditFormData({ ...editFormData, operacion: 'Alquiler' })}
+                    className={`py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      editFormData.operacion === 'Alquiler'
+                        ? 'bg-purple-700 text-white shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    🔑 Alquiler Fijo
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1065,6 +1221,62 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ALERTA / MODAL PARA SELECCIONAR PLAZO DE ALQUILER (3 MESES, 6 MESES O 1 AÑO) */}
+      <AnimatePresence>
+        {isRentalTermAlertOpen && (
+          <div className="modal-overlay fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-100 space-y-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200">
+                    <KeyRound size={11} /> Contrato de Alquiler Fijo
+                  </span>
+                  <h3 className="text-lg font-extrabold text-gray-900 mt-1">
+                    ¿En qué plazo se alquiló la propiedad?
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Selecciona la duración del contrato para registrar el alquiler:
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsRentalTermAlertOpen(false)}
+                  className="p-1.5 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2.5">
+                {RENTAL_TERMS.map(term => (
+                  <button
+                    key={term}
+                    type="button"
+                    onClick={() => handleConfirmRentalTerm(term)}
+                    className={`w-full py-3.5 px-4 rounded-2xl border text-sm font-extrabold flex items-center justify-between transition cursor-pointer ${
+                      property.plazoAlquiler === term && property.status === 'Alquilada'
+                        ? 'bg-purple-700 text-white border-purple-700 shadow-md shadow-purple-700/20'
+                        : 'bg-purple-50/70 hover:bg-purple-100 text-purple-900 border-purple-200'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Calendar size={16} />
+                      Plazo de {term}
+                    </span>
+                    <ArrowRight size={16} />
+                  </button>
+                ))}
+              </div>
             </motion.div>
           </div>
         )}

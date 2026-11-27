@@ -87,6 +87,9 @@ ALTER TABLE properties ADD COLUMN IF NOT EXISTS "metodosPago" TEXT;
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS "mapsUrl" TEXT;
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS "vendidoPor" TEXT;
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS "reservadoPor" TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS "alquiladoPor" TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS "operacion" TEXT DEFAULT 'Venta';
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS "plazoAlquiler" TEXT;
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS "fechaVenta" TIMESTAMPTZ;
 
 -- Generar códigos automáticos RIV-XXX para inmuebles existentes sin código

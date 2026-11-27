@@ -536,8 +536,12 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
       : '';
 
     const phoneStr = advisorPhone ? `\n📲 *Teléfono / WhatsApp:* ${advisorPhone}` : '';
+    const isRental = property.operacion === 'Alquiler' || property.status === 'Alquilada';
+    const opLabel = isRental ? 'en Alquiler Fijo' : 'en Venta';
+    const priceTitle = isRental ? 'Canon Mensual' : 'Precio de Venta';
+    const priceSuffix = isRental ? 'USD/mes' : 'USD';
 
-    return `✨ *OPORTUNIDAD INMOBILIARIA EXCLUSIVA* ✨\n\n🏢 *${property.title}*\n🏷 *Tipo:* ${property.propertyType || 'Inmueble'} en Venta\n📍 *Ubicación:* ${property.location}\n💰 *Precio de Venta:* *$${fmt(property.price)} USD*\n\n${specsLines.join('\n')}${amenitiesBlock}\n👤 *Asesor Inmobiliario:* *${property.captador || 'RIV Margarita Premier'}*${phoneStr}\n\n💬 _Para más información o agendar una visita privada, responde a este mensaje._\n✦ *RIV MARGARITA PREMIER* ✦`;
+    return `✨ *OPORTUNIDAD INMOBILIARIA EXCLUSIVA* ✨\n\n🏢 *${property.title}*\n🏷 *Tipo:* ${property.propertyType || 'Inmueble'} ${opLabel}\n📍 *Ubicación:* ${property.location}\n💰 *${priceTitle}:* *$${fmt(property.price)} ${priceSuffix}*\n\n${specsLines.join('\n')}${amenitiesBlock}\n👤 *Asesor Inmobiliario:* *${property.captador || 'RIV Margarita Premier'}*${phoneStr}\n\n💬 _Para más información o agendar una visita privada, responde a este mensaje._\n✦ *RIV MARGARITA PREMIER* ✦`;
   };
 
   const handleCopyText = async () => {
@@ -835,8 +839,13 @@ export default function ExportModal({ property, isOpen, onClose }: ExportModalPr
       const totalFrames = photoFrames + OUTRO_FRAMES;
 
       // Datos normalizados y simétricos
-      const pTypeLabel = `${(property.propertyType || 'PROPIEDAD').toUpperCase()} EN VENTA`;
-      const priceLabel = property.status === 'Vendida' ? 'VENDIDO' : `$${fmt(property.price)} USD`;
+      const isRentalVideo = property.operacion === 'Alquiler' || property.status === 'Alquilada';
+      const pTypeLabel = `${(property.propertyType || 'PROPIEDAD').toUpperCase()} ${isRentalVideo ? 'EN ALQUILER' : 'EN VENTA'}`;
+      const priceLabel = property.status === 'Vendida'
+        ? 'VENDIDO'
+        : property.status === 'Alquilada'
+        ? 'ALQUILADO'
+        : `$${fmt(property.price)} ${isRentalVideo ? 'USD/MES' : 'USD'}`;
       const phoneLabel = advisorPhone || '0414-7901111';
       const advisorLabel = property.captador || 'RIV Margarita Premier';
       const locationLabel = (property.location || 'Isla de Margarita').toUpperCase();
@@ -2299,10 +2308,17 @@ function RenderExportTemplate({
 }: SharedTemplateProps) {
   const validSpecs = getValidSpecs(property);
   const logoSrc = base64Logo || '/logo-riv.png';
+  const isRental = property.operacion === 'Alquiler' || property.status === 'Alquilada';
   const typeLabel = property.propertyType
-    ? `${property.propertyType.toUpperCase()} EN VENTA`
+    ? `${property.propertyType.toUpperCase()} ${isRental ? 'EN ALQUILER' : 'EN VENTA'}`
+    : isRental
+    ? 'PROPIEDAD EN ALQUILER'
     : 'PROPIEDAD EN VENTA';
-  const priceText = property.status === 'Vendida' ? 'VENDIDO' : `$${fmt(property.price)} USD`;
+  const priceText = property.status === 'Vendida'
+    ? 'VENDIDO'
+    : property.status === 'Alquilada'
+    ? 'ALQUILADO'
+    : `$${fmt(property.price)} ${isRental ? 'USD/MES' : 'USD'}`;
   const phone = advisorPhone || '0414-7901111';
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -3828,10 +3844,17 @@ function LiveSlideshowPreview({
 
   const validSpecs = getValidSpecs(property);
   const logoSrc = base64Logo || '/logo-riv.png';
+  const isRental = property.operacion === 'Alquiler' || property.status === 'Alquilada';
   const typeLabel = property.propertyType
-    ? `${property.propertyType.toUpperCase()} EN VENTA`
+    ? `${property.propertyType.toUpperCase()} ${isRental ? 'EN ALQUILER' : 'EN VENTA'}`
+    : isRental
+    ? 'PROPIEDAD EN ALQUILER'
     : 'PROPIEDAD EN VENTA';
-  const priceText = property.status === 'Vendida' ? 'VENDIDO' : `$${fmt(property.price)} USD`;
+  const priceText = property.status === 'Vendida'
+    ? 'VENDIDO'
+    : property.status === 'Alquilada'
+    ? 'ALQUILADO'
+    : `$${fmt(property.price)} ${isRental ? 'USD/MES' : 'USD'}`;
   const phone = advisorPhone || '0414-7901111';
 
   return (

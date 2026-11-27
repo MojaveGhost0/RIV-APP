@@ -111,7 +111,7 @@ export const MARGARITA_LOCATIONS: string[] = [
 ];
 
 // =============================================================================
-// TIPOS DE PROPIEDAD
+// TIPOS DE PROPIEDAD Y OPERACIÓN (VENTA / ALQUILER FIJO)
 // =============================================================================
 export const PROPERTY_TYPES = [
   'Apartamento',
@@ -123,6 +123,10 @@ export const PROPERTY_TYPES = [
   'Terreno',
 ] as const;
 export type PropertyType = typeof PROPERTY_TYPES[number];
+
+export type OperationType = 'Venta' | 'Alquiler';
+export const RENTAL_TERMS = ['3 meses', '6 meses', '1 año'] as const;
+export type RentalTerm = typeof RENTAL_TERMS[number];
 
 // =============================================================================
 // INTERFACES
@@ -143,6 +147,12 @@ export interface Property {
   captador: string;
   amenities?: string[];
   propertyType?: PropertyType;
+  /** Tipo de operación: 'Venta' (default) o 'Alquiler' (Alquiler Fijo) */
+  operacion?: OperationType;
+  /** Plazo seleccionado cuando una propiedad en alquiler se marca como 'Alquilada' ('3 meses' | '6 meses' | '1 año') */
+  plazoAlquiler?: RentalTerm | string;
+  /** Asesor que concretó el alquiler del inmueble (cuando status === 'Alquilada') */
+  alquiladoPor?: string;
   propietarioNombre?: string;
   propietarioTelefono?: string;
   formasNegociacion?: string;
@@ -153,7 +163,7 @@ export interface Property {
   vendidoPor?: string;
   /** Asesor que reservó el inmueble (cuando status === 'Reservada') */
   reservadoPor?: string;
-  /** Fecha ISO de la venta o reserva para métricas mensuales */
+  /** Fecha ISO de la venta, reserva o alquiler para métricas mensuales */
   fechaVenta?: string;
   /** ISO date string — se asigna automáticamente al registrar */
   createdAt?: string;
@@ -191,7 +201,18 @@ interface DataContextType {
   addProperty: (property: Omit<Property, 'id' | 'createdAt' | 'created_at'>) => Promise<string>;
   updateProperty: (id: string, updates: Partial<Omit<Property, 'id' | 'createdAt' | 'created_at'>>) => Promise<void>;
   deleteProperty: (id: string) => Promise<void>;
-  updatePropertyStatus: (id: string, status: string, txMeta?: { vendidoPor?: string; reservadoPor?: string; fechaVenta?: string }) => Promise<void>;
+  updatePropertyStatus: (
+    id: string,
+    status: string,
+    txMeta?: {
+      vendidoPor?: string;
+      reservadoPor?: string;
+      alquiladoPor?: string;
+      plazoAlquiler?: string;
+      operacion?: OperationType;
+      fechaVenta?: string;
+    }
+  ) => Promise<void>;
   addAppointment: (appointment: Omit<Appointment, 'id' | 'estado'>) => Promise<void>;
   updateAppointment: (id: string, updates: Partial<Omit<Appointment, 'id'>>) => Promise<void>;
   deleteAppointment: (id: string) => Promise<void>;
@@ -366,6 +387,9 @@ const DEFAULT_CITAS: Appointment[] = [
 const TX_META_STORAGE_KEY = 'riv_property_tx_meta_v1';
 
 interface PropertyTxMeta {
+  operacion?: OperationType;
+  plazoAlquiler?: string;
+  alquiladoPor?: string;
   vendidoPor?: string;
   reservadoPor?: string;
   fechaVenta?: string;
@@ -428,10 +452,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setDataError(null);
         const propsData = (propsRes.data as any[] | null)?.map(p => {
           const localTx = txMetaMap[p.id] || {};
+          const inferredOp: OperationType =
+            p.operacion ||
+            localTx.operacion ||
+            (p.status === 'Alquilada' || p.status === 'Alquilado' ? 'Alquiler' : 'Venta');
           return {
             ...p,
             createdAt: p.createdAt || p.created_at,
             created_at: p.created_at || p.createdAt,
+            operacion: inferredOp,
+            plazoAlquiler: p.plazoAlquiler || p.plazo_alquiler || localTx.plazoAlquiler,
+            alquiladoPor: p.alquiladoPor || p.alquilado_por || localTx.alquiladoPor || (p.status === 'Alquilada' ? p.captador : undefined),
             vendidoPor: p.vendidoPor || p.vendido_por || localTx.vendidoPor || (p.status === 'Vendida' ? p.captador : undefined),
             reservadoPor: p.reservadoPor || p.reservado_por || localTx.reservadoPor || (p.status === 'Reservada' ? p.captador : undefined),
             fechaVenta: p.fechaVenta || p.fecha_venta || localTx.fechaVenta,
@@ -483,8 +514,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (isColError) {
         console.warn('Supabase: Columna codigo o campos adicionales no detectados en BD / cache. Reintentando...', err?.message);
         
-        // 1. Intentar omitir solo 'codigo' si las demás existen
-        const { codigo: _, ...withoutCodigo } = propPayload;
+        // 1. Intentar omitir solo 'codigo' y campos de alquiler si las demás existen
+        const { codigo: _, operacion: _op, plazoAlquiler: _pl, alquiladoPor: _alq, ...withoutCodigo } = propPayload as any;
         const retry1 = await supabase
           .from('properties')
           .insert([withoutCodigo])
@@ -514,6 +545,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
 
     const timestamp = dataCreatedAt || new Date().toISOString();
+    saveTxMetaForProperty(dataId, {
+      operacion: propPayload.operacion || 'Venta',
+      plazoAlquiler: propPayload.plazoAlquiler,
+      alquiladoPor: propPayload.alquiladoPor,
+    });
     const property: Property = {
       ...propPayload,
       id: dataId,
@@ -542,11 +578,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Update Property Status con Rollback (LOG-02) y soporte de vendidoPor / reservadoPor
+  // Update Property Status con Rollback (LOG-02) y soporte de vendidoPor / reservadoPor / alquiladoPor / plazoAlquiler
   const updatePropertyStatus = useCallback(async (
     id: string,
     status: string,
-    txMeta?: { vendidoPor?: string; reservadoPor?: string; fechaVenta?: string }
+    txMeta?: {
+      vendidoPor?: string;
+      reservadoPor?: string;
+      alquiladoPor?: string;
+      plazoAlquiler?: string;
+      operacion?: OperationType;
+      fechaVenta?: string;
+    }
   ) => {
     let previousState: Property[] = [];
     const nowIso = new Date().toISOString();
@@ -567,12 +610,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
             : status === 'Activa'
             ? undefined
             : p.reservadoPor;
+        const nextAlquiladoPor =
+          status === 'Alquilada'
+            ? (txMeta?.alquiladoPor ?? p.alquiladoPor ?? p.captador)
+            : status === 'Activa'
+            ? undefined
+            : p.alquiladoPor;
+        const nextPlazoAlquiler =
+          status === 'Alquilada'
+            ? (txMeta?.plazoAlquiler ?? p.plazoAlquiler ?? '1 año')
+            : status === 'Activa'
+            ? undefined
+            : p.plazoAlquiler;
+        const nextOperacion = txMeta?.operacion ?? p.operacion ?? (status === 'Alquilada' ? 'Alquiler' : 'Venta');
         const nextFechaVenta =
-          status === 'Vendida' || status === 'Reservada'
+          status === 'Vendida' || status === 'Reservada' || status === 'Alquilada'
             ? (txMeta?.fechaVenta ?? p.fechaVenta ?? nowIso)
             : p.fechaVenta;
 
         saveTxMetaForProperty(id, {
+          operacion: nextOperacion,
+          plazoAlquiler: nextPlazoAlquiler,
+          alquiladoPor: nextAlquiladoPor,
           vendidoPor: nextVendidoPor,
           reservadoPor: nextReservadoPor,
           fechaVenta: nextFechaVenta,
@@ -581,6 +640,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return {
           ...p,
           status,
+          operacion: nextOperacion,
+          plazoAlquiler: nextPlazoAlquiler,
+          alquiladoPor: nextAlquiladoPor,
           vendidoPor: nextVendidoPor,
           reservadoPor: nextReservadoPor,
           fechaVenta: nextFechaVenta,
@@ -592,11 +654,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const payload: Record<string, any> = { status };
       if (txMeta?.vendidoPor !== undefined) payload.vendidoPor = txMeta.vendidoPor;
       if (txMeta?.reservadoPor !== undefined) payload.reservadoPor = txMeta.reservadoPor;
+      if (txMeta?.alquiladoPor !== undefined) payload.alquiladoPor = txMeta.alquiladoPor;
+      if (txMeta?.plazoAlquiler !== undefined) payload.plazoAlquiler = txMeta.plazoAlquiler;
+      if (txMeta?.operacion !== undefined) payload.operacion = txMeta.operacion;
       if (txMeta?.fechaVenta !== undefined) payload.fechaVenta = txMeta.fechaVenta;
 
       const { error } = await supabase.from('properties').update(payload).eq('id', id);
       if (error) {
-        // Fallback si las columnas vendidoPor / reservadoPor no existen aún en Supabase
+        // Fallback si las columnas personalizadas no existen aún en Supabase
         const retry = await supabase.from('properties').update({ status }).eq('id', id);
         if (retry.error) throw retry.error;
       }
@@ -613,9 +678,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (
       updates.vendidoPor !== undefined ||
       updates.reservadoPor !== undefined ||
+      updates.alquiladoPor !== undefined ||
+      updates.plazoAlquiler !== undefined ||
+      updates.operacion !== undefined ||
       updates.fechaVenta !== undefined
     ) {
       saveTxMetaForProperty(id, {
+        operacion: updates.operacion,
+        plazoAlquiler: updates.plazoAlquiler,
+        alquiladoPor: updates.alquiladoPor,
         vendidoPor: updates.vendidoPor,
         reservadoPor: updates.reservadoPor,
         fechaVenta: updates.fechaVenta,
@@ -630,7 +701,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.from('properties').update(updates).eq('id', id);
       if (error) {
         // Fallback defensivo si alguna columna aún no existe en Supabase (ej. schema cache o 42703)
-        const { codigo: _, vendidoPor: _v, reservadoPor: _r, fechaVenta: _f, ...withoutCustom } = updates as any;
+        const {
+          codigo: _,
+          vendidoPor: _v,
+          reservadoPor: _r,
+          alquiladoPor: _a,
+          plazoAlquiler: _p,
+          operacion: _op,
+          fechaVenta: _f,
+          ...withoutCustom
+        } = updates as any;
         const retry1 = await supabase.from('properties').update(withoutCustom).eq('id', id);
         if (retry1.error) {
           const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, ...coreUpdates } = withoutCustom;

@@ -17,8 +17,11 @@ import { normalize } from '../../lib/searchEngine';
 import {
   MARGARITA_LOCATIONS,
   PROPERTY_TYPES,
+  RENTAL_TERMS,
   generateNextCodigo,
   type PropertyType,
+  type OperationType,
+  type RentalTerm,
 } from '../../context/DataContext';
 import BrandLogo from '../../components/BrandLogo';
 import { fmt, formatPrice } from '../../lib/currency';
@@ -263,6 +266,8 @@ export default function RegistroPropiedad() {
 
   const [formData, setFormData] = useState({
     // Inmueble
+    operacion: 'Venta' as OperationType,
+    plazoAlquiler: '1 año' as RentalTerm,
     codigo: '',
     titulo: '',
     precio: '',
@@ -283,6 +288,7 @@ export default function RegistroPropiedad() {
     metodosPagoTags: [] as string[],
     metodosPagoExtra: '',
   });
+  const [isRentalTermAlertOpen, setIsRentalTermAlertOpen] = useState(false);
 
   // Directorio unificado de propietarios a partir de properties y crmLogs
   const registeredOwners = useMemo<RegisteredOwner[]>(() => {
@@ -668,6 +674,9 @@ export default function RegistroPropiedad() {
         captador: user?.nombre ?? 'Asesor',
         amenities: formData.amenities,
         propertyType: selectedType,
+        operacion: formData.operacion,
+        plazoAlquiler: formData.operacion === 'Alquiler' && formData.status === 'Alquilada' ? formData.plazoAlquiler : undefined,
+        alquiladoPor: formData.operacion === 'Alquiler' && formData.status === 'Alquilada' ? (user?.nombre ?? 'Asesor') : undefined,
         propietarioNombre: formData.propietarioNombre.trim(),
         propietarioTelefono: formData.propietarioTelefono.trim(),
         formasNegociacion: formasNegociacionFinal,
@@ -680,7 +689,7 @@ export default function RegistroPropiedad() {
           cliente: formData.propietarioNombre.trim(),
           asesor: user?.nombre ?? 'Asesor',
           tipo_interaccion: 'Captación de Inmueble',
-          notas: `Captación de Inmueble: ${formData.titulo.trim()} (${selectedType}) en ${formData.ubicacion.trim()}`,
+          notas: `Captación de Inmueble (${formData.operacion === 'Alquiler' ? 'Alquiler Fijo' : 'Venta'}): ${formData.titulo.trim()} (${selectedType}) en ${formData.ubicacion.trim()}`,
         });
       } catch (crmErr) {
         console.warn('Aviso: no se pudo sincronizar de inmediato el log de CRM:', crmErr);
@@ -867,8 +876,54 @@ export default function RegistroPropiedad() {
                     <Home size={18} /> 1. Datos del Inmueble
                   </h2>
                   <p className="text-xs text-gray-400">
-                    Tipo actual: <span className="font-bold text-gray-700">{selectedType}</span>
+                    Tipo actual: <span className="font-bold text-gray-700">{selectedType}</span> · Modalidad: <span className="font-bold text-vinotinto">{formData.operacion === 'Alquiler' ? 'Alquiler Fijo' : 'Venta'}</span>
                   </p>
+                </div>
+
+                {/* SELECTOR DE MODALIDAD: VENTA vs ALQUILER FIJO */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Modalidad de Operación *
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5 bg-gray-100/90 p-1.5 rounded-2xl border border-gray-200/80">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData(prev => ({
+                          ...prev,
+                          operacion: 'Venta',
+                          status: prev.status === 'Alquilada' ? 'Activa' : prev.status,
+                        }))
+                      }
+                      className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                        formData.operacion === 'Venta'
+                          ? 'bg-gradient-to-r from-vinotinto to-vinotinto-light text-white shadow-md shadow-vinotinto/20'
+                          : 'bg-white/60 text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <CircleDollarSign size={15} />
+                      <span>En Venta</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData(prev => ({
+                          ...prev,
+                          operacion: 'Alquiler',
+                          status: prev.status === 'Vendida' || prev.status === 'Reservada' ? 'Activa' : prev.status,
+                        }))
+                      }
+                      className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                        formData.operacion === 'Alquiler'
+                          ? 'bg-gradient-to-r from-purple-700 to-indigo-700 text-white shadow-md shadow-purple-700/20'
+                          : 'bg-white/60 text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <Home size={15} />
+                      <span>Alquiler Fijo</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Código y Título */}
@@ -952,7 +1007,7 @@ export default function RegistroPropiedad() {
                 {/* Precio */}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    {config.priceLabel} *
+                    {formData.operacion === 'Alquiler' ? 'Canon de Alquiler Mensual (USD)' : config.priceLabel} *
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">$</span>
@@ -965,10 +1020,12 @@ export default function RegistroPropiedad() {
                         const raw = e.target.value.replace(/\D/g, '');
                         setFormData(prev => ({ ...prev, precio: raw }));
                       }}
-                      className="w-full pl-7 pr-14 p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-semibold"
-                      placeholder={config.pricePlaceholder}
+                      className="w-full pl-7 pr-20 p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-semibold"
+                      placeholder={formData.operacion === 'Alquiler' ? 'Ej: 450' : config.pricePlaceholder}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">USD</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
+                      {formData.operacion === 'Alquiler' ? 'USD/mes' : 'USD'}
+                    </span>
                   </div>
                 </div>
 
@@ -1022,13 +1079,41 @@ export default function RegistroPropiedad() {
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Estado de Publicación *</label>
                   <select
-                    name="status" value={formData.status} onChange={handleInputChange}
+                    name="status"
+                    value={formData.status}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === 'Alquilada') {
+                        setIsRentalTermAlertOpen(true);
+                      } else {
+                        setFormData(prev => ({ ...prev, status: val }));
+                      }
+                    }}
                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none bg-white text-sm font-medium"
                   >
-                    <option value="Activa">✅ Activa</option>
-                    <option value="Suspendida">⏸ Suspendida</option>
-                    <option value="Vendida">✔️ Vendida</option>
+                    <option value="Activa">✅ Activa (Disponible)</option>
+                    {formData.operacion === 'Alquiler' ? (
+                      <option value="Alquilada">🔑 Alquilado{formData.status === 'Alquilada' ? ` (${formData.plazoAlquiler})` : ''}</option>
+                    ) : (
+                      <>
+                        <option value="Reservada">🔖 Reservada</option>
+                        <option value="Suspendida">⏸ Suspendida</option>
+                        <option value="Vendida">✔️ Vendida</option>
+                      </>
+                    )}
                   </select>
+                  {formData.operacion === 'Alquiler' && formData.status === 'Alquilada' && (
+                    <div className="mt-2 flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-3 py-2 text-xs text-purple-900">
+                      <span>Plazo de contrato seleccionado: <strong>{formData.plazoAlquiler}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => setIsRentalTermAlertOpen(true)}
+                        className="text-purple-700 font-bold underline cursor-pointer"
+                      >
+                        Cambiar plazo
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1613,14 +1698,21 @@ export default function RegistroPropiedad() {
                   <p className="text-xs text-gray-400">Verifica que todos los datos sean correctos antes de guardar.</p>
                 </div>
 
-                {/* Badge tipo */}
-                <div className="flex items-center justify-between p-3 bg-vinotinto/5 border border-vinotinto/15 rounded-xl">
+                {/* Badge tipo y modalidad */}
+                <div className="flex items-center justify-between p-3 bg-vinotinto/5 border border-vinotinto/15 rounded-xl flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-vinotinto">{TYPE_ICONS[selectedType]}</span>
                     <span className="text-sm font-bold text-vinotinto">{selectedType}</span>
+                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                      formData.operacion === 'Alquiler'
+                        ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                        : 'bg-vinotinto/10 text-vinotinto border border-vinotinto/20'
+                    }`}>
+                      {formData.operacion === 'Alquiler' ? 'Alquiler Fijo' : 'En Venta'}
+                    </span>
                   </div>
-                  <span className="text-xs font-semibold px-2 py-0.5 bg-green-100 text-green-800 rounded-full">
-                    {formData.status}
+                  <span className="text-xs font-semibold px-2.5 py-0.5 bg-green-100 text-green-800 rounded-full">
+                    {formData.status === 'Alquilada' ? `Alquilado (${formData.plazoAlquiler})` : formData.status}
                   </span>
                 </div>
 
@@ -1636,9 +1728,9 @@ export default function RegistroPropiedad() {
                     <span className="font-semibold text-gray-800 text-right max-w-[60%]">{formData.ubicacion}</span>
                   </div>
                   <div className="flex justify-between text-xs py-1 border-b border-gray-200/50">
-                    <span className="text-gray-500">Precio:</span>
+                    <span className="text-gray-500">{formData.operacion === 'Alquiler' ? 'Canon Mensual:' : 'Precio:'}</span>
                     <span className="font-black text-vinotinto text-sm">
-                      {formatPrice(formData.precio, { suffix: ' USD' })}
+                      {formatPrice(formData.precio, { suffix: formData.operacion === 'Alquiler' ? ' USD/mes' : ' USD' })}
                     </span>
                   </div>
                   <div className="flex justify-between text-xs py-1">
@@ -1761,6 +1853,67 @@ export default function RegistroPropiedad() {
       </div>
 
       </div>{/* /px-4 wrapper */}
+
+      {/* ALERTA / MODAL PARA SELECCIONAR PLAZO DE ALQUILER (3 MESES, 6 MESES O 1 AÑO) */}
+      <AnimatePresence>
+        {isRentalTermAlertOpen && (
+          <div className="modal-overlay fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-100 space-y-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200">
+                    Contrato de Alquiler Fijo
+                  </span>
+                  <h3 className="text-lg font-extrabold text-gray-900 mt-1">
+                    ¿Por qué plazo se alquiló la propiedad?
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Selecciona la duración acordada del alquiler para actualizar el estado.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsRentalTermAlertOpen(false)}
+                  className="p-1.5 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2.5">
+                {RENTAL_TERMS.map(term => (
+                  <button
+                    key={term}
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        status: 'Alquilada',
+                        plazoAlquiler: term,
+                      }));
+                      setIsRentalTermAlertOpen(false);
+                      showToast(`Propiedad marcada como Alquilado por ${term}.`);
+                    }}
+                    className={`w-full py-3.5 px-4 rounded-2xl border text-sm font-extrabold flex items-center justify-between transition cursor-pointer ${
+                      formData.plazoAlquiler === term && formData.status === 'Alquilada'
+                        ? 'bg-purple-700 text-white border-purple-700 shadow-md shadow-purple-700/20'
+                        : 'bg-purple-50/60 hover:bg-purple-100/80 text-purple-900 border-purple-200'
+                    }`}
+                  >
+                    <span>🔑 Plazo de {term}</span>
+                    <ArrowRight size={16} />
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

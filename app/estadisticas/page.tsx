@@ -1231,6 +1231,7 @@ export default function Estadisticas() {
 
   // 1. Estado del inventario según el alcance
   const activos     = propiedadesBase.filter(p => p.status === 'Activa').length;
+  const alquilados  = propiedadesBase.filter(p => p.status === 'Alquilada').length;
   const reservados  = propiedadesBase.filter(p => p.status === 'Reservada').length;
   const vendidos    = propiedadesBase.filter(p => p.status === 'Vendida').length;
   const suspendidos = propiedadesBase.filter(p => p.status === 'Suspendida').length;
@@ -1265,6 +1266,7 @@ export default function Estadisticas() {
 
   const STATUS_DATA = [
     { name: 'Activos',     value: activos,      color: '#800020' },
+    ...(alquilados > 0 ? [{ name: 'Alquilados', value: alquilados, color: '#7E22CE' }] : []),
     ...(reservados > 0 ? [{ name: 'Reservados', value: reservados, color: '#2563EB' }] : []),
     { name: 'Vendidos',    value: vendidos,     color: '#D4AF37' },
     { name: 'Suspendidos', value: suspendidos,  color: '#9CA3AF' },
@@ -2057,14 +2059,16 @@ export default function Estadisticas() {
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
                           p.status === 'Activa'
                             ? 'bg-emerald-100 text-emerald-800'
+                            : p.status === 'Alquilada'
+                            ? 'bg-purple-100 text-purple-800'
                             : p.status === 'Vendida'
                             ? 'bg-amber-100 text-amber-800'
                             : 'bg-gray-200 text-gray-700'
                         }`}>
-                          {p.status || 'Activa'}
+                          {p.status === 'Alquilada' ? `Alquilado (${p.plazoAlquiler || '1 año'})` : (p.status || 'Activa')}
                         </span>
                         <span className="text-[10px] text-gray-400 font-semibold truncate">
-                          {p.propertyType || 'Inmueble'}
+                          {p.propertyType || 'Inmueble'}{p.operacion === 'Alquiler' ? ' · Alquiler Fijo' : ''}
                         </span>
                       </div>
                       <h4 className="text-xs font-bold text-gray-900 group-hover:text-vinotinto truncate transition">
