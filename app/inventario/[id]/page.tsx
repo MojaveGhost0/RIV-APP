@@ -300,7 +300,6 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
             : editFormData.operacion === 'Venta' && property.status === 'Alquilada'
             ? 'Activa'
             : property.status,
-        codigo: editFormData.codigo.trim() || undefined,
         title: newTitle,
         price: Number(editFormData.price.replace(/\D/g, '')) || property.price,
         location: editFormData.location.trim(),
@@ -1030,14 +1029,16 @@ export default function InmuebleDetalle({ params }: { params: { id: string } }) 
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="sm:col-span-1">
-                    <label className="block font-bold text-gray-700 mb-1">Código Único</label>
-                    <input
-                      type="text"
-                      placeholder="Ej: RIV-001"
-                      value={editFormData.codigo}
-                      onChange={e => setEditFormData({ ...editFormData, codigo: e.target.value.toUpperCase() })}
-                      className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-bold text-vinotinto"
-                    />
+                    <label className="block font-bold text-gray-700 mb-1">Código Único (Fijo)</label>
+                    <div
+                      className="w-full p-2.5 bg-vinotinto/5 border border-vinotinto/25 rounded-xl text-sm font-black text-vinotinto flex items-center justify-between select-none cursor-not-allowed"
+                      title="El código único del inmueble no puede ser modificado"
+                    >
+                      <span>{property.codigo || 'N/A'}</span>
+                      <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-vinotinto text-white">
+                        Fijo
+                      </span>
+                    </div>
                   </div>
                   <div className="sm:col-span-2">
                     <label className="block font-bold text-gray-700 mb-1">Título del Inmueble *</label>

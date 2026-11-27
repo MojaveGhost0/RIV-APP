@@ -229,14 +229,18 @@ interface DataContextType {
 const localToday = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
 
 // =============================================================================
-// =============================================================================
-// HELPER — Generador de código correlativo único (ej: RIV-001)
+// HELPER — Generador de código correlativo único e inmutable (ej: RIV-001)
+// Garantiza que cada propiedad reciba automáticamente el siguiente código
+// correlativo disponible sin colisiones ni modificaciones manuales.
 // =============================================================================
 export function generateNextCodigo(existingProperties: Property[]): string {
+  const usedCodes = new Set<string>();
   let maxNum = 0;
   for (const p of existingProperties) {
     if (p.codigo) {
-      const match = p.codigo.match(/RIV-(\d+)/i);
+      const upper = p.codigo.trim().toUpperCase();
+      usedCodes.add(upper);
+      const match = upper.match(/RIV-(\d+)/i);
       if (match) {
         const num = parseInt(match[1], 10);
         if (!isNaN(num) && num > maxNum) {
@@ -245,8 +249,13 @@ export function generateNextCodigo(existingProperties: Property[]): string {
       }
     }
   }
-  const nextNum = maxNum > 0 ? maxNum + 1 : existingProperties.length + 1;
-  return `RIV-${String(nextNum).padStart(3, '0')}`;
+  let candidateNum = maxNum > 0 ? maxNum + 1 : existingProperties.length + 1;
+  let candidateCode = `RIV-${String(candidateNum).padStart(3, '0')}`;
+  while (usedCodes.has(candidateCode)) {
+    candidateNum += 1;
+    candidateCode = `RIV-${String(candidateNum).padStart(3, '0')}`;
+  }
+  return candidateCode;
 }
 
 // =============================================================================
@@ -484,11 +493,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     fetchData();
   }, []);
 
-  // Add Property con soporte para codigo único, campos de propietario y fallback preventivo
+  // Add Property con código único estricto autogenerado, campos de propietario y fallback preventivo
   const addProperty = useCallback(async (newProp: Omit<Property, 'id' | 'createdAt' | 'created_at'>): Promise<string> => {
     let dataId: string;
     let dataCreatedAt: string | undefined;
-    const finalCodigo = newProp.codigo?.trim() || generateNextCodigo(properties);
+    // Validación estricta: el código siempre es autogenerado por el sistema y único
+    const finalCodigo = generateNextCodigo(properties);
     const propPayload = { ...newProp, codigo: finalCodigo };
 
     try {
@@ -672,37 +682,37 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Update Property completo con Rollback
+  // Update Property completo con Rollback (el código único del inmueble es inmutable)
   const updateProperty = useCallback(async (id: string, updates: Partial<Omit<Property, 'id' | 'createdAt' | 'created_at'>>) => {
     let previousState: Property[] = [];
+    const { codigo: _immutableCodigo, ...safeUpdates } = updates as any;
     if (
-      updates.vendidoPor !== undefined ||
-      updates.reservadoPor !== undefined ||
-      updates.alquiladoPor !== undefined ||
-      updates.plazoAlquiler !== undefined ||
-      updates.operacion !== undefined ||
-      updates.fechaVenta !== undefined
+      safeUpdates.vendidoPor !== undefined ||
+      safeUpdates.reservadoPor !== undefined ||
+      safeUpdates.alquiladoPor !== undefined ||
+      safeUpdates.plazoAlquiler !== undefined ||
+      safeUpdates.operacion !== undefined ||
+      safeUpdates.fechaVenta !== undefined
     ) {
       saveTxMetaForProperty(id, {
-        operacion: updates.operacion,
-        plazoAlquiler: updates.plazoAlquiler,
-        alquiladoPor: updates.alquiladoPor,
-        vendidoPor: updates.vendidoPor,
-        reservadoPor: updates.reservadoPor,
-        fechaVenta: updates.fechaVenta,
+        operacion: safeUpdates.operacion,
+        plazoAlquiler: safeUpdates.plazoAlquiler,
+        alquiladoPor: safeUpdates.alquiladoPor,
+        vendidoPor: safeUpdates.vendidoPor,
+        reservadoPor: safeUpdates.reservadoPor,
+        fechaVenta: safeUpdates.fechaVenta,
       });
     }
     setProperties(prev => {
       previousState = prev;
-      return prev.map(p => p.id === id ? { ...p, ...updates } : p);
+      return prev.map(p => p.id === id ? { ...p, ...safeUpdates, codigo: p.codigo } : p);
     });
 
     try {
-      const { error } = await supabase.from('properties').update(updates).eq('id', id);
+      const { error } = await supabase.from('properties').update(safeUpdates).eq('id', id);
       if (error) {
         // Fallback defensivo si alguna columna aún no existe en Supabase (ej. schema cache o 42703)
         const {
-          codigo: _,
           vendidoPor: _v,
           reservadoPor: _r,
           alquiladoPor: _a,
@@ -710,7 +720,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           operacion: _op,
           fechaVenta: _f,
           ...withoutCustom
-        } = updates as any;
+        } = safeUpdates as any;
         const retry1 = await supabase.from('properties').update(withoutCustom).eq('id', id);
         if (retry1.error) {
           const { propietarioNombre, propietarioTelefono, formasNegociacion, metodosPago, ...coreUpdates } = withoutCustom;

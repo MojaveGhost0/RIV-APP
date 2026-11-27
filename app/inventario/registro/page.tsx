@@ -658,9 +658,9 @@ export default function RegistroPropiedad() {
         formData.metodosPagoExtra.trim(),
       ].filter(Boolean).join('. ');
 
-      // Guardar propiedad en inventario
+      // Guardar propiedad en inventario (el código único se asigna automáticamente sin modificaciones)
       const newId = await addProperty({
-        codigo: formData.codigo.trim() || suggestedCodigo,
+        codigo: suggestedCodigo,
         title: formData.titulo.trim(),
         price: Number(formData.precio.replace(/\D/g, '')),
         location: formData.ubicacion.trim(),
@@ -926,21 +926,22 @@ export default function RegistroPropiedad() {
                   </div>
                 </div>
 
-                {/* Código y Título */}
+                {/* Código Automático Bloqueado y Título */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div className="sm:col-span-1">
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Código Único
+                      Código Único (Automático)
                     </label>
-                    <input
-                      type="text"
-                      name="codigo"
-                      value={formData.codigo}
-                      onChange={e => setFormData(prev => ({ ...prev, codigo: e.target.value.toUpperCase() }))}
-                      placeholder={suggestedCodigo}
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-vinotinto/40 focus:border-vinotinto outline-none text-sm font-bold text-vinotinto"
-                    />
-                    <p className="text-[10px] text-gray-400 mt-1">Sugerido: <span className="font-semibold text-gray-600">{suggestedCodigo}</span></p>
+                    <div
+                      className="w-full p-3 bg-vinotinto/5 border border-vinotinto/25 rounded-xl text-sm font-black text-vinotinto flex items-center justify-between select-none cursor-not-allowed"
+                      title="El código del inmueble es único y asignado automáticamente por el sistema"
+                    >
+                      <span>{suggestedCodigo}</span>
+                      <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-vinotinto text-white">
+                        Fijo
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">Asignado por el sistema (no editable)</p>
                   </div>
                   <div className="sm:col-span-3">
                     <label className="block text-xs font-bold text-gray-700 mb-1">
@@ -1719,6 +1720,10 @@ export default function RegistroPropiedad() {
                 {/* Resumen Inmueble */}
                 <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 space-y-2">
                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Inmueble</p>
+                  <div className="flex justify-between text-xs py-1 border-b border-gray-200/50">
+                    <span className="text-gray-500">Código Único Asignado:</span>
+                    <span className="font-black text-vinotinto bg-vinotinto/10 px-2 py-0.5 rounded-md border border-vinotinto/20">{suggestedCodigo}</span>
+                  </div>
                   <div className="flex justify-between text-xs py-1 border-b border-gray-200/50">
                     <span className="text-gray-500">Título:</span>
                     <span className="font-bold text-gray-800 text-right max-w-[60%]">{formData.titulo}</span>
